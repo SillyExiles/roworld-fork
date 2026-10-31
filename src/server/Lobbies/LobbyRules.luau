@@ -436,6 +436,72 @@ function LobbyRules.missing_starts(
 	return out
 end
 
+-- ---------------------------------------------------------------------------------------------
+-- Spreading players over the open lobbies (Empires Front, 2026-10-31)
+-- ---------------------------------------------------------------------------------------------
+-- Every hub lists the same lobbies, but each player sees them in their own order: the card of a kind
+-- shows the first one, and their JOIN tries that one first. A lobby is put first for a share of the
+-- players about as large as its free seats (a nearly full one for a few, an empty one for many), and
+-- the ones starting soon get SPREAD_SOON_BOOST more, so the next match fills and starts while the
+-- crowd spreads over the others instead of everyone racing for the same seats.
+LobbyRules.SPREAD_SOON_S = 30
+LobbyRules.SPREAD_SOON_BOOST = 2.0
+
+--- A stable number in [0, 1) for the string `s` (32-bit FNV-1a).
+function LobbyRules.hash01(s: string): number
+	local h = 2166136261
+	for i = 1, #s do
+		h = bit32.bxor(h, string.byte(s, i))
+		-- h * 16777619 (2^24 + 403) mod 2^32, exact in doubles
+		h = (bit32.lshift(h, 24) + h * 403) % 4294967296
+	end
+	-- (a final avalanche, murmur3's fmix32: strings differing only at the end must land far apart)
+	local function mul32(a: number, b: number): number
+		return ((a % 65536) * b + (((a // 65536) * b) % 65536) * 65536) % 4294967296
+	end
+	h = bit32.bxor(h, bit32.rshift(h, 16))
+	h = mul32(h, 0x85EBCA6B)
+	h = bit32.bxor(h, bit32.rshift(h, 13))
+	h = mul32(h, 0xC2B2AE35)
+	h = bit32.bxor(h, bit32.rshift(h, 16))
+	return h / 4294967296
+end
+
+--- How strongly lobby `l` is shown first (0: full or closed).
+function LobbyRules.spread_weight(l: Lobby, now: number): number
+	local free = math.max(l.max - l.players, 0)
+	if free <= 0 or not LobbyRules.joinable(l, now) then
+		return 0
+	end
+	local w = free
+	if l.starts - now <= LobbyRules.SPREAD_SOON_S then
+		w *= 1 + LobbyRules.SPREAD_SOON_BOOST
+	end
+	return w
+end
+
+--- `list` in the order player `uid` sees it: a weighted shuffle (key = u ^ (1 / weight), u the
+--- player's own stable number for that lobby), lobbies with no room last in their own order.
+function LobbyRules.spread(list: { Lobby }, uid: string, now: number): { Lobby }
+	local keyed = {}
+	for i, l in list do
+		local w = LobbyRules.spread_weight(l, now)
+		local u = math.max(LobbyRules.hash01(uid .. ":" .. l.id), 1e-9)
+		keyed[i] = { l = l, k = if w > 0 then u ^ (1 / w) else -1, i = i }
+	end
+	table.sort(keyed, function(a, b)
+		if a.k ~= b.k then
+			return a.k > b.k
+		end
+		return a.i < b.i
+	end)
+	local out = table.create(#keyed)
+	for i, e in keyed do
+		out[i] = e.l
+	end
+	return out
+end
+
 --- The map id a public match on `map` plays ("world@80").
 function LobbyRules.match_map_id(map: string): string
 	return if LobbyRules.MAP_SCALE_PCT < 100 then map .. "@" .. LobbyRules.MAP_SCALE_PCT else map

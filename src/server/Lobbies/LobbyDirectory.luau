@@ -127,6 +127,37 @@ function LobbyDirectory.view(self: any): { any }
 	return out
 end
 
+--- view() as player `uid` sees it (Empires Front): the joinable lobbies in their own order
+--- (LobbyRules.spread: each kind's card shows that player's first), then the running matches.
+function LobbyDirectory.view_for(self: any, uid: string): { any }
+	local now = self.deps.now()
+	local open = {}
+	local live = {}
+	for _, l in self._lobbies do
+		if l.status == "open" and l.starts > now then
+			if LobbyRules.joinable(l, now) then
+				table.insert(open, l)
+			end
+		elseif LobbyRules.watchable(l, now) then
+			table.insert(live, l)
+		end
+	end
+	local out = {}
+	for _, l in LobbyRules.spread(open, uid, now) do
+		table.insert(out, LobbyRules.public_view(l, now))
+	end
+	table.sort(live, function(a, b)
+		if a.players ~= b.players then
+			return a.players > b.players
+		end
+		return a.starts > b.starts
+	end)
+	for i = 1, math.min(#live, LobbyRules.MAX_LIVE_LISTED) do
+		table.insert(out, LobbyRules.public_view(live[i], now))
+	end
+	return out
+end
+
 --- Teleport `player` to a running match as a spectator (no slot is taken).
 function LobbyDirectory.spectate(self: any, player: any, id: string): (boolean, string?)
 	local deps = self.deps
@@ -489,7 +520,8 @@ function LobbyDirectory.join_public(self: any, players: { any }, mode: string, o
 	end
 	local now = deps.now()
 	local spec = LobbyRules.take_spec(mode, n, uids, now, o.id)
-	local open = self:_open_of(mode, now)
+	-- (Empires Front: tried in the order the joining player sees them, LobbyRules.spread)
+	local open = LobbyRules.spread(self:_open_of(mode, now), uids[1] or "", now)
 	local ids = {}
 	for _, l in open do
 		table.insert(ids, l.id)

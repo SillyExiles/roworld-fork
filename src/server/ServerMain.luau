@@ -753,7 +753,7 @@ function ServerMain.start()
 			end
 			send(player, OP.LOBBY, server:lobby_info(player))
 			if directory ~= nil then
-				send(player, OP.LOBBIES, directory:view(), public_kinds)
+				send(player, OP.LOBBIES, directory:view_for(directory:_uid(player)), public_kinds)
 			end
 			-- the stored settings (size-capped) go out once, not on every HELLO
 			SettingsStore.replay(player, function(data: any)
@@ -1550,9 +1550,9 @@ function ServerMain.start()
 			lobby_push += dt
 			if lobby_push >= ServerMain.LOBBIES_PUSH_S then
 				lobby_push = 0.0
-				local view = directory:view()
+				-- (Empires Front: each player sees the open lobbies in their own order, LobbyRules.spread)
 				for _, p in listening_list do
-					send(p, OP.LOBBIES, view, public_kinds)
+					send(p, OP.LOBBIES, directory:view_for(directory:_uid(p)), public_kinds)
 				end
 			end
 			if studio_lobby ~= nil and server:participant_count() == 0 and server:stage() == "idle" then
