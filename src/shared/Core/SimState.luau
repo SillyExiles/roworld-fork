@@ -308,6 +308,7 @@ function SimState.install(C: any)
 		self.geo_manhattan = world.geo_manhattan
 		self.geo_span = world.geo_span
 		self.gc_dist = world.gc_dist
+		require("./Era").set_for_map(world)
 		self.R = Rules.for_map(world)
 		local N = world.N
 		if self.rng == nil then

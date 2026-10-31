@@ -160,6 +160,15 @@ function CommandBar._build_sections(self)
 	self._gold = CountLabel.new(20, 700, T.GOLD, T.fmt_num)
 	gv:add_child(self._gold)
 	self._gold_box:add_child(gv)
+	-- Empires Front: food and ore under the gold (SimEconomy)
+	local rrow = T.hbox(4)
+	rrow:add_child(T.icon_rect("food", 11.0, T.GREEN))
+	self._food = T.label("0", 11, 700, T.TEXT)
+	rrow:add_child(self._food)
+	rrow:add_child(T.icon_rect("ore", 11.0, T.TEXT_3))
+	self._ore = T.label("0", 11, 700, T.TEXT)
+	rrow:add_child(self._ore)
+	self._gold_box:add_child(rrow)
 	self._gold_box:set_min_size(Vector2.new(118, 0))
 
 	-- Attack ratio
@@ -290,6 +299,15 @@ function CommandBar._build_sections(self)
 	self._arsenal_wrap:add_theme_constant_override("margin_left", 6)
 	self._arsenal_wrap:add_child(shop)
 	self._builds:add_child(self._arsenal_wrap)
+	-- Empires Front: no Arsenal store; its kinds are open to all (the SHOP slot stays hidden)
+	do
+		local wrap: any = self._arsenal_wrap
+		local base_set = wrap.set_visible
+		wrap.set_visible = function(node: any, _on: boolean)
+			base_set(node, false)
+		end
+		wrap:set_visible(false)
+	end
 
 	-- Phone tray + toggle, and the touch placement chip.
 	self.tray = GlassPanel.new(10.0, 8.0, T.R_LG, true, 18)
@@ -773,6 +791,13 @@ function CommandBar.refresh(self, animate: boolean?)
 	self._m_troops_bar.fill_color = bar_col
 	self._m_troops_bar:set_target(o.troops / math.max(o.max_troops, 1.0), not anim)
 	self._income:set_text(T.fmt_rate(o.income))
+	do
+		local food, fr = tonumber(o.food) or 0, tonumber(o.food_rate) or 0
+		local ore, orr = tonumber(o.ore) or 0, tonumber(o.ore_rate) or 0
+		self._food:set_text(string.format("%s %s%d", T.fmt_num(food), if fr >= 0 then "+" else "", math.floor(fr + 0.5)))
+		T.set_font_color(self._food, if food <= 0 and fr <= 0 then T.RED elseif fr < 0 then T.ORANGE else T.TEXT)
+		self._ore:set_text(string.format("%s +%d", T.fmt_num(ore), math.floor(orr + 0.5)))
+	end
 	T.set_font_color(self._income, if o.income > 0 then T.GREEN else T.TEXT_3)
 	-- Growth: the troop-rate label — "+{troops gained per second}/s" (NumberFormat clamps
 	-- at 0, so a nation above its cap after losing land reads +0/s), green while the rate is not

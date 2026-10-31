@@ -45,7 +45,10 @@ Ev.REINFORCE = 33 -- id, troops, ready_tick  (Reinforcements arrived; the next c
 Ev.BONUS = 34 -- owner, tile, gold  (gold `owner` earned at `tile`, a train's
 --   stop at a station. Only for a person, and sent to that person alone)
 
+-- Empires Front
+Ev.PACT = 35 -- a, b, kind (1 trade, 2 defence), state (0 proposed by a to b, 1 signed, 2 ended, 3 withdrawn)
+
 --- Number of event ids (ids are 0..COUNT-1).
-Ev.COUNT = 35
+Ev.COUNT = 36
 
 return Ev

@@ -16,12 +16,10 @@ local MapPicker = W.class(W.Control)
 
 --- Tabs: { label, predicate on the categories set }.
 MapPicker.TABS = {
-	{ "Featured", { featured = true } },
-	{ "World", { world = true, continental = true } },
-	{ "Europe", { europe = true } },
-	{ "Asia", { asia = true } },
-	{ "Americas", { north_america = true, south_america = true } },
-	{ "Africa · Oceania", { africa = true, oceania = true, antarctica = true } },
+	{ "Empires", { featured = true } },
+	{ "Antiquity", { antiquity = true } },
+	{ "Gunpowder · Sail", { gunpowder = true, age_of_sail = true } },
+	{ "Industrial", { industrial = true } },
 	{ "All", nil },
 }
 MapPicker.CARD = Vector2.new(168, 132)

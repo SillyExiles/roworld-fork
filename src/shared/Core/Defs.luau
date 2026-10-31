@@ -50,8 +50,28 @@ Defs.S_SILO = 5
 Defs.S_ARTILLERY = 6
 Defs.S_AIRFIELD = 7
 Defs.S_RAILGUN = 8
-Defs.STRUCT_KIND_COUNT = 9
-Defs.STRUCT_NAMES = { [0] = "city", "port", "factory", "defense", "sam", "silo", "artillery", "airfield", "railgun" }
+-- Empires Front: the Forge (arms and armour for every troop; tiers in Data/Eras)
+Defs.S_FORGE = 9
+-- Empires Front's economy (Core/SimEconomy): farms feed the troops, mines dig ore, markets sell both
+Defs.S_FARM = 10
+Defs.S_MINE = 11
+Defs.S_MARKET = 12
+Defs.STRUCT_KIND_COUNT = 13
+Defs.STRUCT_NAMES = {
+	[0] = "city",
+	"port",
+	"factory",
+	"defense",
+	"sam",
+	"silo",
+	"artillery",
+	"airfield",
+	"railgun",
+	"forge",
+	"farm",
+	"mine",
+	"market",
+}
 Defs.STRUCT_TITLES = {
 	[0] = "City",
 	"Port",
@@ -62,6 +82,10 @@ Defs.STRUCT_TITLES = {
 	"Artillery",
 	"Airfield",
 	"Railgun",
+	"Forge",
+	"Farm",
+	"Mine",
+	"Market",
 }
 
 -- Unit kinds
@@ -110,7 +134,7 @@ Defs.UNLOCK = {
 }
 Defs.UNLOCK_ALL = 127
 --- The unlock a structure kind (Defs.S_*) / a munition (Defs.N_*) needs: 0 = none.
-Defs.STRUCT_UNLOCK = { [0] = 0, 0, 0, 0, 0, 0, 8, 16, 32 }
+Defs.STRUCT_UNLOCK = { [0] = 0, 0, 0, 0, 0, 0, 8, 16, 32, 0, 0, 0, 0 }
 Defs.NUKE_UNLOCK = { [0] = 0, 0, 0, 0, 1, 2, 8, 16, 32 }
 
 -- Tile flags (GameState.flags / delta "flags")
@@ -134,6 +158,8 @@ Defs.OVER_DOMINATION = 0
 Defs.OVER_TIME = 1
 Defs.OVER_DEFEATED = 2
 Defs.OVER_ABANDONED = 3
+-- Empires Front: the empire's historical objective (Data/Eras objective) was held long enough
+Defs.OVER_OBJECTIVE = 4
 
 -- Map atlas cells (assets/icons/map_atlas.png, 8 x 2 cells of 128 px) as {x, y} (Vector2i in GDScript).
 Defs.ATLAS_CITY = { x = 0, y = 0 }

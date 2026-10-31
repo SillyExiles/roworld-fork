@@ -1088,6 +1088,22 @@ function UIInteract.on_radial(self: any, id: string, tile: number)
 		self.target_card:confirm_betray()
 	elseif id == "donate" then
 		self:donate_to(own, pos)
+	elseif string.sub(id, 1, 5) == "pact:" then
+		ctx:send({ type = "pact", target = own, kind = string.sub(id, 6) })
+		self:_float("Pact proposed to " .. s:owner_name(own), "pact", T().VIOLET, pos)
+	elseif string.sub(id, 1, 12) == "pact_accept:" then
+		ctx:send({ type = "pact_reply", target = own, kind = string.sub(id, 13), accept = true })
+		self:_float("Pact signed", "pact", T().VIOLET, pos)
+	elseif string.sub(id, 1, 5) == "send:" then
+		-- a quarter of the stock at a time
+		local what = string.sub(id, 6)
+		local mo = s:get_owner(ctx:me())
+		local have = if mo ~= nil then tonumber(mo[what]) or 0 else 0
+		local amount = math.floor(have * 0.25)
+		if amount >= 1 then
+			ctx:send({ type = "send", target = own, kind = what, troops = amount })
+			self:_float(string.format("Sent %d %s", amount, if what == "food" then "Food" else "Ore"), what, T().GREEN, pos)
+		end
 	elseif id == "retreat" then
 		local aid = self:my_attack_on(own)
 		if aid >= 0 then
@@ -1614,6 +1630,11 @@ if UICtx.IS_ROBLOX then
 		[K.KeypadFive] = 5,
 		[K.Six] = 6,
 		[K.KeypadSix] = 6,
+		[K.Minus] = 11,
+		[K.KeypadMinus] = 11,
+		[K.Equals] = 12,
+		[K.LeftBracket] = 13,
+		[K.RightBracket] = 14,
 		[K.Seven] = 7,
 		[K.KeypadSeven] = 7,
 		[K.Eight] = 8,

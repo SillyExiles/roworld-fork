@@ -885,6 +885,10 @@ function GameOver._copy(self, kind: string, winner: number, killer: number, reas
 		if reason == Defs.OVER_TIME then
 			c.kicker = "TIME LIMIT REACHED"
 			c.sub = string.format("Time! You hold the most land with %s.", wshare)
+		elseif reason == Defs.OVER_OBJECTIVE then
+			local era = UICtx.data("Eras").current()
+			c.kicker = if era then string.upper(era.objective.title) else "OBJECTIVE COMPLETE"
+			c.sub = "You held every historic site of the empire. Glory is yours!"
 		else
 			c.sub = string.format(
 				"You conquered the world with %s.",
@@ -898,6 +902,10 @@ function GameOver._copy(self, kind: string, winner: number, killer: number, reas
 			c.kicker = "TIME LIMIT REACHED"
 			c.title = "TIME'S UP"
 			c.sub = string.format("Time! %s holds the most land with %s.", wname, wshare)
+		elseif reason == Defs.OVER_OBJECTIVE then
+			local era = UICtx.data("Eras").current()
+			c.title = "DEFEAT"
+			c.sub = string.format("%s fulfilled %s.", wname, if era then era.objective.title else "the objective")
 		elseif dominated then
 			c.title = "DEFEAT"
 			c.sub = string.format("%s conquered the world (%s).", wname, wdom)
@@ -914,6 +922,9 @@ function GameOver._copy(self, kind: string, winner: number, killer: number, reas
 			c.sub = if dominated
 				then string.format("%s conquered the world (%s).", wname, wdom)
 				else string.format("%s won the war with %s of the land.", wname, wshare)
+		elseif reason == Defs.OVER_OBJECTIVE then
+			local era = UICtx.data("Eras").current()
+			c.sub = string.format("%s fulfilled %s.", wname, if era then era.objective.title else "the objective")
 		elseif reason == Defs.OVER_DEFEATED then
 			c.title = "MATCH OVER"
 			c.sub = string.format("Every commander has fallen. %s leads with %s.", lname, lshare)

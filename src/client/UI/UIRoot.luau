@@ -518,6 +518,9 @@ end
 --- "offer" (one of the result screen's offers).
 --- A solo match stands still while it is open.
 function UIRoot.open_arsenal(self, focus: string?, from: string?)
+	do -- Empires Front: no shop, crates or offers
+		return
+	end
 	if self.arsenal == nil then
 		return
 	end
@@ -531,6 +534,9 @@ end
 --- The flag shop (FlagShop; Data/Shop): the title's shop button. Opening it marks today's shop seen
 --- (the button's NEW sticker goes).
 function UIRoot.open_shop(self)
+	do -- Empires Front: no shop, crates or offers
+		return
+	end
 	local fs = self.flag_shop
 	if fs == nil or fs.is_open then
 		return
@@ -546,6 +552,9 @@ end
 
 --- The starter pack's offer (StarterOffer; Data/Starter). `from`: "auto" | "button".
 function UIRoot.open_starter(self, from: string)
+	do -- Empires Front: no shop, crates or offers
+		return
+	end
 	local st = self.starter
 	local s = self.ctx.session
 	if st == nil or st.is_open or s == nil then
@@ -569,6 +578,9 @@ end
 UIRoot.STARTER_DELAY_S = 1.5
 
 function UIRoot._starter_auto(self)
+	do -- Empires Front: no shop, crates or offers
+		return
+	end
 	local ctx = self.ctx
 	local s = ctx.session
 	if self.starter == nil or self.starter.is_open or self._starter_shown or s == nil then
@@ -618,6 +630,9 @@ end
 
 --- RoWorld General's window (Data/Subscription): the title's General button.
 function UIRoot.open_general(self, from: string)
+	do -- Empires Front: no shop, crates or offers
+		return
+	end
 	if self.general == nil or self.general.is_open then
 		return
 	end
@@ -651,6 +666,9 @@ end
 
 --- The Locker (Main's crate button on the title): crates, skins and flags.
 function UIRoot.open_locker(self)
+	do -- Empires Front: no shop, crates or offers
+		return
+	end
 	if self.locker == nil or self.locker.is_open then
 		return
 	end

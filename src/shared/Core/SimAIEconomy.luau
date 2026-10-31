@@ -84,7 +84,7 @@ SimAIEconomy.PERCEIVED_COST_STEP = zt({ 1.0, 1.0, 1.0, 0.0, f32(0.3), 1.0 }) -- 
 -- existing structure of the chosen kind instead of placing a new one.
 SimAIEconomy.UPGRADE_DENSITY_FULL_TILES = 1500.0
 -- Build order after defense posts; a city when none of these is due or possible.
-SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, S_SAM, S_SILO }
+SimAIEconomy.BUILD_ORDER = { Defs.S_FARM, S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FORGE, S_SAM, S_SILO }
 -- Crowded map: more nations than one per this many full-size land tiles.
 SimAIEconomy.CROWDED_FULL_TILES_PER_NATION = 7500.0
 -- A coastal nation's first structure is a port whatever the map's density.
@@ -275,6 +275,28 @@ function SimAIEconomy.install(C)
 				and silos < Defs.trunc(cities * (if silos == 0 then E.FIRST_SILO_PER_CITY else E.SILO_PER_CITY))
 				and age > NUKE_AGE[d] - 900
 				and self.rank[id] <= E.SILO_TOP_RANK
+		elseif kind == Defs.S_FARM then
+			-- Empires Front: feed the army (SimEconomy): a farm whenever the food would run short
+			if sim.o_kind[id] == Defs.KIND_TRIBE then
+				return false
+			end
+			local prod, use = sim:resource_rates(id)
+			local want = math.max(use, sim.o_troops[id] * 0.0005, sim.o_cap[id] * 0.0005 * 0.95)
+			return prod < want * 1.05 or (sim.o_food[id] < 1500 and sim.o_food_rate[id] < 0)
+		elseif kind == Defs.S_MINE then
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_levels(id, Defs.S_MINE) < math.min(6, 1 + cities // 2)
+				and age > 300
+		elseif kind == Defs.S_MARKET then
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_levels(id, Defs.S_MINE) > 0
+				and sim:struct_levels(id, Defs.S_MARKET) < math.max(1, sim:struct_levels(id, Defs.S_MINE) // 2)
+		elseif kind == Defs.S_FORGE then
+			-- Empires Front: a nation arms its troops as it grows (one Forge level per two cities, 4 at most)
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_levels(id, Defs.S_FORGE) < math.min(4, cities // 2)
+				and (sim.o_ore[id] or 0) >= 60 * (sim:struct_levels(id, Defs.S_FORGE) + 1)
+				and age > 600
 		end
 		return false
 	end
@@ -290,7 +312,7 @@ function SimAIEconomy.install(C)
 		if kind ~= S_DEFENSE and cities >= E.CITIES_BEFORE_SAVING then
 			local save_up = Rules.nuke_cost("mirv", sim.mirvs_launched) + Rules.nuke_cost("hydrogen")
 			if gold < save_up then
-				perceived = cost * (1.0 + PERCEIVED_COST_STEP[kind] * sim:struct_levels(id, kind))
+				perceived = cost * (1.0 + (PERCEIVED_COST_STEP[kind] or 1.0) * sim:struct_levels(id, kind))
 			end
 		end
 		if gold < perceived then

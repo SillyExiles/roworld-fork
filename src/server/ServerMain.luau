@@ -492,7 +492,8 @@ function ServerMain.start()
 		end,
 		-- the Arsenal a player has unlocked (Data/Arsenal), and their Stars for a public match
 		unlocks_of = function(peer: any): number
-			return if typeof(peer) == "Instance" then Purchases.unlock_mask(peer) else 0
+			-- Empires Front: no shop; the whole arsenal is open to every player
+			return core("Defs").UNLOCK_ALL
 		end,
 		on_result = function(peer: any, result: any)
 			if typeof(peer) == "Instance" then

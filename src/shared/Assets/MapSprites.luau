@@ -31,6 +31,7 @@ return {
 		city = "rbxassetid://87231117419360",
 		port = "rbxassetid://95035713905738",
 		factory = "rbxassetid://133968282899567",
+		forge = "rbxassetid://133968282899567",
 		defense = "rbxassetid://105328690138999",
 		sam = "rbxassetid://121184602615632",
 		silo = "rbxassetid://93768208808207",

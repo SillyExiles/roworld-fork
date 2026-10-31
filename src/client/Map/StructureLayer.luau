@@ -27,6 +27,15 @@
 local RS = game:GetService("ReplicatedStorage")
 local Airfront = RS:WaitForChild("Airfront")
 local Rules = require(Airfront:WaitForChild("Core"):WaitForChild("Rules")) :: any
+local Defs = require(Airfront:WaitForChild("Core"):WaitForChild("Defs")) :: any
+local PixelIcons = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PixelIcons")) :: any
+--- Empires Front's structure kinds: the base plate (shape column) each borrows, and its glyph
+local EXTRA_KINDS = {
+	[Defs.S_FORGE] = { plate = 3, glyph = "forge" },
+	[Defs.S_FARM] = { plate = 1, glyph = "farm" },
+	[Defs.S_MINE] = { plate = 0, glyph = "mine" },
+	[Defs.S_MARKET] = { plate = 2, glyph = "market" },
+}
 local Sprites = require(Airfront:WaitForChild("Assets"):WaitForChild("MapSprites")) :: any
 --- Sprites.shapes_one is used once it is known to have loaded (an image still in moderation would leave
 --- every plate invisible).
@@ -51,7 +60,13 @@ StructureLayer.GROW_ZOOM = 7.0
 --- per structure kind (Defs.S_*, 0-based) — index with kind + 1: the plate's size (x ICON_SIZE) and
 --- the share of it the glyph spans (ICON_FILL / SHAPE_SCALE of the plate), set with the art
 StructureLayer.SHAPE_SCALE = table.clone(Sprites.shape_scale)
+for _ = 1, 4 do -- the Forge, Farm, Mine, Market
+	table.insert(StructureLayer.SHAPE_SCALE, 1.1)
+end
 StructureLayer.ICON_FILL = table.clone(Sprites.icon_fill)
+for _ = 1, 4 do
+	table.insert(StructureLayer.ICON_FILL, 0.72)
+end
 StructureLayer.FILL_V = 0.65
 StructureLayer.BORDER_V = 0.1
 StructureLayer.BORDER_DARKEN = 0.125
@@ -329,7 +344,10 @@ function StructureLayer._style(self: any, p: Plate, s: any, building: boolean)
 		return
 	end
 	p.state_key = key
-	local shapes, icons, col = Sprites.shapes, Sprites.icons, k
+	-- (Empires Front's structures: a plate borrowed from the base set, and a runtime pixel-art glyph)
+	local extra = EXTRA_KINDS[k]
+	local shapes, icons, col = Sprites.shapes, Sprites.icons, (if extra ~= nil then extra.plate else k)
+	local gcol = col
 	local fill_col, rim_col
 	if building then
 		fill_col, rim_col = StructureLayer.CONSTRUCT_FILL, StructureLayer.CONSTRUCT_BORDER
@@ -366,10 +384,12 @@ function StructureLayer._style(self: any, p: Plate, s: any, building: boolean)
 		f.ImageRectSize = Vector2.new(cell, cell)
 		f.ImageColor3 = fill_col
 	end
-	p.glyph.Image = icons.id
 	local ic = icons.cell
-	p.glyph.ImageRectOffset = Vector2.new(col * ic, 0)
-	p.glyph.ImageRectSize = Vector2.new(ic, ic)
+	if not (extra ~= nil and PixelIcons.apply(p.glyph, extra.glyph)) then
+		p.glyph.Image = icons.id
+		p.glyph.ImageRectOffset = Vector2.new(gcol * ic, 0)
+		p.glyph.ImageRectSize = Vector2.new(ic, ic)
+	end
 	-- the glyph spans ICON_FILL / SHAPE_SCALE of the plate
 	local g = ICON_FILL[k + 1] / SHAPE_SCALE[k + 1]
 	p.glyph.Size = UDim2.fromScale(g, g)

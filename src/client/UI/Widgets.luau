@@ -1969,6 +1969,13 @@ function Icon.set_icon(self, icon_name: string)
 		return
 	end
 	self.icon_name = icon_name
+	-- (Empires Front: glyphs without uploaded art are drawn at runtime: UI/PixelIcons)
+	if game ~= nil and icon_name ~= "" then
+		local PixelIcons = require("./PixelIcons") :: any
+		if PixelIcons.has(icon_name) and PixelIcons.apply(self.gui, icon_name) then
+			return
+		end
+	end
 	local id = if icon_name ~= "" then UITheme.icon(icon_name) else nil
 	(self.gui :: ImageLabel).Image = id or ""
 end

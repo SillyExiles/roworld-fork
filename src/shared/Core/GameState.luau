@@ -21,6 +21,7 @@
 local Defs = require("./Defs")
 local Ev = require("./Ev")
 local Rules = require("./Rules")
+local Era = require("./Era")
 local Signal = require("./Signal")
 local WorldMap = require("./WorldMap")
 local Coop = require("../Net/Coop")
@@ -66,6 +67,7 @@ local SIGNALS = {
 	"alliance_requested", -- (from, to)
 	"alliance_request_closed", -- (from, to)
 	"alliance_changed", -- (a, b, formed, traitor, expired)
+	"pacts_changed", -- (a, b, kind, state) Empires Front pacts (Ev.PACT)
 	"alliance_extension", -- (a, b, expires_at, asked) a renewal was asked for or granted (Ev.ALLY_EXT)
 	"traitor_marked", -- (id, until_tick)
 	"message", -- (to, category, text)
@@ -91,6 +93,11 @@ local function new_owner_info(id: number)
 		gold = 0,
 		max_troops = 0,
 		income = 0, -- gold per second
+		-- Empires Front's economy (SimEconomy): stock and net change a second
+		food = 0,
+		food_rate = 0,
+		ore = 0,
+		ore_rate = 0,
 		traitor_until = 0, -- tick
 		killer = 0,
 		-- sums of the owned tiles' x and y (territory centroid = (cx, cy) / tiles); cz unused (0)
@@ -174,6 +181,7 @@ function GameState.new(world: any?)
 		self[name] = Signal.new()
 	end
 	local map = world or WorldMap.shared()
+	Era.set_for_map(map)
 	self.map = map
 	self.map_id = map.id
 	Defs.set_view_map(map) -- deprecated UI shims follow the displayed map
@@ -222,6 +230,9 @@ function GameState.new(world: any?)
 	self.attacks = {} :: { [number]: AttackInfo }
 	--- key = min(a,b) * 1024 + max(a,b)
 	self.alliances = {} :: { [number]: boolean }
+	--- Empires Front pacts (SimDiplomacy): min*1024+max -> { [kind] = true }; proposals (from*1024+to)*4+kind
+	self.pacts = {} :: { [number]: { [number]: boolean } }
+	self.pact_reqs = {} :: { [number]: boolean }
 	--- key as alliances → tick at which the alliance expires (Rules.ALLIANCE_TICKS after it was
 	--- formed or last renewed)
 	self.alliance_expires = {} :: { [number]: number }
@@ -402,6 +413,17 @@ function GameState.team_ranking(self: GameState): { { [string]: any } }
 	return out
 end
 
+--- Empires Front: a pact of `kind` (1 trade, 2 defence) between a and b.
+function GameState.has_pact(self: any, a: number, b: number, kind: number): boolean
+	local p = self.pacts[math.min(a, b) * 1024 + math.max(a, b)]
+	return p ~= nil and p[kind] == true
+end
+
+--- A pact of `kind` proposed by `from` to `to`, unanswered.
+function GameState.pact_requested(self: any, from: number, to: number, kind: number): boolean
+	return self.pact_reqs[(from * 1024 + to) * 4 + kind] == true
+end
+
 function GameState.has_request(self: GameState, from: number, to: number): boolean
 	return self.requests[from * 1024 + to] ~= nil
 end
@@ -486,6 +508,7 @@ end
 
 --- Switches the mirror to another map (clears the grids; a snapshot must follow).
 function GameState.set_map(self: GameState, map: any)
+	Era.set_for_map(map)
 	self.map = map
 	self.map_id = map.id
 	Defs.set_view_map(map)
@@ -1052,9 +1075,9 @@ end
 
 function GameState._apply_stats(self: GameState, stats: { number })
 	local owners = self.owners
-	local n = #stats // 6
+	local n = #stats // 10
 	for k = 0, n - 1 do
-		local b = k * 6
+		local b = k * 10
 		local o = owners[stats[b + 1]]
 		if o == nil then
 			continue
@@ -1063,6 +1086,10 @@ function GameState._apply_stats(self: GameState, stats: { number })
 		o.gold = stats[b + 4]
 		o.max_troops = stats[b + 5]
 		o.income = stats[b + 6]
+		o.food = stats[b + 7]
+		o.food_rate = stats[b + 8] / 10
+		o.ore = stats[b + 9]
+		o.ore_rate = stats[b + 10] / 10
 	end
 	self.stats_changed:Fire()
 end
@@ -1282,6 +1309,31 @@ HANDLERS[Ev.ATTACK_END] = function(self, e)
 		self.attack_ended:Fire(e[2])
 		self.attacks[e[2]] = nil
 	end
+end
+
+HANDLERS[Ev.PACT] = function(self, e)
+	local a, b, kind, st = e[2], e[3], e[4], e[5]
+	local k = math.min(a, b) * 1024 + math.max(a, b)
+	if st == 0 then
+		self.pact_reqs[(a * 1024 + b) * 4 + kind] = true
+	elseif st == 1 then
+		local p = self.pacts[k] or {}
+		p[kind] = true
+		self.pacts[k] = p
+		self.pact_reqs[(a * 1024 + b) * 4 + kind] = nil
+		self.pact_reqs[(b * 1024 + a) * 4 + kind] = nil
+	elseif st == 2 then
+		local p = self.pacts[k]
+		if p ~= nil then
+			p[kind] = nil
+			if next(p) == nil then
+				self.pacts[k] = nil
+			end
+		end
+	else
+		self.pact_reqs[(a * 1024 + b) * 4 + kind] = nil
+	end
+	self.pacts_changed:Fire(a, b, kind, st)
 end
 
 HANDLERS[Ev.ALLY_REQ] = function(self, e)

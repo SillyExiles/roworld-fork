@@ -17,6 +17,7 @@
 local Defs = require("./Defs")
 local Ev = require("./Ev")
 local Rules = require("./Rules")
+local SimEconomy = require("./SimEconomy")
 local SimState = require("./SimState")
 local Coop = require("../Net/Coop")
 
@@ -572,6 +573,13 @@ function SimStructures.install(C)
 			self:msg(id, Defs.MSG_INFO, string.format("Not enough gold for %s", a_an(struct_title(kind))))
 			return false
 		end
+		-- Empires Front: the Forge's tiers also need ore (SimEconomy)
+		local ore_need = SimEconomy.ore_cost(kind, self:struct_levels(id, kind))
+		if ore_need > 0 and (self.o_ore[id] or 0) < ore_need then
+			self:msg(id, Defs.MSG_INFO, string.format("%s needs %d Ore (Mines dig it)", struct_title(kind), ore_need))
+			return false
+		end
+
 		local p = self:place(id, kind, t)
 		local up = p.upgrade_sid
 		if up ~= 0 then
@@ -580,6 +588,7 @@ function SimStructures.install(C)
 				return false
 			end
 			self.o_gold[id] -= cost
+			self.o_ore[id] -= ore_need
 			self:upgrade_struct(s)
 			return true, true
 		end
@@ -588,6 +597,8 @@ function SimStructures.install(C)
 			local reason = p.reason
 			if reason == "no_coast" then
 				self:msg(id, Defs.MSG_INFO, "Ports must be built on your coast")
+			elseif reason == "no_hills" then
+				self:msg(id, Defs.MSG_INFO, "Mines must be dug in your hills or mountains")
 			elseif reason == "not_own" then
 				self:msg(id, Defs.MSG_INFO, "You can only build on your own land")
 			else
@@ -596,6 +607,7 @@ function SimStructures.install(C)
 			return false
 		end
 		self.o_gold[id] -= cost
+		self.o_ore[id] -= ore_need
 		self:add_struct(kind, id, site)
 		return true
 	end

@@ -502,7 +502,8 @@ end
 
 --- Does the player have Arsenal item `key`?
 function Session.has_unlock(self: any, key: string): boolean
-	return self.inventory.unlocks[key] == true
+	-- Empires Front: no shop; every era's whole arsenal is open to everyone (paid for in gold in play)
+	return true
 end
 
 --- Unlock Arsenal item `key` with Stars (the answer comes as unlock_result; the inventory follows).
@@ -578,7 +579,7 @@ function Session._apply_own_unlocks(self: any)
 		if self._sim ~= sim then
 			return
 		end
-		sim:set_unlocks(st.local_owner, Arsenal.mask(self.inventory.unlocks))
+		sim:set_unlocks(st.local_owner, 127) -- Defs.UNLOCK_ALL
 	end
 end
 

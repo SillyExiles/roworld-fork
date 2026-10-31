@@ -188,7 +188,7 @@ function WorldMap.from_terrain(data: { [string]: any }, scale: number?): WorldMa
 	m.k_area = m.k_lin * m.k_lin
 	local meta = {}
 	for k, v in data do
-		if k ~= "terrain" and k ~= "nations" then
+		if k ~= "terrain" and k ~= "nations" and k ~= "sites" then
 			meta[k] = v
 		end
 	end
@@ -215,6 +215,15 @@ function WorldMap.from_terrain(data: { [string]: any }, scale: number?): WorldMa
 		table.insert(nations, { name = tostring(nd.name or "Nation"), flag = nd.flag, x = x, y = y, tile = tile })
 	end
 	m.nations = nations
+	-- Empires Front: the objective's sites (Data/Eras objective), scaled like the nations
+	local sites = {}
+	for _, sd in data.sites or {} do
+		local x = math.clamp(math.floor((tonumber(sd.x) or 0) * w / w0), 0, w - 1)
+		local y = math.clamp(math.floor((tonumber(sd.y) or 0) * h / h0), 0, h - 1)
+		table.insert(sites, { name = tostring(sd.name or "Site"), x = x, y = y, tile = y * w + x })
+	end
+	m.sites = sites
+	m.era = data.era
 	m.ok = true
 	return m
 end

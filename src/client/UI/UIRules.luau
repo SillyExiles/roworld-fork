@@ -33,11 +33,26 @@ end
 local UIRules = {}
 UIRules.__index = UIRules
 
-UIRules.BUILD_KINDS = { "city", "port", "factory", "defense", "sam", "silo", "warship" }
+UIRules.BUILD_KINDS = { "city", "farm", "mine", "market", "port", "factory", "defense", "forge", "sam", "silo", "warship" }
 UIRules.NUKE_KINDS = { "atom", "hydrogen", "mirv" }
 --- Hotkeys 1..9, 0 in this order.
-UIRules.ACTIONS = { "city", "port", "factory", "defense", "sam", "silo", "warship", "atom", "hydrogen", "mirv" }
-UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" }
+UIRules.ACTIONS = {
+	"city",
+	"farm",
+	"mine",
+	"market",
+	"port",
+	"factory",
+	"defense",
+	"forge",
+	"sam",
+	"silo",
+	"warship",
+	"atom",
+	"hydrogen",
+	"mirv",
+}
+UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]" }
 --- The Arsenal's kinds (Data/Arsenal: unlocked with Stars or Robux), in the order of its tray:
 --- structures, munitions launched like a nuke (the last two from their own structure: strikes), and
 --- the Reinforcements call. A locked one is offered in the Arsenal instead of doing anything.
@@ -50,6 +65,10 @@ UIRules.TITLES = {
 	port = "Port",
 	factory = "Factory",
 	defense = "Defense Post",
+	forge = "Forge",
+	farm = "Farm",
+	mine = "Mine",
+	market = "Market",
 	sam = "SAM Launcher",
 	silo = "Missile Silo",
 	warship = "Warship",
@@ -70,6 +89,10 @@ UIRules.SHORT = {
 	port = "Port",
 	factory = "Factory",
 	defense = "Defense",
+	forge = "Forge",
+	farm = "Farm",
+	mine = "Mine",
+	market = "Market",
 	sam = "SAM",
 	silo = "Silo",
 	warship = "Warship",
@@ -90,6 +113,10 @@ UIRules.BLURBS = {
 	port = "Coastal. Sends trade ships for gold and builds warships.",
 	factory = "Road hub. Trucks pay gold at every stop they pass.",
 	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time.",
+	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}",
+	farm = "Grows {farm_food} Food a second for each level (less on hills or dry land). Your army eats: without Food it stops growing and deserts.",
+	mine = "Digs {mine_ore} Ore a second for each level. Only on hills or mountains (more in mountains).",
+	market = "Sells up to {mkt_ore} Ore and your spare Food a second for each level. Trade pacts raise its prices.",
 	sam = "Shoots down bombs aimed within {sam_r} tiles. MIRV warheads can't be stopped.",
 	silo = "Required to launch nuclear weapons.",
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
@@ -134,7 +161,24 @@ function UIRules.blurb(kind: string): string
 		scat_lo = tostring(R.SCATTER_MIN),
 		scat_hi = tostring(R.SCATTER_MAX),
 		rein_s = tostring(R.REINFORCE_COOLDOWN_TICKS // Defs.TICK_RATE),
+		forge_next = UIRules.forge_tiers(),
+		farm_food = "45",
+		mine_ore = "3",
+		mkt_ore = "8",
 	})
+end
+
+--- The era's Forge tiers in order (Data/Eras forge), e.g. "Gladius (+15% attack) > Scutum (+15% defence)".
+function UIRules.forge_tiers(): string
+	local Eras = UICtx.data("Eras")
+	local e = Eras.current() or Eras.list[1]
+	local parts = {}
+	for _, t in e.forge do
+		local what = if t.atk > 0 then string.format("+%d%% attack", math.floor(t.atk * 100 + 0.5))
+			else string.format("+%d%% defence", math.floor(t.def * 100 + 0.5))
+		table.insert(parts, t.name .. " (" .. what .. ")")
+	end
+	return table.concat(parts, " > ")
 end
 
 function UIRules.new(c: any)
@@ -768,6 +812,7 @@ end
 UIRules.PLACE_REASONS = {
 	not_own = "Build on your own land",
 	no_room = "No room here: structures need space",
+	no_hills = "Mines must be dug in hills or mountains",
 	no_coast = "Ports must be on your coast",
 	no_port = "Warships need a finished port on this water",
 	gold = "Not enough gold",
@@ -1326,6 +1371,26 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				troops = plan.amount,
 				capped = plan.capped,
 			})
+			-- Empires Front: pacts and resources between allies (SimDiplomacy, SimEconomy)
+			if type(s.has_pact) == "function" then
+				for _, pk in { { 1, "trade", "Trade Pact" }, { 2, "defense", "Defence Pact" } } do
+					local kid, kname, label = pk[1], pk[2], pk[3]
+					if s:has_pact(me, own, kid) then
+						table.insert(items, { id = "pact:" .. kname, label = label, icon = "pact", ok = false, reason = "Signed", danger = false })
+					elseif s:pact_requested(own, me, kid) then
+						table.insert(items, { id = "pact_accept:" .. kname, label = "Accept " .. label, icon = "pact", ok = true, reason = "", danger = false })
+					elseif s:pact_requested(me, own, kid) then
+						table.insert(items, { id = "pact:" .. kname, label = label, icon = "pact", ok = false, reason = "Proposed", danger = false })
+					else
+						table.insert(items, { id = "pact:" .. kname, label = label, icon = "pact", ok = true, reason = "", danger = false })
+					end
+				end
+				local mo = s:get_owner(me)
+				local food = if mo ~= nil then tonumber(mo.food) or 0 else 0
+				local ore = if mo ~= nil then tonumber(mo.ore) or 0 else 0
+				table.insert(items, { id = "send:food", label = "Send Food", icon = "food", ok = food >= 4, reason = if food >= 4 then "" else "No Food to spare", danger = false })
+				table.insert(items, { id = "send:ore", label = "Send Ore", icon = "ore", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to spare", danger = false })
+			end
 			-- the last ALLIANCE_EXTEND_WINDOW_TICKS: ask to renew (renewed once both asked)
 			local ai = s:alliance_info(me, own)
 			if ai ~= nil and ai.in_window then

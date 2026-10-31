@@ -788,6 +788,27 @@ function SimAttacks.install(C: any)
 				mag_k = Rules.BOT_DEFENDER_LOSS_MULT
 			end
 		end
+		-- Empires Front: the Forge's arms and armour (Data/Eras forge): the attacker's attack tiers cut
+		-- its losses, the defender's armour tiers raise them; both move the attack's pace a little.
+		local forge_k = 1.0
+		do
+			local SK = self.STRUCT_KINDS
+			local la = self.o_alevel[at * SK + Defs.S_FORGE] or 0
+			local f_atk = 0.0
+			local f_def = 0.0
+			if la > 0 then
+				f_atk = Rules.forge_bonus(la)
+			end
+			if not neutral and tg > 0 then
+				local ld = self.o_alevel[tg * SK + Defs.S_FORGE] or 0
+				if ld > 0 then
+					local _, d = Rules.forge_bonus(ld)
+					f_def = d
+				end
+			end
+			forge_k = (1.0 + f_def) / (1.0 + f_atk)
+		end
+		local forge_s = math.sqrt(forge_k)
 		local owner = self.owner
 		local land = self.land
 		local flags = self.flags
@@ -866,6 +887,8 @@ function SimAttacks.install(C: any)
 				local c2 = if r20 < 1.0 then 1.0 elseif r20 > 50.0 then 50.0 else r20
 				tf = c1 * c2 * tc * bonus_s * trait_s
 			end
+			loss *= forge_k
+			tf *= forge_s
 			if tf < 1e-6 then
 				tf = 1e-6
 			end

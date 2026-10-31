@@ -133,6 +133,10 @@ Protocol.INTENT_TYPES = {
 	"donate",
 	"ally_extend", -- {target}: ask to renew the alliance with `target` (last 30 s before it expires)
 	"reinforce", -- {}: the Arsenal's Reinforcements (gold for troops; Sim.reinforce)
+	-- Empires Front
+	"pact", -- {target, kind = "trade" | "defense"}: propose a pact to an ally
+	"pact_reply", -- {target, kind, accept}
+	"send", -- {target, kind = "food" | "ore" | "gold", troops = amount}: send resources to an ally
 }
 local INTENT_INDEX: { [string]: number } = {}
 for i, name in Protocol.INTENT_TYPES do

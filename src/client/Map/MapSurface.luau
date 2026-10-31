@@ -222,6 +222,197 @@ function MapSurface.terrain_pixel(tb: number): number
 	return pack(OCEAN[1] - m, OCEAN[2] - m, OCEAN[3] - m, 255)
 end
 
+-- ---------------------------------------------------------------------------------------------
+-- Empires Front: pixel-art terrain (RoWorld's palette with detail). Each tile is still one pixel;
+-- its colour also reads the tile up-left (relief lit from the north-west), the latitude of its row
+-- (tundra, snowfields), the arid bit of land tiles (bit 5: deserts, dry steppe; tools/maps), a
+-- value noise (forests) and a per-tile hash (texture pixels). Water: lighter shallows near coasts,
+-- the deep sea darker, sparse wave dashes. Deterministic: every client paints the same map alike.
+-- ---------------------------------------------------------------------------------------------
+
+local function h32(x: number, y: number, s: number): number
+	local v = bit32.bor(0, x * 374761393 + y * 668265263 + s * 1442695041)
+	v = bit32.bxor(v, bit32.rshift(v, 13))
+	-- (32-bit multiply without float precision loss: split the factor)
+	local lo = bit32.band(v, 0xFFFF)
+	local hi = bit32.rshift(v, 16)
+	v = bit32.bor(0, lo * 1274126177 + bit32.lshift(bit32.band(hi * 1274126177, 0xFFFF), 16))
+	return bit32.bxor(v, bit32.rshift(v, 16))
+end
+
+local function vnoise(x: number, y: number, cell: number, s: number): number
+	local gx, gy = x // cell, y // cell
+	local fx = (x % cell) / cell
+	local fy = (y % cell) / cell
+	local a = band(h32(gx, gy, s), 0xFFFF) / 65535
+	local b = band(h32(gx + 1, gy, s), 0xFFFF) / 65535
+	local c = band(h32(gx, gy + 1, s), 0xFFFF) / 65535
+	local d = band(h32(gx + 1, gy + 1, s), 0xFFFF) / 65535
+	fx = fx * fx * (3 - 2 * fx)
+	fy = fy * fy * (3 - 2 * fy)
+	local top = a + (b - a) * fx
+	local bot = c + (d - c) * fx
+	return top + (bot - top) * fy
+end
+
+local function shade(r: number, g: number, b: number, d: number): number
+	return pack(math.clamp(r + d, 0, 255), math.clamp(g + d, 0, 255), math.clamp(b + d, 0, 255), 255)
+end
+
+--- RGBA8 pixel of tile (x, y): `b` its byte, `nw` the byte of the tile up-left, `alat` |latitude|.
+function MapSurface.pixel_art(b: number, nw: number, x: number, y: number, alat: number): number
+	local hv = h32(x, y, 1)
+	local r01 = band(hv, 0xFFFF) / 65535
+	local mag = band(b, 31)
+	local shore = band(b, 64) ~= 0
+	if b >= 128 then
+		if b == 0x9F then
+			return pack(BACKGROUND[1], BACKGROUND[2], BACKGROUND[3], 255)
+		end
+		local arid = band(b, 32) ~= 0
+		local nmag = if nw >= 128 then band(nw, 31) else 0
+		local light = 0
+		if mag >= 10 then
+			if nmag < mag - 1 then
+				light = 1
+			elseif nmag > mag + 1 then
+				light = -1
+			end
+		end
+		local cold = alat > 64
+		local frozen = alat > 71
+		if shore and not frozen then
+			return if cold then pack(0xC4, 0xC6, 0xB4, 255) else pack(SAND[1], SAND[2], SAND[3], 255)
+		elseif frozen or mag >= 26 then
+			if light < 0 then
+				return pack(0xD4, 0xDE, 0xE8, 255)
+			end
+			return if r01 > 0.12 then pack(0xF2, 0xF4, 0xF6, 255) else pack(0xDD, 0xE6, 0xEE, 255)
+		elseif mag >= 20 then
+			local k = mag // 2
+			local r, g, bb
+			if arid then
+				r, g, bb = 0xDE, 0xCF, 0xB4
+			else
+				r, g, bb = 0xE6 + k - 30, 0xE6 + k - 32, 0xE6 + k - 36
+			end
+			return shade(r, g, bb, if light > 0 then 14 elseif light < 0 then -22 else 0)
+		elseif mag >= 10 then
+			local m = mag - 10
+			local r, g, bb
+			if cold then
+				r, g, bb = 0xC9, 0xCC, 0xB2
+			elseif arid then
+				r, g, bb = 0xDE + m, 0xC0 + m, 0x8A + m
+			else
+				r, g, bb = 0xDC + 2 * m, 0xCB + 2 * m, 0x9E + 2 * m
+			end
+			return shade(r, g, bb, if light > 0 then 10 elseif light < 0 then -16 else 0)
+		elseif cold then
+			return if r01 > 0.2 then pack(0xC8, 0xD3, 0xB0, 255) else pack(0xB8, 0xC6, 0xA0, 255)
+		elseif arid then
+			if alat > 42 then
+				return if r01 > 0.1 then pack(0xD2, 0xD5, 0x98, 255) else pack(0xC4, 0xC9, 0x8A, 255)
+			end
+			local dune = ((x + (y // 2) * 3) // 3 + band(h32(x // 9, y // 5, 3), 7)) % 7 == 0
+			if dune then
+				return pack(0xD8, 0xC4, 0x88, 255)
+			elseif r01 < 0.05 then
+				return pack(0xEE, 0xE2, 0xB2, 255)
+			end
+			return pack(0xE6, 0xD6, 0x9E, 255)
+		end
+		local n = vnoise(x, y, 14, 2) * 0.7 + vnoise(x, y, 5, 4) * 0.3
+		if alat > 50 then
+			n += 0.12
+		end
+		if n > 0.62 or (n > 0.58 and (x + y) % 2 == 0) then
+			local dense = n > 0.74
+			if r01 < 0.33 then
+				return if dense then pack(0x80, 0xAE, 0x5C, 255) else pack(0x8E, 0xBB, 0x66, 255)
+			elseif r01 > 0.94 then
+				return pack(0xB4, 0xD8, 0x88, 255)
+			end
+			return if dense then pack(0x96, 0xC2, 0x6C, 255) else pack(0xA4, 0xCD, 0x78, 255)
+		end
+		if r01 < 0.04 then
+			return pack(0xC8, 0xE4, 0x96, 255)
+		end
+		return pack(PLAINS[1], PLAINS[2] - 2 * mag, PLAINS[3], 255)
+	end
+	if shore then
+		return pack(126, 170, 203, 255)
+	elseif band(b, 32) == 0 then
+		return pack(0x55, 0x96, 0xC6, 255)
+	elseif mag <= 1 then
+		return pack(0x5B, 0x9A, 0xC6, 255)
+	elseif mag <= 3 then
+		return pack(0x50, 0x8F, 0xBE, 255)
+	end
+	if band(h32(x // 3, y, 5), 0x3FF) < 3 then
+		return pack(0x62, 0x9E, 0xCA, 255)
+	end
+	local m = math.min(mag, 12)
+	return pack(OCEAN[1] - m + 4, OCEAN[2] - m + 4, OCEAN[3] - m + 4, 255)
+end
+
+--- The objective's sites (Data/Eras objective, map.sites) as gold pixel-art stars burnt into the terrain
+--- buffer; returns the mask of their pixels (drawn over any territory: always visible), or nil.
+local STAR = {
+	"...O...",
+	"..OYO..",
+	"OOYHYOO",
+	".OYYYO.",
+	"..OYO..",
+	".OYOYO.",
+	".OO.OO.",
+}
+function MapSurface.paint_sites(sites: any, W: number, H: number, out: buffer): buffer?
+	if type(sites) ~= "table" or #sites == 0 then
+		return nil
+	end
+	local mask = buffer.create(W * H)
+	local col = {
+		O = pack(0x5A, 0x34, 0x0C, 255),
+		Y = pack(0xF5, 0xC2, 0x2B, 255),
+		H = pack(0xFF, 0xF0, 0x9A, 255),
+	}
+	for _, st in sites do
+		for dy = 0, 6 do
+			local line = STAR[dy + 1]
+			for dx = 0, 6 do
+				local ch = string.sub(line, dx + 1, dx + 1)
+				local c = col[ch]
+				local x, y = st.x + dx - 3, st.y + dy - 3
+				if c ~= nil and x >= 0 and y >= 0 and x < W and y < H then
+					local i = y * W + x
+					writeu32(out, i * 4, c)
+					writeu8(mask, i, 1)
+				end
+			end
+		end
+	end
+	return mask
+end
+
+--- Paints the whole terrain buffer (RGBA8 per tile) of a map's tile bytes `of`.
+function MapSurface.paint_terrain(of: buffer, W: number, H: number, meta: any, out: buffer, yield: () -> ())
+	local lt = if meta ~= nil then tonumber(meta.lat_top) else nil
+	local lb = if meta ~= nil then tonumber(meta.lat_bottom) else nil
+	for y = 0, H - 1 do
+		local alat = if lt ~= nil and lb ~= nil then math.abs(lt + (lb - lt) * (y + 0.5) / H) else 30
+		local row = y * W
+		for x = 0, W - 1 do
+			local i = row + x
+			local nw = if x > 0 and y > 0 then readu8(of, i - W - 1) else readu8(of, i)
+			writeu32(out, i * 4, MapSurface.pixel_art(readu8(of, i), nw, x, y, alat))
+		end
+		if y % 96 == 95 then
+			yield()
+		end
+	end
+end
+
 --- Terrain bytes in the map files' format for the legacy 1024 x 512 Earth (terrain classes only, no
 --- elevation): each land class ramps with the distance from its edge (plains 0..9 from the coast,
 --- highland 10..19 and mountain 20..30 toward the middle of a range), water magnitude is the
@@ -503,12 +694,8 @@ function MapSurface.set_map(self: MapSurface, map: any)
 	self.tile_bytes = of
 	local N = W * H
 	local terrain = buffer.create(N * 4)
-	for i = 0, N - 1 do
-		writeu32(terrain, i * 4, MapSurface.terrain_pixel(readu8(of, i)))
-		if i % 262144 == 262143 then
-			yield()
-		end
-	end
+	MapSurface.paint_terrain(of, W, H, map.meta, terrain, yield)
+	;(self :: any).markers = MapSurface.paint_sites(map.sites, W, H, terrain)
 	self.terrain = terrain
 	local comp = buffer.create(N * 4)
 	buffer.copy(comp, 0, terrain, 0, N * 4)
@@ -841,6 +1028,10 @@ local function composite(self: MapSurface, i: number)
 			math.floor(r + 0.5) + math.floor(gg + 0.5) * 256 + math.floor(b + 0.5) * 65536 + 4278190080
 		)
 	end
+	local mk = (self :: any).markers
+	if mk ~= nil and readu8(mk, i) == 1 then
+		writeu32(self.comp, k, readu32(self.terrain, k))
+	end
 end
 
 local function mark(self: MapSurface, x: number, y: number)
@@ -878,6 +1069,7 @@ local function paint_queue(self: MapSurface, head: number, last: number)
 		alliances = nil
 	end
 	local tiles, tw, th, cols = self.tiles, self.tile_w, self.tile_h, self.cols
+	local markers = (self :: any).markers
 	for q = head, last do
 		local i = queue[q]
 		writeu8(queued, i, 0)
@@ -939,6 +1131,9 @@ local function paint_queue(self: MapSurface, head: number, last: number)
 					)
 				end
 			end
+		end
+		if markers ~= nil and readu8(markers, i) == 1 then
+			writeu32(comp, k, readu32(terrain, k))
 		end
 		local t = tiles[(y // th) * cols + (x // tw) + 1]
 		if t then

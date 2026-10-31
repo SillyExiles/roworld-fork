@@ -65,6 +65,12 @@ function MapFetch.serve(folder: Instance, load_data: (string) -> { [string]: any
 				land_tiles = data.land_tiles,
 				nations = nations,
 				size = data.size or (data.width * data.height),
+				-- Empires Front: the era, the latitudes the renderer shades by, the objective's sites
+				era = data.era,
+				year = data.year,
+				lat_top = data.lat_top,
+				lat_bottom = data.lat_bottom,
+				sites = data.sites,
 			},
 			z = z,
 		}
@@ -165,6 +171,11 @@ function MapFetch.fetch(id: string): (boolean, string?)
 			land_tiles = first.land_tiles,
 			nations = first.nations,
 			size = first.size,
+			era = first.era,
+			year = first.year,
+			lat_top = first.lat_top,
+			lat_bottom = first.lat_bottom,
+			sites = first.sites,
 			codec = "zstd",
 			terrain = z,
 		})

@@ -386,7 +386,10 @@ function BuildButton._redraw(self)
 	local ip = self.icon_px
 	local sc = UITheme.scale
 	local g = self._glyph
-	g.Image = UITheme.icon(self.kind) or ""
+	local PixelIcons = require("./PixelIcons") :: any
+	if not (PixelIcons.has(self.kind) and PixelIcons.apply(g, self.kind)) then
+		g.Image = UITheme.icon(self.kind) or ""
+	end
 	g.ImageColor3 = UITheme.color3(icol)
 	self:_part(g, "ImageTransparency", UITheme.alpha(icol))
 	local ipx = math.floor(ip * sc + 0.5)

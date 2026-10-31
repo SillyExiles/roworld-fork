@@ -34,6 +34,9 @@ local SimNaval = require("./SimNaval")
 local SimWarships = require("./SimWarships")
 local SimNukes = require("./SimNukes")
 local SimArsenal = require("./SimArsenal")
+local Era = require("./Era")
+local SimEconomy = require("./SimEconomy")
+local SimDiplomacy = require("./SimDiplomacy")
 local SimAI = require("./SimAI")
 local Teams = require("./Teams")
 local WorldMap = require("./WorldMap")
@@ -55,6 +58,8 @@ SimNaval.install(Sim)
 SimWarships.install(Sim)
 SimNukes.install(Sim)
 SimArsenal.install(Sim)
+SimEconomy.install(Sim)
+SimDiplomacy.install(Sim)
 
 Sim.TICK_RATE = TICK_RATE
 --- Owners whose start lies within these many tiles (of the original 1024-wide grid; scaled by the
@@ -85,6 +90,7 @@ function Sim.new(p_map: any, config: { [string]: any }?): any
 	if p_map == nil then
 		p_map = WorldMap.get(if type(cfg.map_id) == "string" then cfg.map_id else nil)
 	end
+	Era.set_for_map(p_map)
 	local self: any = setmetatable({}, Sim)
 	local seed = if type(cfg.seed) == "number" then Defs.trunc(cfg.seed) else 1
 	self.rng = Rng.new(seed)
@@ -145,6 +151,8 @@ function Sim.new(p_map: any, config: { [string]: any }?): any
 	self:_init_warships()
 	self:_init_nukes()
 	self:_init_arsenal()
+	self:_init_economy()
+	self:_init_diplomacy()
 	Coop.check()
 	if type(cfg.defense_posts_shoot) == "boolean" then
 		self.defense_posts_shoot = cfg.defense_posts_shoot
@@ -996,6 +1004,12 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		self:donate(id, _int(it, "target", 0), _int(it, "troops", 0))
 	elseif kind == "reinforce" then
 		self:reinforce(id)
+	elseif kind == "pact" then
+		self:pact_request(id, _int(it, "target", 0), _str(it, "kind"))
+	elseif kind == "pact_reply" then
+		self:pact_reply(id, _int(it, "target", 0), _str(it, "kind"), it.accept == true)
+	elseif kind == "send" then
+		self:send_resource(id, _int(it, "target", 0), _str(it, "kind"), _int(it, "troops", 0))
 	end
 end
 
@@ -1496,6 +1510,11 @@ function Sim._start_playing(self: any)
 		self.time_limit_ticks = self.tick + self.time_limit_s * TICK_RATE
 	end
 	self:ev({ Ev.PHASE, Defs.PHASE_PLAYING, 0 })
+	-- Empires Front: say what the empire's objective is (the sites are marked in gold on the map)
+	local era = Era.current()
+	if era ~= nil and self.map.sites ~= nil and #self.map.sites > 0 then
+		self:msg(-1, Defs.MSG_ALERT, string.format("%s: %s for %d s to win", era.objective.title, era.objective.text, era.objective.hold_s))
+	end
 	for id = 1, self.owner_total do
 		if self.o_alive[id] == 1 and self.o_spawned[id] == 1 then
 			if self.o_kind[id] == Defs.KIND_HUMAN and not self.solo then
@@ -1548,15 +1567,25 @@ function Sim._economy_tick(self: any)
 		o_cap[id] = cap
 		-- Per-tick player update: + troopIncreaseRate troops (whole troops: truncated) and
 		-- + goldAdditionRate gold every tick, never during the spawn phase.
-		o_troops[id] += troop_growth_applied(tkind, o_troops[id], cap, tdiff)
+		-- (Empires Front: the growth the army's food allows: SimEconomy)
+		o_troops[id] += troop_growth_applied(tkind, o_troops[id], cap, tdiff) * self.o_fed[id]
 		if (tick + id) % 10 == 0 then
 			o_income[id] = Rules.passive_income(kind, o_tiles[id])
+			-- (Empires Front: trade pacts raise it: SimDiplomacy)
+			local tp = self:trade_pacts(id)
+			if tp > 0 then
+				o_income[id] *= 1.0 + SimDiplomacy.TRADE_INCOME_BONUS * tp
+			end
 		end
 		o_gold[id] += o_income[id] / TICK_RATE
 		if second then
 			o_bonus_rate[id] = o_bonus_rate[id] * 0.9 + o_bonus_acc[id] * 0.1
 			o_bonus_acc[id] = 0.0
 		end
+	end
+	if second then
+		self:_resource_tick()
+		self:_pacts_tick()
 	end
 end
 
@@ -1700,6 +1729,9 @@ function Sim._check_victory(self: any)
 		self:_game_over(best, Defs.OVER_DOMINATION, team)
 		return
 	end
+	if self:_check_objective() then
+		return
+	end
 	if self.time_limit_ticks > 0 and self.tick >= self.time_limit_ticks then
 		self:_game_over(best, Defs.OVER_TIME, team)
 		return
@@ -1729,6 +1761,74 @@ function Sim._check_victory(self: any)
 	end
 end
 
+--- Empires Front: who holds every site of the map's objective (Data/Eras objective; map.sites): an owner
+--- (or, in a team game, a team: its biggest member stands for it), or 0. Returns (owner, team).
+function Sim.objective_holder(self: any): (number, number)
+	local sites = self.map.sites
+	if sites == nil or #sites == 0 then
+		return 0, 0
+	end
+	local owner = self.owner
+	local first = 0
+	local team = 0
+	for i, st in sites do
+		local o = buffer.readi32(owner, st.tile * 4)
+		if o <= 0 or self.o_alive[o] ~= 1 then
+			return 0, 0
+		end
+		if self.team_mode and #self.team_names > 0 then
+			local t = self.o_team[o] or 0
+			if t == 0 then
+				return 0, 0
+			end
+			if i == 1 then
+				team = t
+				first = o
+			elseif t ~= team then
+				return 0, 0
+			elseif self.o_tiles[o] > self.o_tiles[first] then
+				first = o
+			end
+		elseif i == 1 then
+			first = o
+		elseif o ~= first then
+			return 0, 0
+		end
+	end
+	return first, team
+end
+
+--- Ends the match once one owner (team) has held every objective site for the era's hold time.
+function Sim._check_objective(self: any): boolean
+	local era = Era.current()
+	if era == nil or self.map.sites == nil or #self.map.sites == 0 then
+		return false
+	end
+	local holder, team = self:objective_holder()
+	local key = if team ~= 0 then -team else holder
+	if key ~= (self._obj_key or 0) then
+		local prev = self._obj_key or 0
+		self._obj_key = key
+		self._obj_since = self.tick
+		local title = era.objective.title
+		if holder ~= 0 then
+			local who = if team ~= 0 then ("The " .. tostring(self.team_names[team]) .. " team") else self.o_name[holder]
+			self:msg(
+				-1,
+				Defs.MSG_ALERT,
+				string.format("%s holds every site of %s! %d s to victory", who, title, era.objective.hold_s)
+			)
+		elseif prev ~= 0 then
+			self:msg(-1, Defs.MSG_INFO, string.format("%s: the sites are divided again", title))
+		end
+	end
+	if holder ~= 0 and self.tick - (self._obj_since or self.tick) >= era.objective.hold_s * Defs.TICK_RATE then
+		self:_game_over(holder, Defs.OVER_OBJECTIVE, team)
+		return true
+	end
+	return false
+end
+
 function Sim._game_over(self: any, w: number, reason: number, team: number?)
 	self.phase = Defs.PHASE_OVER
 	self.winner = w
@@ -1751,6 +1851,9 @@ function Sim._game_over(self: any, w: number, reason: number, team: number?)
 				then who .. " has won"
 				else "Time is up — " .. string.lower(string.sub(who, 1, 1)) .. string.sub(who, 2) .. " holds the most land and wins"
 		)
+	elseif w > 0 and reason == Defs.OVER_OBJECTIVE then
+		local era = Era.current()
+		self:msg(-1, Defs.MSG_ALERT, string.format("%s fulfilled %s", self.o_name[w], if era then era.objective.title else "the objective"))
 	elseif w > 0 and reason == Defs.OVER_DOMINATION then
 		self:msg(-1, Defs.MSG_ALERT, self.o_name[w] .. " has conquered the world")
 	elseif w > 0 and reason == Defs.OVER_TIME then
@@ -1785,7 +1888,12 @@ function Sim._stats_rows(self: any): { number }
 		s[n + 4] = self:_gold_int(id)
 		s[n + 5] = trunc(self.o_cap[id])
 		s[n + 6] = trunc(self.o_income[id] + self.o_bonus_rate[id])
-		n += 6
+		-- Empires Front: food and ore, their rates a second x 10
+		s[n + 7] = trunc(self.o_food[id])
+		s[n + 8] = trunc(self.o_food_rate[id] * 10)
+		s[n + 9] = trunc(self.o_ore[id])
+		s[n + 10] = trunc(self.o_ore_rate[id] * 10)
+		n += 10
 	end
 	return s
 end

@@ -27,6 +27,7 @@
 -- returned a Vector2 return two numbers (nuke_radii → inner, outer). PackedFloat32Array constants
 -- are rounded to float32 like the Godot version.
 local Defs = require("./Defs")
+local Eras = require("../Data/Eras")
 
 local f32 = Defs.f32
 local function f32t(values: { number }): { [number]: number }
@@ -219,10 +220,10 @@ local function build(K_LIN: number): any
 	--- defense post 5 s, SAM 30 s, silo 10 s. A structure under construction blocks placement and
 	--- counts for prices but does nothing and can't be upgraded.
 	--- (Arsenal: artillery 8 s, airfield 10 s, railgun 15 s.)
-	Rules.BUILD_TICKS = zt({ 20, 50, 20, 50, 300, 100, 80, 100, 150 })
+	Rules.BUILD_TICKS = zt({ 20, 50, 20, 50, 300, 100, 80, 100, 150, 60, 40, 60, 60 })
 	--- Upgradable: city, port, factory, SAM and silo gain levels; defense posts don't (nor
 	--- the Arsenal's structures).
-	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0 })
+	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1 })
 	--- Build search radius (15 full-size tiles): a build click floods the builder's own
 	--- connected land within this range and builds on the nearest tile with no structure closer than
 	--- STRUCT_MIN_DIST. radiusPortSpawn (20 full-size tiles, manhattan) limits where a port may snap to the coast.
@@ -269,6 +270,15 @@ local function build(K_LIN: number): any
 			return math.min(1500000, 500000 * (n + 1))
 		elseif kind_name == "railgun" then
 			return math.min(7500000, 2500000 * (n + 1))
+		elseif kind_name == "farm" then
+			return math.min(500000, 75000 * (n + 1))
+		elseif kind_name == "mine" then
+			return math.min(1000000, 150000 * (n + 1))
+		elseif kind_name == "market" then
+			return math.min(2400000, 300000 * 2 ^ math.min(n, 3))
+		elseif kind_name == "forge" then
+			-- each level (a new Forge or an upgrade) opens the era's next tier: Data/Eras forge
+			return math.min(4000000, 400000 * 2 ^ math.min(n, 4))
 		end
 		return -1
 	end
@@ -391,8 +401,13 @@ local function build(K_LIN: number): any
 		local port = kind == Defs.S_PORT
 		local pick = -1
 		local pd = 0.0
+		local mine = kind == Defs.S_MINE
 		for _, t in flood do
 			if port and (buffer.readu8(coastal, t) == 0 or geo_manhattan(tile, t) > Rules.PORT_SPAWN_MANHATTAN) then
+				continue
+			end
+			-- Empires Front: a mine digs into hills or mountains
+			if mine and buffer.readu8(map.terrain, t) < Defs.T_HIGHLAND then
 				continue
 			end
 			local blocked = false
@@ -412,7 +427,7 @@ local function build(K_LIN: number): any
 			end
 		end
 		if pick < 0 then
-			out.reason = if port then "no_coast" else "no_room"
+			out.reason = if port then "no_coast" elseif mine then "no_hills" else "no_room"
 			return out
 		end
 		out.tile = pick
@@ -938,7 +953,7 @@ local function build(K_LIN: number): any
 	--- A structure that fires reloads for this long per shot (index Defs.S_*; 0: it doesn't fire).
 	--- SAMCooldown / SiloCooldown 90; an airfield rearms for 30 s, a railgun reloads for 25 s. A battery
 	--- rolls its own gap per shot (ARTILLERY_GAP_*).
-	Rules.RELOAD_TICKS = zt({ 0, 0, 0, 0, 90, 90, 0, 300, 250 })
+	Rules.RELOAD_TICKS = zt({ 0, 0, 0, 0, 90, 90, 0, 300, 250, 0, 0, 0, 0 })
 	--- What the Rapid Reload unlock makes of every reload of its owner's.
 	Rules.RAPID_RELOAD_MULT = 0.5
 	--- Artillery: a battery shells whatever isn't its owner's or an ally's within 45 tiles, every 4 to
@@ -966,7 +981,7 @@ local function build(K_LIN: number): any
 	Rules.STRIKE_DAMAGE = zt({ 0, 0, 0, 0, 0, 0, 150, 600, 1000 })
 	--- Health of a structure (index Defs.S_*), only ever lowered by a shell, an air strike or a slug:
 	--- at 0 it loses a level and is whole again, or is destroyed at level 1.
-	Rules.STRUCT_HP = zt({ 1000, 1000, 1000, 600, 1000, 1000, 600, 800, 1000 })
+	Rules.STRUCT_HP = zt({ 1000, 1000, 1000, 600, 1000, 1000, 600, 800, 1000, 800, 800, 1000, 1000 })
 	--- Scattershot: 4 to 6 warheads come down 28 to 46 tiles around the aim point.
 	Rules.SCATTER_MIN = 4
 	Rules.SCATTER_MAX = 6
@@ -1093,6 +1108,83 @@ local function build(K_LIN: number): any
 		return Rules.HUMAN_GRACE_TICKS[clampi(difficulty, 0, 2)]
 	end
 
+	-- ---------------------------------------------------------------------------------------------
+	-- Empires Front: the active era's balance (Data/Eras rules), over the numbers above
+	-- ---------------------------------------------------------------------------------------------
+	local era = Eras.current()
+	local er = if era ~= nil then era.rules else nil
+	if er ~= nil then
+		for kind_name, v in er.nuke or {} do
+			local k = Defs.nuke_kind_from_name(kind_name)
+			if k >= 0 then
+				Rules.NUKE_INNER_FULL[k] = f32(v[1])
+				Rules.NUKE_OUTER_FULL[k] = f32(v[2])
+				Rules.NUKE_RADIUS[k] = f32(v[2] / K_LIN)
+				if v[3] ~= nil then
+					Rules.NUKE_SPEED_FULL[k] = f32(v[3])
+				end
+				if v[4] ~= nil then
+					Rules.NUKE_COST[k] = v[4]
+				end
+			end
+		end
+		if er.mirv_warheads then
+			Rules.MIRV_WARHEADS = er.mirv_warheads
+		end
+		if er.mirv_spread_full then
+			Rules.MIRV_SPREAD = trunc(er.mirv_spread_full / K_LIN)
+		end
+		local silo_r = er.silo_range_full or 0
+		local air_r = er.airstrike_range_full or 156.0
+		local art_r = er.artillery_range_full or 45.0
+		local rail_r = er.railgun_range_full or 0
+		Rules.AIRFIELD_RANGE_FULL = air_r
+		Rules.ARTILLERY_RANGE_FULL = art_r
+		function Rules.artillery_range(): number
+			return art_r / K_LIN
+		end
+		function Rules.launch_range(kind: number): number
+			if kind == Defs.N_AIRSTRIKE then
+				return air_r / K_LIN
+			elseif kind == Defs.N_SHELL then
+				return art_r / K_LIN
+			elseif kind == Defs.N_SLUG then
+				return rail_r / K_LIN
+			elseif Rules.NUKE_LAUNCHER[kind] == Defs.S_SILO then
+				return silo_r / K_LIN
+			end
+			return 0.0
+		end
+		local ws_r = er.warship_range_full or 130.0
+		Rules.WARSHIP_RANGE_FULL = ws_r
+		Rules.WARSHIP_RANGE = trunc(ws_r / K_LIN)
+		function Rules.warship_range(): number
+			return ws_r / K_LIN
+		end
+		local hp = er.warship_hp or 1000
+		Rules.WARSHIP_HP = hp
+		function Rules.warship_max_hp(vet: number): number
+			return hp * (100 + clampi(vet, 0, 3) * 20) // 100
+		end
+		local ws = er.warship_speed or 1.0
+		Rules.WARSHIP_TPT_X100 = math.max(1, trunc(100.0 * K_LIN * ws))
+		Rules.WARSHIP_HUNT_TPT_X100 = math.max(1, trunc(50.0 * K_LIN * ws))
+		local bs = er.boat_speed or 1.0
+		Rules.TRANSPORT_TPT_X100 = math.max(1, trunc(100.0 * K_LIN * bs))
+		Rules.TRADE_TPT_X100 = math.max(1, trunc(100.0 * K_LIN * bs))
+		local sk = er.sam_range or 1.0
+		function Rules.sam_range(level: number?): number
+			local l = level or 1
+			return sk * (150.0 - 480.0 / (math.max(l, 1) + 5)) / K_LIN
+		end
+	end
+
+	--- The Forge's bonus of an owner whose finished Forges add up to `levels` levels: (attack,
+	--- defence) fractions and the tiers open (Data/Eras forge).
+	function Rules.forge_bonus(levels: number): (number, number, number)
+		return Eras.forge_bonus(levels)
+	end
+
 	return Rules
 end
 
@@ -1116,4 +1208,17 @@ local function for_k(k_lin: number?): any
 	return r
 end
 
-return for_k(1.0)
+local base = for_k(1.0)
+
+--- Empires Front: rebuilds every cached rules table in place for the active era (Data/Eras.active,
+--- set by Core/Era). Modules keep their references: the tables' contents change, not the tables.
+function base.rebuild_for_era()
+	for k, r in cache do
+		local fresh = build(k)
+		for key, v in fresh do
+			r[key] = v
+		end
+	end
+end
+
+return base

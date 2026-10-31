@@ -28,16 +28,16 @@ local LobbyHttp = {}
 LobbyHttp.__index = LobbyHttp
 
 --- The service (easy-1, behind Cloudflare: HTTPS; http:// is redirected).
-LobbyHttp.BASE_URL = "https://rofront.snick.co"
+LobbyHttp.BASE_URL = ""
 --- Its own port, straight (until it closes, docs/lobby-service.md "Ops"): used while the domain fails.
 --- "" = none.
-LobbyHttp.FALLBACK_URL = "http://54.39.159.132:3002"
+LobbyHttp.FALLBACK_URL = ""
 --- How long a server stays on the fallback before it tries the domain again.
 LobbyHttp.RETRY_PRIMARY_S = 300
 --- Live servers use the service (MemoryStore stays the fallback). false = MemoryStore only.
 --- (On since 2026-09-28, once easy-1's firewall let port 3002 in; the service's LOBBIES switch turns it
 --- off without a publish.)
-LobbyHttp.ENABLED = true
+LobbyHttp.ENABLED = false
 LobbyHttp.TIMEOUT_S = 5
 --- Transport failures in a row before the service counts as down.
 LobbyHttp.FAIL_THRESHOLD = 3

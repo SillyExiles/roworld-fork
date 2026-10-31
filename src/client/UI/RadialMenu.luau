@@ -641,8 +641,14 @@ function RadialMenu._redraw(self: any)
 		local rm = (ri + ro2) * 0.5
 		local ip = Vector2.new(math.cos(mid), math.sin(mid)) * (rm - 5.0)
 		sg.icon.Visible = true
-		local id = Th.icon(tostring(it.icon or "info"))
-		sg.icon.Image = id or ""
+		local iname = tostring(it.icon or "info")
+		local PixelIcons = require("./PixelIcons") :: any
+		if not (PixelIcons.has(iname) and PixelIcons.apply(sg.icon, iname)) then
+			local id = Th.icon(iname)
+			sg.icon.Image = id or ""
+			sg.icon.ImageRectOffset = Vector2.zero
+			sg.icon.ImageRectSize = Vector2.zero
+		end
 		sg.icon.Position = UDim2.fromOffset(ip.X, ip.Y - 5)
 		sg.icon.ImageColor3 = icol
 		sg.icon.ImageTransparency = 1 - icol_a * alpha

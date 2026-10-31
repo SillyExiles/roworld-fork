@@ -37,9 +37,9 @@ TitleScreen.WORD_MAX_W = 0.35
 --- The credits line under the dock (desktop, phones). It points at the help window by its top-bar name
 --- (2026-10-25: "See Help & Credits" instead of "see How to play"; 2026-10-26: no map credit, the World
 --- map is RoWorld's own, made from public-domain data).
-TitleScreen.CREDITS = "© OpenFront and Contributors  ·  Music by Rodrigo Flores  ·  "
+TitleScreen.CREDITS = "© OpenFront and Contributors  ·  Based on RoWorld  ·  Music by Rodrigo Flores  ·  "
 	.. "GNU AGPL v3, no warranty: See Help & Credits"
-TitleScreen.CREDITS_SHORT = "© OpenFront and Contributors  ·  Music: Rodrigo Flores  ·  GNU AGPL v3"
+TitleScreen.CREDITS_SHORT = "© OpenFront and Contributors  ·  Based on RoWorld  ·  GNU AGPL v3"
 
 local SHINE_HALF = 70.0 -- smoothstep(0, 70, |x - sweep - (y - y0) * 0.35|)
 
@@ -439,6 +439,14 @@ function TitleScreen.new(c: any)
 		self.open_general:Fire()
 	end)
 	self:add_child(self._general_btn)
+	-- Empires Front: no shop, crates, Arsenal store, starter pack or subscription: their buttons stay hidden
+	for _, b in { self._crate_btn, self._arsenal_btn, self._shop_btn, self._starter_btn, self._general_btn } do
+		local base_set = b.set_visible
+		b.set_visible = function(node: any, _on: boolean)
+			base_set(node, false)
+		end
+		b:set_visible(false)
+	end
 	-- the party (team games on: staging only for now; hidden until the server sends one)
 	self._party = PartyPanel.new(c)
 	self._party.on_action = function(action: string, uid: number?)
@@ -492,7 +500,7 @@ function TitleScreen._build_head(self)
 	self:add_child(self._glow)
 	self:move_child(self._glow, 3)
 
-	local word = GradientText.new("ROWORLD", 120, 900)
+	local word = GradientText.new("EMPIRES FRONT", 120, 900)
 	word.spacing = 14
 	word.shadow = { color = Color3.new(0.0, 0.02, 0.08), alpha = 0.55, offset_y = 6, outline = 14 }
 	word:set_colors(Color3.new(1, 1, 1), Color3.new(1.0, 0.8, 0.52))

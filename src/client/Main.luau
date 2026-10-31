@@ -482,6 +482,11 @@ function Main.start()
 			pg.ScreenOrientation = Enum.ScreenOrientation.LandscapeSensor
 		end)
 	end)
+	-- Empires Front: the UI's words follow the era of the map in play (client/EraText)
+	local EraText = optional(script.Parent, { "EraText" })
+	if EraText ~= nil then
+		task.spawn(EraText.start)
+	end
 	local session = Session.new()
 	Main.session = session
 	Main.boot.session_new = os.clock()

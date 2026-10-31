@@ -34,7 +34,7 @@ function RotateCard.new(c: any)
 	t:set_alignment(W.ALIGN_CENTER)
 	cc:add_child(t)
 	local s = UITheme.label(
-		"RoWorld is played in landscape.\nTurn your device sideways to continue.",
+		"Empires Front is played in landscape.\nTurn your device sideways to continue.",
 		15,
 		500,
 		UITheme.TEXT_2
