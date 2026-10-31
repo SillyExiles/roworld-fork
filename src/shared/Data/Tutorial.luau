@@ -36,7 +36,9 @@ Tutorial.DIFFICULTY = 0
 Tutorial.COUNTDOWN_TICKS = 10
 --- The Attack bar while the tutorial runs: it starts at the default and stops at RATIO_CAP (the
 --- player's saved setting could leave it at about 85%, which is too much; 2026-10-04).
-Tutorial.RATIO_CAP = 0.5
+--- Empires Front (2026-10-31): no cap (1.0) and no floor (0): in Studio and for every new player the tutorial
+--- held the Attack bar at 50% and kept a quarter of the army's CAP at home, so a big army could send nothing.
+Tutorial.RATIO_CAP = 1.0
 --- Keeps players from going too low in troop count (2026-10-04): while the tutorial
 --- runs an order leaves at least TROOP_FLOOR of the army's cap at home (it is trimmed to what may go,
 --- and refused when nothing may). The floor holds from the first time the army reaches FLOOR_ARM of
@@ -50,7 +52,7 @@ Tutorial.RATIO_CAP = 0.5
 ---     the cap climbs with every tile taken. Grow lost 11.6% of the players who reached it, the most
 ---     of any step, and 110,302 of its 175,898 left with Skip (the week to 2026-10-26). Before the
 ---     first neighbour there is nobody to fear, and the Attack bar's cap (RATIO_CAP) still holds.
-Tutorial.TROOP_FLOOR = 0.25
+Tutorial.TROOP_FLOOR = 0.0
 Tutorial.FLOOR_ARM = 0.35
 Tutorial.FLOOR_ARM_S = 10
 Tutorial.FLOOR_FROM = "attack"
@@ -107,12 +109,13 @@ Tutorial.CONTACT_WAIT_S = 25
 ---     step left on it, the most of any step (Tutorial funnel, 2026-10-07), so the
 ---     step was made easier.
 ---   * Nobody waits on it past RATIO_MAX_S (the other steps: STEP_MAX_S).
-Tutorial.RATIO_GOAL = 0.35
-Tutorial.RATIO_LOW = 0.3
-Tutorial.RATIO_HIGH = 0.4
+--- (Empires Front v9: the 35% stop became 100%, so the goal is the 50% stop)
+Tutorial.RATIO_GOAL = 0.5
+Tutorial.RATIO_LOW = 0.45
+Tutorial.RATIO_HIGH = 0.55
 Tutorial.RATIO_HOLD_S = 0.2
 Tutorial.RATIO_MAX_S = 30
-Tutorial.RATIO_TOO_MUCH = "Too many! Tap 35%"
+Tutorial.RATIO_TOO_MUCH = "Too many! Tap 50%"
 --- A step nobody finishes in this long is passed over (the player is never stuck on one).
 Tutorial.STEP_MAX_S = 75
 --- With no order for this long the pointer shows where to tap again.
@@ -143,8 +146,8 @@ Tutorial.STEPS = {
 	},
 	{
 		id = "ratio",
-		touch = "Tap 35% below. Keep troops home!",
-		desktop = "Click 35% on the Attack bar. Keep troops home!",
+		touch = "Tap 50% below. Keep troops home!",
+		desktop = "Click 50% on the Attack bar. Keep troops home!",
 		max_s = Tutorial.RATIO_MAX_S,
 	},
 	{
