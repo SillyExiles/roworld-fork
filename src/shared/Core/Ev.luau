@@ -47,8 +47,10 @@ Ev.BONUS = 34 -- owner, tile, gold  (gold `owner` earned at `tile`, a train's
 
 -- Empires Front
 Ev.PACT = 35 -- a, b, kind (1 trade, 2 defence), state (0 proposed by a to b, 1 signed, 2 ended, 3 withdrawn)
+Ev.PING = 36 -- to, from, tile, kind (1 attack here, 2 help here)  (a Signal: sent to `to` alone, one
+--   event per teammate or ally of `from` and one for `from` itself: Sim.ping)
 
 --- Number of event ids (ids are 0..COUNT-1).
-Ev.COUNT = 36
+Ev.COUNT = 37
 
 return Ev

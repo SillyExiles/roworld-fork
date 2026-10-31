@@ -34,11 +34,12 @@ local UIRules = {}
 UIRules.__index = UIRules
 
 -- (Empires Front: no SAMs, silos, bombs or Arsenal; no farms: 2026-10-31)
-UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship" }
+-- (Empires Front 2026-10-31: the Border Wall and the Barracks)
+UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks" }
 UIRules.NUKE_KINDS = {}
 --- Hotkeys 1..9, 0 in this order.
-UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship" }
-UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8" }
+UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks" }
+UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" }
 --- The Arsenal's kinds (Data/Arsenal: unlocked with Stars or Robux), in the order of its tray:
 --- structures, munitions launched like a nuke (the last two from their own structure: strikes), and
 --- the Reinforcements call. A locked one is offered in the Arsenal instead of doing anything.
@@ -55,6 +56,8 @@ UIRules.TITLES = {
 	farm = "Farm",
 	mine = "Mine",
 	market = "Market",
+	wall = "Border Wall",
+	barracks = "Barracks",
 	sam = "SAM Launcher",
 	silo = "Missile Silo",
 	warship = "Warship",
@@ -79,6 +82,8 @@ UIRules.SHORT = {
 	farm = "Farm",
 	mine = "Mine",
 	market = "Market",
+	wall = "Wall",
+	barracks = "Barracks",
 	sam = "SAM",
 	silo = "Silo",
 	warship = "Warship",
@@ -103,6 +108,8 @@ UIRules.BLURBS = {
 	farm = "Grows {farm_food} Food a second for each level (less on hills or dry land). Your army eats: without Food it stops growing and deserts.",
 	mine = "Digs {mine_ore} Ore a second for each level. Only on hills or mountains (more in mountains).",
 	market = "Sells up to {mkt_ore} spare Ore a second for each level at the match's Ore price (it keeps what your next Forge level needs). Each trade pact raises what it gets by 20%.",
+	wall = "Raises stone walls along your frontier within {wall_r} tiles: taking a walled tile costs {wall_mag}x the troops and {wall_cost}x the time. The stones follow the frontier and fall with the tile.",
+	barracks = "Trains troops: each level makes your army grow {bar_pct}% faster (up to {bar_max} levels). Your troop cap stays the same.",
 	sam = "Shoots down bombs aimed within {sam_r} tiles. MIRV warheads can't be stopped.",
 	silo = "Required to launch nuclear weapons.",
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
@@ -151,6 +158,11 @@ function UIRules.blurb(kind: string): string
 		farm_food = "45",
 		mine_ore = "3",
 		mkt_ore = "8",
+		wall_r = tostring(Defs.round(R.wall_radius())),
+		wall_mag = tostring(Defs.round(R.WALL_MAG)),
+		wall_cost = tostring(Defs.round(R.WALL_COST)),
+		bar_pct = tostring(math.floor(R.BARRACKS_GROWTH * 100 + 0.5)),
+		bar_max = tostring(R.BARRACKS_MAX_LEVELS),
 	})
 end
 
@@ -1131,6 +1143,17 @@ function UIRules._primary(self: any, tile: number): { [string]: any }
 		out.icon = "attack"
 		return out
 	end
+	-- Empires Front (2026-10-31): team games: march through a teammate's land (the Sim finds the way:
+	-- SimAttacks passage_tile). Before a boat: a land route through friends is the natural one.
+	local via_mate = if s:is_team_game() then ctx.borders:mate_touches(tile) else 0
+	if via_mate == 1 then
+		out.type = if own == 0 then "expand" else "attack"
+		out.ok = true
+		out.via_ally = true
+		out.verb = if own == 0 then "Expand through ally" else "Attack through ally"
+		out.icon = "attack"
+		return out
+	end
 	local landing = self:boat_landing(tile)
 	if landing >= 0 then
 		out.boat_tile = landing
@@ -1145,6 +1168,15 @@ function UIRules._primary(self: any, tile: number): { [string]: any }
 		out.ok = true
 		out.verb = "Boat invasion"
 		out.icon = "boat"
+		return out
+	end
+	if via_mate == -1 then
+		-- (a region too large to explore here: let the Sim look for a way through a teammate)
+		out.type = if own == 0 then "expand" else "attack"
+		out.ok = true
+		out.via_ally = true
+		out.verb = if own == 0 then "Expand through ally" else "Attack through ally"
+		out.icon = "attack"
 		return out
 	end
 	out.reason = if own == 0 then "Out of reach: expand toward it" else "No border or sea route"
@@ -1172,8 +1204,14 @@ function UIRules.confirm_text(self: any, action: { [string]: any }): string
 	if ty == "spawn" then
 		return "Starting position set"
 	elseif ty == "expand" then
+		if action.via_ally then
+			return "Marching through allied land with " .. troops
+		end
 		return "Expanding with " .. troops
 	elseif ty == "attack" then
+		if action.via_ally then
+			return string.format("Marching through allied land to attack %s with %s", s:owner_name(target), troops)
+		end
 		return string.format("Attacking %s with %s", s:owner_name(target), troops)
 	elseif ty == "boat" then
 		if target == 0 then
@@ -1212,6 +1250,22 @@ function UIRules.donate_plan(self: any, own: number): { [string]: any }
 		capped = amount < want,
 		full = cap > 0 and room < math.max(1.0, cap * 0.01),
 	}
+end
+
+--- True when the local player has a living human teammate or ally (who would see a Signal).
+function UIRules.has_mates(self: any): boolean
+	local ctx = self.ctx
+	local s = ctx.state
+	local me = ctx:me()
+	if s == nil or me == 0 then
+		return false
+	end
+	for id, o in s.owners do
+		if id ~= me and o.alive and o.kind == Defs.KIND_HUMAN and s:are_allies(me, id) then
+			return true
+		end
+	end
+	return false
 end
 
 function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
@@ -1426,6 +1480,22 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				danger = false,
 			})
 		end
+	end
+
+	-- Empires Front: markers for the team and allies (Sim.ping): what to hit, where help is needed
+	if playing and me ~= 0 and self:has_mates() then
+		table.insert(items, {
+			id = "ping",
+			label = "Signal",
+			icon = "ping",
+			ok = true,
+			reason = "",
+			danger = false,
+			sub = {
+				{ id = "ping:target", label = "Attack here", icon = "ping_target", ok = true, reason = "", danger = false },
+				{ id = "ping:help", label = "Help here", icon = "ping_help", ok = true, reason = "", danger = false },
+			},
+		})
 	end
 
 	table.insert(items, { id = "focus", label = "Focus", icon = "eye", ok = true, reason = "", danger = false })

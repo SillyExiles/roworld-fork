@@ -27,6 +27,7 @@ local WorldMap = require("./WorldMap")
 local Coop = require("../Net/Coop")
 
 local F_FALLOUT = Defs.F_FALLOUT
+local F_WALL = Defs.F_WALL
 
 local GameState = {}
 GameState.__index = GameState
@@ -73,6 +74,7 @@ local SIGNALS = {
 	"message", -- (to, category, text)
 	"phase_changed", -- (phase, ticks_left)
 	"game_over", -- (winner, reason)
+	"pinged", -- (from, tile, kind) Empires Front Ev.PING: a teammate's or ally's Signal (1 attack here, 2 help here)
 }
 GameState.SIGNAL_NAMES = SIGNALS
 
@@ -220,6 +222,8 @@ function GameState.new(world: any?)
 	self.flags = buffer.create(map.N)
 	--- Tiles currently irradiated (victory counts land that is not fallout; see Rules).
 	self.fallout_count = 0
+	--- Empires Front: tiles holding a Border Wall's stones (Defs.F_WALL)
+	self.wall_count = 0
 	self.owners = {} :: { [number]: OwnerInfo }
 	self.structures = {} :: { [number]: StructInfo }
 	self.roads = {} :: { [number]: RoadInfo }
@@ -519,6 +523,8 @@ function GameState.set_map(self: GameState, map: any)
 	self.owner = buffer.create(map.N * 4)
 	self.flags = buffer.create(map.N)
 	self.fallout_count = 0
+	--- Empires Front: tiles holding a Border Wall's stones (Defs.F_WALL)
+	self.wall_count = 0
 end
 
 --- Owner id of tile `i` (0 = unowned / out of range).
@@ -891,16 +897,24 @@ function GameState.load_snapshot(self: GameState, snap: { [string]: any })
 		self.flags = buffer.create(N)
 	end
 	local fc = 0
+	local wc = 0
 	local flags = self.flags
 	for i = 0, N - 1 do
 		if i % 65536 == 0 then
 			Coop.check()
 		end
-		if buffer.readu8(flags, i) == F_FALLOUT then
-			fc += 1
+		local f = buffer.readu8(flags, i)
+		if f ~= 0 then
+			if bit32.band(f, F_FALLOUT) ~= 0 then
+				fc += 1
+			end
+			if bit32.band(f, F_WALL) ~= 0 then
+				wc += 1
+			end
 		end
 	end
 	self.fallout_count = fc
+	self.wall_count = wc
 
 	for _, row in snap.owners or {} do
 		local o = new_owner_info(row[1])
@@ -977,16 +991,24 @@ function GameState.apply_delta(self: GameState, delta: { [string]: any })
 	if fl ~= nil and #fl > 0 then
 		local flags = self.flags
 		local fc = self.fallout_count
+		local wc = self.wall_count or 0
 		for _, v in fl do
 			local fi = v // 256
-			local was = bit32.band(buffer.readu8(flags, fi), F_FALLOUT) ~= 0
+			local old = buffer.readu8(flags, fi)
+			local was = bit32.band(old, F_FALLOUT) ~= 0
+			local wwas = bit32.band(old, F_WALL) ~= 0
 			buffer.writeu8(flags, fi, v % 256)
 			local now = bit32.band(v, F_FALLOUT) ~= 0
 			if was ~= now then
 				fc += if now then 1 else -1
 			end
+			local wnow = bit32.band(v, F_WALL) ~= 0
+			if wwas ~= wnow then
+				wc += if wnow then 1 else -1
+			end
 		end
 		self.fallout_count = fc
+		self.wall_count = wc
 		self.flags_changed:Fire(fl)
 	end
 	local stats = delta.stats
@@ -1389,6 +1411,13 @@ HANDLERS[Ev.TRAITOR] = function(self, e)
 		o.traitor_until = e[3]
 	end
 	self.traitor_marked:Fire(e[2], e[3])
+end
+
+--- Empires Front: a Signal sent to this player (Sim.ping: only its teammates and allies get one).
+HANDLERS[Ev.PING] = function(self, e)
+	if e[2] == self.local_owner then
+		self.pinged:Fire(e[3], e[4], e[5])
+	end
 end
 
 HANDLERS[Ev.MSG] = function(self, e)

@@ -332,7 +332,8 @@ function LobbyRules.public_weights(maps: { any }): { { id: string, weight: numbe
 	local out = {}
 	for _, m in maps do
 		local w = math.max(0, tonumber(m.weight) or 0)
-		if m.id ~= LobbyRules.WORLD_ID then
+		-- (Empires Front 2026-10-31: no World mode, so World rotates in the free-for-all with the others)
+		if true then
 			for _, c in (if type(m.categories) == "table" then m.categories else {}) do
 				if LobbyRules.WEIRD_CATEGORIES[c] then
 					w *= LobbyRules.WEIRD_FACTOR
@@ -606,6 +607,10 @@ function LobbyRules.team_weights(maps: { any }): { { id: string, weight: number 
 	for _, m in maps do
 		local f: number? = (LobbyRules.TEAM_FREQUENCY :: { [string]: number })[m.id]
 		local w = if f ~= nil then f else math.max(0, tonumber(m.weight) or 0)
+		-- (Empires Front 2026-10-31: the free-for-all maps, World and the continents, are never team games)
+		if m.ffa_only then
+			w = 0
+		end
 		table.insert(out, { id = m.id, weight = w })
 	end
 	return out

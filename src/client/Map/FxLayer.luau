@@ -30,6 +30,9 @@
 -- Every pooled object remembers what it was last given and is written only what changed (2026-10-26,
 -- phones' slow frames: a nuke's 240 debris sprites were written six properties each a frame, with the
 -- view still and between their frames), and spent effects leave their lists in one pass, in order.
+-- Signals (Empires Front, 2026-10-31): a teammate's or ally's marker (GameState.pinged: "attack here"
+-- in red, "help here" in amber) is its pixel glyph with the sender's name under it and a ring pulsing
+-- around it, a fixed size on screen, for PING_S seconds (fading over the last PING_FADE_S).
 local ContentProvider = game:GetService("ContentProvider")
 local RS = game:GetService("ReplicatedStorage")
 local Airfront = RS:WaitForChild("Airfront")
@@ -39,6 +42,7 @@ local Rules = require(Airfront:WaitForChild("Core"):WaitForChild("Rules")) :: an
 -- all new art): the explosions, the debris a nuke leaves and the conquest's flag.
 local MapFx = require(Airfront:WaitForChild("Assets"):WaitForChild("MapFx")) :: any
 local FrameClock = require(script.Parent:WaitForChild("FrameClock")) :: any
+local PixelIcons = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PixelIcons")) :: any
 
 local FxLayer = {}
 FxLayer.__index = FxLayer
@@ -128,6 +132,15 @@ FxLayer.DEBRIS_MAX = 240
 FxLayer.WARHEAD_DEBRIS = 28
 --- how long a strike's warheads are counted together (s)
 FxLayer.WARHEAD_WINDOW_S = 10.0
+--- Signals: lifetime, fade-out, the glyph's size and the ring's widest (px), one pulse a PING_PULSE_S,
+--- at most PING_MAX up at once, and the colours of "attack here" (1) and "help here" (2).
+FxLayer.PING_S = 7.0
+FxLayer.PING_FADE_S = 1.5
+FxLayer.PING_PX = 26
+FxLayer.PING_RING_PX = 54
+FxLayer.PING_PULSE_S = 1.0
+FxLayer.PING_MAX = 12
+FxLayer.PING_COLORS = { Color3.fromRGB(255, 84, 72), Color3.fromRGB(255, 198, 64) }
 
 type Fx = { u: number, v: number, r0: number, r1: number, t0: number, dur: number, col: Color3, flash: boolean }
 type Pop = { u: number, v: number, t0: number, text: string, col: Color3 }
@@ -225,6 +238,9 @@ function FxLayer.new(parent: Instance, view: any)
 	self._warheads_counted = -1.0
 	self._bonus = {} :: { Bonus }
 	self._bonus_gui = {} :: { BonusGui }
+	--- Signals: { u, v, t0, kind, name, from } and their pooled GUI
+	self._pings = {} :: { any }
+	self._ping_gui = {} :: { any }
 	-- Fetch the atlas now: a cold download outlasts the 2.5 s conquest popup.
 	task.spawn(function()
 		pcall(function()
@@ -242,6 +258,7 @@ function FxLayer.bind(self: any, state: any)
 	table.clear(self._debris)
 	table.clear(self._warheads_landed)
 	table.clear(self._bonus)
+	table.clear(self._pings)
 end
 
 function FxLayer.unbind(self: any)
@@ -252,6 +269,11 @@ function FxLayer.unbind(self: any)
 	table.clear(self._debris)
 	table.clear(self._warheads_landed)
 	table.clear(self._bonus)
+	table.clear(self._pings)
+	for _, g in self._ping_gui do
+		g.vis = false
+		g.root.Visible = false
+	end
 	for _, g in self._frames do
 		g.vis = false
 		g.frame.Visible = false
@@ -523,6 +545,172 @@ end
 local function truncate(list: { any }, n: number)
 	for i = #list, n + 1, -1 do
 		list[i] = nil
+	end
+end
+
+--- A Signal from owner `from` at `tile` (kind 1: attack here, 2: help here). GameState.pinged.
+function FxLayer.ping(self: any, from: number, tile: number, kind: number)
+	local st = self._state
+	if st == nil or tile < 0 then
+		return
+	end
+	local W = st.map.W or Defs.W
+	local list = self._pings
+	-- (a sender's new Signal replaces its old one)
+	for i = #list, 1, -1 do
+		if list[i].from == from then
+			table.remove(list, i)
+		end
+	end
+	if #list >= FxLayer.PING_MAX then
+		table.remove(list, 1)
+	end
+	local name = if from == st.local_owner then "You" else st:owner_name(from)
+	table.insert(list, {
+		u = tile % W + 0.5,
+		v = tile // W + 0.5,
+		t0 = FrameClock.now(),
+		kind = if kind == 2 then 2 else 1,
+		name = tostring(name or ""),
+		from = from,
+	})
+end
+
+local function ping_gui(self: any, n: number): any
+	local g = self._ping_gui[n]
+	if g ~= nil then
+		return g
+	end
+	local root = Instance.new("Frame")
+	root.Name = "Signal"
+	root.BackgroundTransparency = 1
+	root.AnchorPoint = Vector2.new(0.5, 0.5)
+	root.Size = UDim2.fromOffset(FxLayer.PING_RING_PX, FxLayer.PING_RING_PX)
+	root.ZIndex = FxLayer.Z + 3
+	root.Parent = self.root
+	local ring = Instance.new("Frame")
+	ring.Name = "Ring"
+	ring.AnchorPoint = Vector2.new(0.5, 0.5)
+	ring.Position = UDim2.fromScale(0.5, 0.5)
+	ring.BackgroundTransparency = 1
+	ring.ZIndex = FxLayer.Z + 3
+	local corner = Instance.new("UICorner")
+	corner.CornerRadius = UDim.new(0.5, 0)
+	corner.Parent = ring
+	local stroke = Instance.new("UIStroke")
+	stroke.Thickness = 2
+	stroke.Parent = ring
+	ring.Parent = root
+	local plate = Instance.new("Frame")
+	plate.Name = "Plate"
+	plate.AnchorPoint = Vector2.new(0.5, 0.5)
+	plate.Position = UDim2.fromScale(0.5, 0.5)
+	plate.Size = UDim2.fromOffset(FxLayer.PING_PX + 8, FxLayer.PING_PX + 8)
+	plate.BackgroundColor3 = Color3.fromRGB(16, 18, 28)
+	plate.BackgroundTransparency = 0.2
+	plate.ZIndex = FxLayer.Z + 4
+	local pc = Instance.new("UICorner")
+	pc.CornerRadius = UDim.new(0.5, 0)
+	pc.Parent = plate
+	local ps = Instance.new("UIStroke")
+	ps.Thickness = 2
+	ps.Parent = plate
+	plate.Parent = root
+	local icon = Instance.new("ImageLabel")
+	icon.Name = "Glyph"
+	icon.BackgroundTransparency = 1
+	icon.AnchorPoint = Vector2.new(0.5, 0.5)
+	icon.Position = UDim2.fromScale(0.5, 0.5)
+	icon.Size = UDim2.fromOffset(FxLayer.PING_PX - 6, FxLayer.PING_PX - 6)
+	icon.ZIndex = FxLayer.Z + 5
+	icon.Parent = plate
+	local label = Instance.new("TextLabel")
+	label.Name = "From"
+	label.BackgroundTransparency = 1
+	label.AnchorPoint = Vector2.new(0.5, 0)
+	label.Position = UDim2.new(0.5, 0, 0.5, FxLayer.PING_PX // 2 + 8)
+	label.AutomaticSize = Enum.AutomaticSize.XY
+	label.Size = UDim2.fromOffset(0, 0)
+	label.FontFace = FxLayer.GOLD_FONT
+	label.TextSize = 13
+	label.TextColor3 = Color3.new(1, 1, 1)
+	label.ZIndex = FxLayer.Z + 5
+	local ls = Instance.new("UIStroke")
+	ls.Color = Color3.new(0, 0, 0)
+	ls.Thickness = 1.5
+	ls.Parent = label
+	label.Parent = root
+	g = {
+		root = root,
+		ring = ring,
+		ring_stroke = stroke,
+		plate = plate,
+		plate_stroke = ps,
+		icon = icon,
+		label = label,
+		label_stroke = ls,
+		vis = true,
+		kind = 0,
+		text = nil,
+	}
+	self._ping_gui[n] = g
+	return g
+end
+
+local function pings_step(self: any, cam: any, now: number)
+	local list = self._pings
+	local keep, n = 0, 0
+	for i = 1, #list do
+		local p = list[i]
+		local el = now - p.t0
+		if el >= FxLayer.PING_S then
+			continue
+		end
+		keep += 1
+		list[keep] = p
+		local x, y = cam:map_to_screen(p.u, p.v)
+		if not cam:on_screen(x, y, FxLayer.PING_RING_PX) then
+			continue
+		end
+		n += 1
+		local g = ping_gui(self, n)
+		if not g.vis then
+			g.vis = true
+			g.root.Visible = true
+		end
+		local col = FxLayer.PING_COLORS[p.kind] or FxLayer.PING_COLORS[1]
+		if g.kind ~= p.kind then
+			g.kind = p.kind
+			pcall(PixelIcons.apply, g.icon, if p.kind == 2 then "ping_help" else "ping_target")
+			g.icon.ImageColor3 = col
+			g.ring_stroke.Color = col
+			g.plate_stroke.Color = col
+		end
+		if g.text ~= p.name then
+			g.text = p.name
+			g.label.Text = p.name
+		end
+		g.root.Position = UDim2.fromOffset(x, y)
+		-- fades over the last PING_FADE_S; the ring pulses out from the plate and fades as it grows
+		local fade = math.clamp((FxLayer.PING_S - el) / FxLayer.PING_FADE_S, 0, 1)
+		local ph = (el % FxLayer.PING_PULSE_S) / FxLayer.PING_PULSE_S
+		local d = FxLayer.PING_PX + (FxLayer.PING_RING_PX - FxLayer.PING_PX) * ph
+		g.ring.Size = UDim2.fromOffset(d, d)
+		g.ring_stroke.Transparency = 1 - (1 - ph) * fade
+		local t = 1 - fade
+		g.icon.ImageTransparency = t
+		g.plate.BackgroundTransparency = 0.2 + 0.8 * t
+		g.plate_stroke.Transparency = t
+		g.label.TextTransparency = t
+		g.label_stroke.Transparency = t
+	end
+	truncate(list, keep)
+	for j = n + 1, #self._ping_gui do
+		local g = self._ping_gui[j]
+		if g.vis then
+			g.vis = false
+			g.root.Visible = false
+		end
 	end
 end
 
@@ -1010,6 +1198,9 @@ function FxLayer.tick(self: any, _dt: number)
 	-- (the debris over the fireball, pushed after it)
 	bursts_step(self, cam, now, self._debris, self._debris_gui, FxLayer.Z + 2)
 	bonus_step(self, cam, now)
+	if #self._pings > 0 or #self._ping_gui > 0 then
+		pings_step(self, cam, now)
+	end
 end
 
 return FxLayer

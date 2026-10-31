@@ -1012,7 +1012,44 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		self:trade_ore(id, _int(it, "target", 0), _str(it, "kind"))
 	elseif kind == "send" then
 		self:send_resource(id, _int(it, "target", 0), _str(it, "kind"), _int(it, "troops", 0))
+	elseif kind == "ping" then
+		self:ping(id, tile, _str(it, "kind"))
 	end
+end
+
+--- Empires Front: Signals. A player marks a tile for their teammates and allies: "target" (attack
+--- here) or "help" (send help here). Each human teammate / ally (and the sender) gets its own
+--- Ev.PING (MatchServer sends it to that player alone) and a line in the feed. At most one Signal
+--- per PING_COOLDOWN ticks per player.
+Sim.PING_COOLDOWN = 15
+function Sim.ping(self: any, id: number, tile: number, kname: string): boolean
+	if tile < 0 or tile >= self.N then
+		return false
+	end
+	local k = if kname == "help" then 2 else 1
+	local at = self._ping_at
+	if at == nil then
+		at = {}
+		self._ping_at = at
+	end
+	if self.tick - (at[id] or -100000) < Sim.PING_COOLDOWN then
+		return false
+	end
+	at[id] = self.tick
+	local own = readi32(self.owner, tile * 4)
+	local where = if own > 0 then self.o_name[own] else "unclaimed land"
+	local text = if k == 2
+		then string.format("%s calls for help at their front", self.o_name[id])
+		else string.format("%s marks a target: %s", self.o_name[id], where)
+	local d = self.d_ev
+	d[#d + 1] = { Ev.PING, id, id, tile, k }
+	for _, h in self.humans do
+		if h ~= id and self.o_alive[h] == 1 and self.o_left[h] == 0 and self:allied(id, h) then
+			d[#d + 1] = { Ev.PING, h, id, tile, k }
+			self:msg(h, Defs.MSG_INFO, text)
+		end
+	end
+	return true
 end
 
 function Sim._set_pending(self: any, id: number, t: number)
@@ -1340,6 +1377,21 @@ function Sim.intent_attack_troops(self: any, id: number, t: number, amount: numb
 	o_troops[id] -= troops
 	self.dbg_flow[id * 5] += troops
 	local a = self:start_attack(id, tg, troops, -1)
+	if a == nil and o_troops[id] >= home - 0.5 and self.team_mode then
+		-- Empires Front (2026-10-31): no border of our own, but a teammate's: the troops march through
+		-- the teammate's land and attack from its border nearest the tap (SimAttacks passage_tile).
+		local via, mate = self:passage_tile(id, tg, t)
+		if via >= 0 then
+			o_troops[id] -= troops
+			a = self:start_passage_attack(id, tg, troops, via)
+			if a ~= nil then
+				if self:is_human(id) then
+					self:msg(id, Defs.MSG_INFO, "Your troops march through " .. self.o_name[mate] .. "'s land")
+				end
+				return true
+			end
+		end
+	end
 	if a == nil and o_troops[id] >= home - 0.5 then
 		-- Refunded: there is no frontier (troops spent cancelling a counter-attack are not refunded).
 		if tg ~= 0 then
@@ -1551,6 +1603,8 @@ function Sim._economy_tick(self: any)
 	local o_bonus_acc = self.o_bonus_acc
 	local max_troops = self.R.max_troops
 	local troop_growth_applied = Rules.troop_growth_applied
+	local barracks_mult = Rules.barracks_mult
+	local S_BARRACKS = Defs.S_BARRACKS
 	local o_bot = self.o_bot
 	local o_skill = self.o_skill
 	local NOVICE = Sim.NOVICE_SKILL
@@ -1570,7 +1624,13 @@ function Sim._economy_tick(self: any)
 		-- Per-tick player update: + troopIncreaseRate troops (whole troops: truncated) and
 		-- + goldAdditionRate gold every tick, never during the spawn phase.
 		-- (Empires Front: the growth the army's food allows: SimEconomy)
-		o_troops[id] += troop_growth_applied(tkind, o_troops[id], cap, tdiff) * self.o_fed[id]
+		local grow = troop_growth_applied(tkind, o_troops[id], cap, tdiff) * self.o_fed[id]
+		-- (Empires Front: finished Barracks levels raise the growth, never past the cap)
+		local bl = o_alevel[id * STRUCT_KINDS + S_BARRACKS]
+		if bl > 0 and grow > 0 then
+			grow = math.min(math.floor(grow * barracks_mult(bl)), math.max(cap - o_troops[id], 0))
+		end
+		o_troops[id] += grow
 		if (tick + id) % 10 == 0 then
 			o_income[id] = Rules.passive_income(kind, o_tiles[id])
 			-- (Empires Front: trade pacts raise it: SimDiplomacy)

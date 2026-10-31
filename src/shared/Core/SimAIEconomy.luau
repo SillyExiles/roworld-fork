@@ -85,7 +85,10 @@ SimAIEconomy.PERCEIVED_COST_STEP = zt({ 1.0, 1.0, 1.0, 0.0, f32(0.3), 1.0 }) -- 
 SimAIEconomy.UPGRADE_DENSITY_FULL_TILES = 1500.0
 -- Build order after defense posts; a city when none of these is due or possible.
 -- (Empires Front: no farms, SAMs or silos)
-SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FORGE }
+-- (2026-10-31: and the Barracks; Border Walls go up against a threat, like defense posts)
+SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FORGE, Defs.S_BARRACKS }
+-- Border Walls a nation raises against a threatening neighbour: at most this many.
+SimAIEconomy.WALL_CAP = 3
 -- Crowded map: more nations than one per this many full-size land tiles.
 SimAIEconomy.CROWDED_FULL_TILES_PER_NATION = 7500.0
 -- A coastal nation's first structure is a port whatever the map's density.
@@ -300,6 +303,11 @@ function SimAIEconomy.install(C)
 				and sim:struct_levels(id, Defs.S_FORGE) < math.min(4, cities // 2)
 				and (sim.o_ore[id] or 0) >= 60 * (sim:struct_levels(id, Defs.S_FORGE) + 1)
 				and age > 600
+		elseif kind == Defs.S_BARRACKS then
+			-- Empires Front: a Barracks level for every two cities (5 at most), once the land grab is over
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_levels(id, Defs.S_BARRACKS) < math.min(Rules.BARRACKS_MAX_LEVELS, cities // 2)
+				and age > 900
 		end
 		return false
 	end
@@ -361,6 +369,21 @@ function SimAIEconomy.install(C)
 			and sim.rng:randf() < 0.35
 		then
 			if self:_spawn_structure(sim, id, S_DEFENSE, cities, threat) then
+				self.last_build[id] = sim.tick
+				self.last_defense[id] = sim.tick
+			end
+			return
+		end
+		-- (Empires Front: then a Border Wall along that front)
+		if
+			cities > 1
+			and threat > 0
+			and sim.o_kind[id] ~= Defs.KIND_TRIBE
+			and sim:struct_count(id, Defs.S_WALL) < math.min(E.WALL_CAP, cities // 2)
+			and sim.tick - self.last_defense[id] >= E.DEFENSE_GAP
+			and sim.rng:randf() < 0.25
+		then
+			if self:_spawn_structure(sim, id, Defs.S_WALL, cities, threat) then
 				self.last_build[id] = sim.tick
 				self.last_defense[id] = sim.tick
 			end
@@ -457,7 +480,7 @@ function SimAIEconomy.install(C)
 			return self:_port_site(sim, id)
 		elseif kind == S_FACTORY then
 			return self:_factory_site(sim, id)
-		elseif kind == S_DEFENSE then
+		elseif kind == S_DEFENSE or kind == Defs.S_WALL then
 			return self:_defense_site(sim, id, threat)
 		elseif kind == S_SAM then
 			local cities = sim:structs_of(id, S_CITY)

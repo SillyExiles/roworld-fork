@@ -858,7 +858,8 @@ function TitleScreen.apply_layout(self)
 		end
 	end
 	local dx = col_x - vp.X * 0.5
-	local emblem_px = if compact then 0.0 else math.clamp(word_px * 0.56, 44.0, 76.0)
+	-- (Empires Front 2026-10-31: no emblem above the title, the wordmark stands alone)
+	local emblem_px = 0.0
 	self._emblem:set_visible(emblem_px > 0.0)
 	self._emblem:set_min_size(Vector2.new(emblem_px, emblem_px))
 	self._tag:set_font_size(if compact then 11 else 15)

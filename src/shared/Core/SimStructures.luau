@@ -41,6 +41,11 @@ local S_DEFENSE = Defs.S_DEFENSE
 local S_SAM = Defs.S_SAM
 local S_SILO = Defs.S_SILO
 local S_ARTILLERY = Defs.S_ARTILLERY
+local S_WALL = Defs.S_WALL
+local F_WALL = Defs.F_WALL
+--- Empires Front: a finished Border Wall re-raises its stones every WALL_REFRESH ticks, so the
+--- line follows the frontier as it moves.
+local WALL_REFRESH = 50
 local U_TRANSPORT = Defs.U_TRANSPORT
 local U_TRADE = Defs.U_TRADE
 local U_WARSHIP = Defs.U_WARSHIP
@@ -699,6 +704,13 @@ function SimStructures.install(C)
 		if self._structs_dead > 64 then
 			self:_compact_structs()
 		end
+		if (self._walls or 0) > 0 and self.tick % WALL_REFRESH == 0 then
+			for _, w in self.struct_list do
+				if not w.dead and w.active and w.kind == S_WALL then
+					self:_raise_wall(w)
+				end
+			end
+		end
 		local building = self.building
 		if #building == 0 then
 			return
@@ -732,6 +744,12 @@ function SimStructures.install(C)
 			self:_cover(s.tile, 1)
 		elseif k == S_ARTILLERY then
 			self:_battery_ready(s)
+		elseif k == S_WALL then
+			self._walls = (self._walls or 0) + 1
+			local n = self:_raise_wall(s)
+			if n > 0 and self:is_human(s.owner) then
+				self:msg(s.owner, Defs.MSG_GOOD, string.format("Border Wall raised: %d tiles of frontier fortified", n))
+			end
 		end
 		local t = s.tile
 		if k == S_FACTORY then
@@ -797,6 +815,8 @@ function SimStructures.install(C)
 				end
 			elseif k == S_DEFENSE then
 				self:_cover(s.tile, -1)
+			elseif k == S_WALL then
+				self._walls = math.max(0, (self._walls or 0) - 1)
 			end
 		end
 		-- A station removed: its railroads go (the network may split into clusters)
@@ -854,6 +874,47 @@ function SimStructures.install(C)
 				string.format("You captured %s from %s", a_an(struct_title(s.kind)), self.o_name[old])
 			)
 		end
+	end
+
+	-- Empires Front: a Border Wall's stones (Defs.F_WALL) on every tile of its owner's frontier within
+	-- Rules.wall_radius() of it: own land with a 4-neighbour held by someone not allied. Returns how
+	-- many tiles got new stones. (The stones fall when the tile changes hands: SimState.set_owner.)
+	function C:_raise_wall(s: Struct): number
+		local id = s.owner
+		if id <= 0 then
+			return 0
+		end
+		local owner = self.owner
+		local flags = self.flags
+		local W, N = self.W, self.N
+		local d_flags = self.d_flags
+		local got = 0
+		local function foe(n: number): boolean
+			local o = readi32(owner, n * 4)
+			return o > 0 and o ~= id and not self:allied(id, o)
+		end
+		for _, t in self:disk_tiles(s.tile, self.R.wall_radius(), true) do
+			if readi32(owner, t * 4) ~= id then
+				continue
+			end
+			local f = readu8(flags, t)
+			if bit32.band(f, F_WALL) ~= 0 then
+				continue
+			end
+			local x = t % W
+			if
+				(x > 0 and foe(t - 1))
+				or (x < W - 1 and foe(t + 1))
+				or (t >= W and foe(t - W))
+				or (t < N - W and foe(t + W))
+			then
+				f = bit32.bor(f, F_WALL)
+				writeu8(flags, t, f)
+				d_flags[#d_flags + 1] = t * 256 + f
+				got += 1
+			end
+		end
+		return got
 	end
 
 	-- Marks the tiles a defense post at `t` covers (geo metric, like _defense_post_covers).

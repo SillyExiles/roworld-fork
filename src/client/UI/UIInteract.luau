@@ -1113,11 +1113,34 @@ function UIInteract.on_radial(self: any, id: string, tile: number)
 		if aid >= 0 then
 			self:retreat(aid)
 		end
+	elseif string.sub(id, 1, 5) == "ping:" then
+		self:send_ping(tile, string.sub(id, 6), pos)
 	elseif id == "focus" then
 		ctx:world_call("focus_tile", { tile })
 	elseif id == "info" then
 		self:show_inspect(tile)
 	end
+end
+
+--- Empires Front: a Signal for the team and allies at `tile` ("target": attack here, "help": help
+--- here). The radial's Signal ring, or G over the map (attack here; Shift+G: help here).
+function UIInteract.send_ping(self: any, tile: number, how: string, pos: Vector2?)
+	local ctx = self.ctx
+	if ctx.state == nil or tile < 0 or not ctx.rules:has_mates() then
+		return false
+	end
+	local k = if how == "help" then "help" else "target"
+	ctx:send({ type = "ping", tile = tile, kind = k })
+	ctx:sfx("click")
+	if pos ~= nil then
+		self:_float(
+			if k == "help" then "Help asked for here" else "Target marked for your team",
+			if k == "help" then "ping_help" else "ping_target",
+			if k == "help" then T().AMBER else T().RED,
+			pos
+		)
+	end
+	return true
 end
 
 --- Nations / tribes / commanders whose capital lies within ~88 full-size tiles of `tile` (spawn advice).
@@ -1677,6 +1700,9 @@ function UIInteract._on_key(self: any, key: Enum.KeyCode, echo: boolean): boolea
 		handled = self:escape()
 	elseif key == K.H then
 		ui:toggle_help()
+	elseif key == K.G and ui:screen() == "play" and self.enabled and self.hover_tile >= 0 and ctx.rules:has_mates() then
+		-- Empires Front: a Signal where the mouse is (Shift: "help here")
+		self:send_ping(self.hover_tile, if shift_down() then "help" else "target", nil)
 	elseif key == K.Tab then
 		-- the leaderboard (Tab, as in most games; Roblox's own player list is off)
 		if ui:screen() == "title" then

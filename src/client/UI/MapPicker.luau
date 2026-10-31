@@ -15,12 +15,10 @@ local Signal = UITheme.core("Signal")
 local MapPicker = W.class(W.Control)
 
 --- Tabs: { label, predicate on the categories set }.
+--- (Empires Front 2026-10-31: one tab, every map; the era filters Antiquity / Medieval / Gunpowder
+--- and All were dropped)
 MapPicker.TABS = {
-	{ "Empires", { featured = true } },
-	{ "Antiquity", { antiquity = true } },
-	{ "Medieval", { medieval = true } },
-	{ "Gunpowder · Sail", { gunpowder = true, age_of_sail = true } },
-	{ "All", nil },
+	{ "Empires", nil },
 }
 MapPicker.CARD = Vector2.new(168, 132)
 MapPicker.GRID_SIZE = Vector2.new(740, 420)

@@ -126,6 +126,9 @@ function Tutorial.new(c: any, ui: any)
 	self._skip.pressed:Connect(function()
 		if self._ending > 0.0 then
 			self:_close()
+		elseif self.active and self._flash <= 0.0 and (Data.STEPS[self._i] or {}).info then
+			-- (a step to read: GOT IT moves on)
+			self:_advance()
 		else
 			self:stop("skipped")
 		end
@@ -172,12 +175,10 @@ function Tutorial.stop(self, how: string)
 	self.ctx:set_ratio_max(1.0)
 	self.ctx.troop_floor = nil
 	if how == "done" then
-		-- the last card: the reward, and where it goes
+		-- the last card: what to do next (2026-10-31: no Stars reward any more)
 		self._ending = Tutorial.END_S
-		self._count:set_text("★")
-		self._text:set_text(
-			string.format("Tutorial complete! +%s Stars\nSpend them in the ARSENAL", UICtx.commas(Data.STARS))
-		)
+		self._count:set_text("DONE")
+		self._text:set_text(Data.DONE_TEXT or "Your empire is ready!")
 		self._bar:set_visible(false)
 		self._skip:set_text("OK")
 		self:_tint(UITheme.GREEN)
@@ -304,7 +305,7 @@ function Tutorial._say(self, i: number, arg: string?)
 	self._fill.Size = UDim2.fromScale(0, 1)
 	self._fill.BackgroundColor3 = UITheme.AMBER
 	self._fill_f = 0.0
-	self._skip:set_text("Skip")
+	self._skip:set_text(if step.info then "Got it" else "Skip")
 	self:_tint(UITheme.AMBER)
 	self._card:set_visible(i > 1)
 	if i > 1 then
@@ -443,6 +444,11 @@ function Tutorial._process(self, delta: number)
 			elseif id == "ratio" then
 				self._ratio_ok = 0.0
 				self._ratio_high = false
+			elseif id == "terrain" then
+				self._relief = self:_find_relief()
+				if self._relief ~= nil then
+					ctx:world_call("focus_tile", { self._relief, -1.0, 0.9 })
+				end
 			elseif id == "city" and not self._gold_given then
 				self._gold_given = true
 				local sim = ctx:session_call("local_sim")
@@ -540,6 +546,15 @@ function Tutorial._process(self, delta: number)
 				point = UICtx.rect_center(r)
 				around = math.min(r.Width, r.Height) * 0.5
 			end
+		elseif id == "terrain" then
+			-- read, then GOT IT (or INFO_S passes): counts as done either way
+			if self._step_t > (step.max_s or Data.INFO_S or 9) then
+				self:_advance()
+				return
+			end
+			if self._relief ~= nil then
+				point = ctx:tile_screen_pos(self._relief)
+			end
 		elseif id == "attack" then
 			if on_owner then
 				self:_advance()
@@ -600,6 +615,48 @@ function Tutorial._process(self, delta: number)
 		end
 	end
 	self:_draw_mark(point, word or step.mark, around)
+end
+
+--- The "terrain" step's example: the mountain (else hill) tile nearest the player's land, within
+--- RELIEF_R tiles, or nil.
+Tutorial.RELIEF_R = 90
+function Tutorial._find_relief(self): number?
+	local s = self.ctx.state
+	local map = s and s.map
+	local me = self.ctx:me()
+	if map == nil or map.terrain == nil or me == 0 then
+		return nil
+	end
+	local c = s:label_tile(me)
+	if type(c) ~= "number" or c < 0 then
+		return nil
+	end
+	local W, H = map.W, map.H
+	local cx, cy = c % W, c // W
+	local R = Tutorial.RELIEF_R
+	local best_m, bd_m = nil, math.huge
+	local best_h, bd_h = nil, math.huge
+	for dy = -R, R, 2 do
+		local y = cy + dy
+		if y < 0 or y >= H then
+			continue
+		end
+		for dx = -R, R, 2 do
+			local x = cx + dx
+			if x < 0 or x >= W then
+				continue
+			end
+			local t = y * W + x
+			local code = buffer.readu8(map.terrain, t)
+			local d = dx * dx + dy * dy
+			if code == Defs.T_MOUNTAIN and d < bd_m then
+				best_m, bd_m = t, d
+			elseif code == Defs.T_HIGHLAND and d < bd_h then
+				best_h, bd_h = t, d
+			end
+		end
+	end
+	return best_m or best_h
 end
 
 --- The command bar's troop count as it shows (phones' compact bar has its own), or nil.

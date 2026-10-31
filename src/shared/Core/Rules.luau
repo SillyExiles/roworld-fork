@@ -222,10 +222,32 @@ local function build(K_LIN: number, into: any?): any
 	--- defense post 5 s, SAM 30 s, silo 10 s. A structure under construction blocks placement and
 	--- counts for prices but does nothing and can't be upgraded.
 	--- (Arsenal: artillery 8 s, airfield 10 s, railgun 15 s.)
-	Rules.BUILD_TICKS = zt({ 20, 50, 20, 50, 300, 100, 80, 100, 150, 60, 40, 60, 60 })
+	--- (Empires Front: farm 6 s, mine 4 s, market 6 s, forge 6 s, border wall 6 s, barracks 5 s.)
+	Rules.BUILD_TICKS = zt({ 20, 50, 20, 50, 300, 100, 80, 100, 150, 60, 40, 60, 60, 60, 50 })
 	--- Upgradable: city, port, factory, SAM and silo gain levels; defense posts don't (nor
 	--- the Arsenal's structures).
-	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1 })
+	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1 })
+	--- Empires Front (2026-10-31) Border Wall: when finished it raises stones on every tile of the
+	--- owner's frontier (own land next to someone else's land) within WALL_RADIUS_FULL full-size tiles
+	--- (Defs.F_WALL). Taking a walled tile costs the attacker WALL_MAG x the troops and WALL_COST x
+	--- the time; the stones fall with the tile.
+	Rules.WALL_RADIUS_FULL = 36.0
+	Rules.WALL_MAG = 6.0
+	Rules.WALL_COST = 5.0
+	--- Barracks: each level adds BARRACKS_GROWTH to the troop growth rate (up to BARRACKS_MAX_LEVELS
+	--- levels count); the troop cap is unchanged.
+	Rules.BARRACKS_GROWTH = 0.2
+	Rules.BARRACKS_MAX_LEVELS = 5
+
+	--- Border Wall reach in OUR tiles (euclidean, map.range_d2).
+	function Rules.wall_radius(): number
+		return Rules.WALL_RADIUS_FULL / K_LIN
+	end
+
+	--- Troop growth multiplier for `levels` finished barracks levels.
+	function Rules.barracks_mult(levels: number): number
+		return 1.0 + Rules.BARRACKS_GROWTH * math.clamp(levels, 0, Rules.BARRACKS_MAX_LEVELS)
+	end
 	--- Build search radius (15 full-size tiles): a build click floods the builder's own
 	--- connected land within this range and builds on the nearest tile with no structure closer than
 	--- STRUCT_MIN_DIST. radiusPortSpawn (20 full-size tiles, manhattan) limits where a port may snap to the coast.
@@ -281,6 +303,10 @@ local function build(K_LIN: number, into: any?): any
 		elseif kind_name == "forge" then
 			-- each level (a new Forge or an upgrade) opens the era's next tier: Data/Eras forge
 			return math.min(4000000, 400000 * 2 ^ math.min(n, 4))
+		elseif kind_name == "wall" then
+			return math.min(400000, 100000 * (n + 1))
+		elseif kind_name == "barracks" then
+			return math.min(1600000, 200000 * 2 ^ math.min(n, 3))
 		end
 		return -1
 	end

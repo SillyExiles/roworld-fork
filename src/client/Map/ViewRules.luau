@@ -96,6 +96,14 @@ function ViewRules.defense_range(): number
 	return num(Rules.DEFENSE_RADIUS, 0)
 end
 
+--- Empires Front: a Border Wall's reach (tiles): its stones go on the frontier within it.
+function ViewRules.wall_range(): number
+	if type(Rules.wall_radius) == "function" then
+		return Rules.wall_radius()
+	end
+	return 36.0 / num(Rules.K_LIN, 1.0)
+end
+
 --- inner, outer blast radii in tiles of nuke kind `kind` (Defs.N_*). MIRV: 0, spread.
 function ViewRules.nuke_radii(kind: number): (number, number)
 	if type(Rules.nuke_radii) == "function" then

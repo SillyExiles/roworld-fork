@@ -110,6 +110,7 @@ MatchServer.BUILD_BUDGET_S = 0.012
 -- Wire constants mirrored from Core (kept local so this module has no Sim dependency).
 local EV_MSG = 19
 local EV_BONUS = 34
+local EV_PING = 36
 local PHASE_PLAYING = 1
 local PHASE_OVER = 2
 
@@ -134,6 +135,10 @@ local function is_private(e: any): number?
 	end
 	-- gold a player earned at a tile (a train's stop): their own map shows it, nobody else's
 	if e[1] == EV_BONUS then
+		return e[2]
+	end
+	-- a Signal: only the teammate or ally it is addressed to sees it (Sim.ping)
+	if e[1] == EV_PING then
 		return e[2]
 	end
 	return nil

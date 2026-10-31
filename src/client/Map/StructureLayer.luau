@@ -38,6 +38,9 @@ local EXTRA_KINDS = {
 	[Defs.S_FARM] = { plate = 1, glyph = "farm" },
 	[Defs.S_MINE] = { plate = 0, glyph = "mine" },
 	[Defs.S_MARKET] = { plate = 2, glyph = "market" },
+	-- (2026-10-31) the Border Wall on the Defense Post's plate, the Barracks on the City's
+	[Defs.S_WALL] = { plate = 3, glyph = "wall" },
+	[Defs.S_BARRACKS] = { plate = 0, glyph = "barracks" },
 }
 local Sprites = require(Airfront:WaitForChild("Assets"):WaitForChild("MapSprites")) :: any
 --- Sprites.shapes_one is used once it is known to have loaded (an image still in moderation would leave
@@ -63,11 +66,11 @@ StructureLayer.GROW_ZOOM = 7.0
 --- per structure kind (Defs.S_*, 0-based) — index with kind + 1: the plate's size (x ICON_SIZE) and
 --- the share of it the glyph spans (ICON_FILL / SHAPE_SCALE of the plate), set with the art
 StructureLayer.SHAPE_SCALE = table.clone(Sprites.shape_scale)
-for _ = 1, 4 do -- the Forge, Farm, Mine, Market
+for _ = 1, 6 do -- the Forge, Farm, Mine, Market, Border Wall, Barracks
 	table.insert(StructureLayer.SHAPE_SCALE, 1.1)
 end
 StructureLayer.ICON_FILL = table.clone(Sprites.icon_fill)
-for _ = 1, 4 do
+for _ = 1, 6 do
 	table.insert(StructureLayer.ICON_FILL, 0.72)
 end
 StructureLayer.FILL_V = 0.65

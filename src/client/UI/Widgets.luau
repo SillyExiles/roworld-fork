@@ -2133,6 +2133,8 @@ end
 
 local function make_text(parent: Instance, weight: number, z: number): TextLabel
 	local t = Instance.new("TextLabel")
+	-- (Roblox's default text is "Label": an empty label must show nothing until its text is set)
+	t.Text = ""
 	t.BackgroundTransparency = 1
 	t.BorderSizePixel = 0
 	t.AnchorPoint = Vector2.zero

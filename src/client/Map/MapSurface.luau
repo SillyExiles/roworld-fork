@@ -37,6 +37,7 @@ local Cosmetics: any = if IS_ROBLOX
 	else (require :: any)("../../shared/Data/Cosmetics")
 
 local F_FALLOUT: number = Defs.F_FALLOUT
+local F_WALL: number = Defs.F_WALL or 2
 
 local band = bit32.band
 local readu8, writeu8 = buffer.readu8, buffer.writeu8
@@ -944,6 +945,18 @@ function MapSurface.tile_pixel(self: MapSurface, i: number): number
 	if o <= 0 or o >= MAX_OWNERS then
 		return 0
 	end
+	-- Empires Front: a Border Wall's stones (Defs.F_WALL), opaque pale stone with every third tile
+	-- in the owner's border colour (crenels), so the line still reads as theirs
+	if band(readu8(flags, i), F_WALL) ~= 0 then
+		local y = i // W
+		if (x + y) % 3 == 0 then
+			return dim(readu32(self.pal_border, o * 4), 0.85)
+		end
+		local h = math.sin(x * 12.9898 + y * 78.233) * 43758.5453
+		h -= math.floor(h)
+		local v = 0.70 + h * 0.12
+		return pack(v * 255, v * 247, v * 228, 255)
+	end
 	local nw = if x > 0 then readi32(own, (i - 1) * 4) else -1
 	local ne = if x < W - 1 then readi32(own, (i + 1) * 4) else -1
 	local nn = if i >= W then readi32(own, (i - W) * 4) else -1
@@ -1061,6 +1074,8 @@ local function paint_queue(self: MapSurface, head: number, last: number)
 	-- the fallout flags are not read while the state has no fallout anywhere)
 	local st0 = self._state
 	local fallout = st0 == nil or (tonumber(st0.fallout_count) or 1) > 0
+	-- (Empires Front: Border Wall stones are a flag too: any flagged tile goes through composite())
+	local flagged = fallout or (tonumber(st0.wall_count) or 0) > 0
 	local hover = self.hover
 	local skins = (self :: any)._skins
 	local st = self._state
@@ -1077,7 +1092,7 @@ local function paint_queue(self: MapSurface, head: number, last: number)
 		local o = readi32(own, k)
 		local x = i % W
 		local y = i // W
-		if (fallout and band(readu8(flags, i), F_FALLOUT) ~= 0) or o >= MAX_OWNERS or (o > 0 and skins[o] ~= nil) then
+		if (flagged and readu8(flags, i) ~= 0) or o >= MAX_OWNERS or (o > 0 and skins[o] ~= nil) then
 			composite(self, i)
 		elseif o <= 0 then
 			writeu32(comp, k, readu32(terrain, k))

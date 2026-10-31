@@ -324,4 +324,55 @@ function BorderTracker.region_touches_me(self: any, tile: number, budget: number
 	return 0
 end
 
+--- Team games (Empires Front, 2026-10-31): can our troops reach the clicked owner's region through a
+--- teammate's land? Flood-fills that region from `tile` (bounded) looking for a teammate's tile next to
+--- it. 1 = a teammate touches it, 0 = region fully explored without one, -1 = budget exhausted.
+--- (The Sim picks the way itself: SimAttacks passage_tile.)
+function BorderTracker.mate_touches(self: any, tile: number, budget: number?): number
+	local s = self.state
+	if s == nil or self.me <= 0 or tile < 0 or s.is_team_game == nil or not s:is_team_game() then
+		return 0
+	end
+	local lim = budget or 6000
+	local own = s.owner
+	local me = self.me
+	local target = owner_at(own, tile)
+	local map = s.map
+	local seen = { [tile] = true }
+	local queue = { tile }
+	local head = 1
+	local ns = table.create(4, 0)
+	local mate: { [number]: boolean } = {}
+	while head <= #queue do
+		if head - 1 >= lim then
+			return -1
+		end
+		local i = queue[head]
+		head += 1
+		self:_neighbours4(i)
+		local cnt = self._nn
+		for k = 1, cnt do
+			ns[k] = self._nb[k]
+		end
+		for k = 1, cnt do
+			local n = ns[k]
+			local o = owner_at(own, n)
+			if o ~= 0 and o ~= me and o ~= target then
+				local m = mate[o]
+				if m == nil then
+					m = s:same_team(me, o) and s:are_allies(me, o)
+					mate[o] = m
+				end
+				if m then
+					return 1
+				end
+			elseif o == target and not seen[n] and map:is_contestable(n) then
+				seen[n] = true
+				table.insert(queue, n)
+			end
+		end
+	end
+	return 0
+end
+
 return BorderTracker

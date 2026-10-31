@@ -15,12 +15,18 @@
 --     and the gentlest AI (DIFFICULTY).
 --
 -- The match is an ordinary solo match otherwise: it goes on after the last step. client/UI/Tutorial
--- runs the steps; server/Analytics logs them as the "Tutorial" funnel (FUNNEL); the Stars are paid
--- once per player (server/Purchases.tutorial_bonus).
+-- runs the steps; server/Analytics logs them as the "Tutorial" funnel (FUNNEL).
+--
+-- Empires Front (2026-10-31): the tutorial was reworked for the empires. It teaches founding the
+-- empire, claiming land, letting the army refill, the first war, the Attack bar, the land itself (hills
+-- and mountains are natural walls: an `info` step, read and dismissed) and the first City. It pays no
+-- Stars any more: the reward is the empire, and the last card says what to do next.
 local Tutorial = {}
 
---- Stars for finishing it (5% of the cheapest Arsenal unlock: the bar on its card moves).
-Tutorial.STARS = 1000
+--- Stars for finishing it: none (2026-10-31). Kept at 0 for old callers.
+Tutorial.STARS = 0
+--- The last card (two short lines).
+Tutorial.DONE_TEXT = "Your empire is ready!\nGrow, ally and conquer to win"
 --- Tribes on the tutorial's map (a normal match has Rules.DEFAULT_TRIBES, 400): room to grow fast.
 Tutorial.TRIBES = 60
 Tutorial.DIFFICULTY = 0
@@ -110,14 +116,17 @@ Tutorial.STEP_MAX_S = 75
 Tutorial.NUDGE_S = 5
 
 --- The steps, in order. `touch` / `desktop`: what the card says; `%s` is the neighbour's name.
+--- `info`: nothing to do but read it; the card's button says GOT IT and moves on (or INFO_S passes).
+--- `mark`: what the tap mark says instead of "Tap here".
+Tutorial.INFO_S = 9
 Tutorial.STEPS = {
-	{ id = "spawn", touch = "Tap the map to start your nation", desktop = "Click the map to start your nation" },
-	{ id = "expand", touch = "Tap the land next to you to take it", desktop = "Click the land next to you to take it" },
+	{ id = "spawn", touch = "Tap the map to found your empire", desktop = "Click the map to found your empire" },
+	{ id = "expand", touch = "Tap the land next to you to claim it", desktop = "Click the land next to you to claim it" },
 	{
 		id = "grow",
-		touch = "Tap empty land to expand",
-		desktop = "Click empty land to expand",
-		wait = "Now let your troops refill",
+		touch = "Troops ready: tap empty land again",
+		desktop = "Troops ready: click empty land again",
+		wait = "Let your troops refill before you expand",
 		-- (the green card of an expansion sent while they refilled)
 		early = "Done! Next time, let the bar fill",
 		bar = true,
@@ -136,6 +145,14 @@ Tutorial.STEPS = {
 		max_s = Tutorial.RATIO_MAX_S,
 	},
 	{
+		id = "terrain",
+		info = true,
+		touch = "Hills and mountains are natural walls: armies cross them slowly",
+		desktop = "Hills and mountains are natural walls: armies cross them slowly",
+		mark = "Mountains",
+		max_s = Tutorial.INFO_S,
+	},
+	{
 		id = "city",
 		touch = "Open BUILD, pick City, tap your land",
 		desktop = "Pick City (1) and click your land",
@@ -145,7 +162,8 @@ Tutorial.STEPS = {
 
 --- The "Tutorial" funnel's steps (Creator Dashboard): 1 is the match starting, then one a step,
 --- then finishing. A step passed over is not logged.
-Tutorial.FUNNEL = { "Started", "Spawned", "First Tap", "Grew", "Attacked", "Used Slider", "Built City", "Completed" }
+Tutorial.FUNNEL =
+	{ "Started", "Spawned", "First Tap", "Grew", "Attacked", "Used Slider", "Saw Terrain", "Built City", "Completed" }
 
 --- The funnel step of finishing step `id` (2..7), or nil.
 function Tutorial.funnel_step(id: string): number?

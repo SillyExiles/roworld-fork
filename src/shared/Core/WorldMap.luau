@@ -215,14 +215,9 @@ function WorldMap.from_terrain(data: { [string]: any }, scale: number?): WorldMa
 		table.insert(nations, { name = tostring(nd.name or "Nation"), flag = nd.flag, x = x, y = y, tile = tile })
 	end
 	m.nations = nations
-	-- Empires Front: the objective's sites (Data/Eras objective), scaled like the nations
-	local sites = {}
-	for _, sd in data.sites or {} do
-		local x = math.clamp(math.floor((tonumber(sd.x) or 0) * w / w0), 0, w - 1)
-		local y = math.clamp(math.floor((tonumber(sd.y) or 0) * h / h0), 0, h - 1)
-		table.insert(sites, { name = tostring(sd.name or "Site"), x = x, y = y, tile = y * w + x })
-	end
-	m.sites = sites
+	-- Empires Front: the empires' objective sites (the gold stars) were removed on 2026-10-31: a match is
+	-- won by holding the land. A map's `sites` are ignored, so no objective and no stars.
+	m.sites = {}
 	m.era = data.era
 	m.ok = true
 	return m

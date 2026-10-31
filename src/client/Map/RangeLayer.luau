@@ -298,6 +298,9 @@ function RangeLayer._build_kind(self: any): number
 			return Defs.S_ARTILLERY
 		elseif k == "airfield" then
 			return Defs.S_AIRFIELD
+		elseif k == "wall" then
+			-- (Empires Front: the reach of a Border Wall's stones, while one is placed)
+			return Defs.S_WALL
 		end
 	elseif ak == "sam" then
 		return Defs.S_SAM
@@ -524,6 +527,7 @@ function RangeLayer._rebuild(self: any)
 				elseif bk == Defs.S_FACTORY then VR.factory_range()
 				elseif bk == Defs.S_ARTILLERY then VR.artillery_range()
 				elseif bk == Defs.S_AIRFIELD then VR.airfield_range()
+				elseif bk == Defs.S_WALL then VR.wall_range()
 				else VR.defense_range(),
 			C_BUILD,
 			bc,

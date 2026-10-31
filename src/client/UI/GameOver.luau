@@ -381,8 +381,11 @@ function GameOver._stars_spec(self): { [string]: any }
 end
 
 --- The match's payout ({ lines, total, balance }, Session.stars_awarded), or nil: the pill counts up.
+--- (Empires Front 2026-10-31: no Stars on the result screen: the payout pill, the next unlock
+--- "MEGA NUKE x / 20,000" and the 2x Stars offer stay hidden, whatever the server pays)
+GameOver.SHOW_STARS = false
 function GameOver.set_award(self, award: any)
-	if award == nil or (tonumber(award.total) or 0) <= 0 then
+	if not GameOver.SHOW_STARS or award == nil or (tonumber(award.total) or 0) <= 0 then
 		self._award = nil
 		self._stars_btn:set_visible(false)
 		self:_refresh_offers()
@@ -407,6 +410,12 @@ end
 
 --- The offers for the payout shown (hidden without one, and while the takeover offer stands).
 function GameOver._refresh_offers(self)
+	if not GameOver.SHOW_STARS then
+		self._goal_key = nil
+		self._goal_wanted = false
+		self._x2_wanted = false
+		return
+	end
 	local sess = self.ctx.session
 	local inv = if sess ~= nil then sess.inventory else nil
 	local o = UIRules.result_offers(self._award, inv, UICtx.data("Arsenal"), self._balance)

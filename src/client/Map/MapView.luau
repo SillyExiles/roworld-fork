@@ -407,6 +407,12 @@ function MapView.bind_state(self: any, state: any)
 	self:_connect(state.conquest, function(by, victim, gold)
 		self:_on_conquest(by, victim, gold)
 	end)
+	-- Empires Front: Signals from teammates and allies (and the player's own), on the map
+	if state.pinged ~= nil then
+		self:_connect(state.pinged, function(from, tile, kind)
+			call(self.layers.fx, "ping", from, tile, kind)
+		end)
+	end
 	-- only the local player's income shows
 	self:_connect(state.bonus, function(owner, tile, gold)
 		if owner ~= 0 and owner == state.local_owner then

@@ -11,7 +11,19 @@ local ShipData = require(script.Parent:WaitForChild("ShipData")) :: any
 local ShipArt = {}
 
 ShipArt.STYLE_OF_ERA =
-	{ rome = "ancient", persia = "ancient", china = "junk", spain = "sail", mongol = "junk", ottoman = "ancient" }
+	{
+		rome = "ancient",
+		persia = "ancient",
+		china = "junk",
+		mongol = "junk",
+		ottoman = "ancient",
+		russia = "sail",
+		britain = "sail",
+		nations = "sail",
+		inca = "ancient",
+		aztec = "ancient",
+		mali = "ancient",
+	}
 
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local INV: { [number]: number } = {}

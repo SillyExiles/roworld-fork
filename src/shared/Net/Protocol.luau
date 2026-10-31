@@ -138,6 +138,7 @@ Protocol.INTENT_TYPES = {
 	"pact_reply", -- {target, kind, accept}
 	"send", -- {target, kind = "ore" | "gold", troops = amount}: send resources to an ally
 	"trade", -- {target, kind = "sell" | "buy"}: an ore deal with a trade-pact partner
+	"ping", -- {tile, kind = "target" | "help"}: a Signal on the map for the team and allies (Sim.ping)
 }
 local INTENT_INDEX: { [string]: number } = {}
 for i, name in Protocol.INTENT_TYPES do

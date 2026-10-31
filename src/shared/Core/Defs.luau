@@ -56,7 +56,11 @@ Defs.S_FORGE = 9
 Defs.S_FARM = 10
 Defs.S_MINE = 11
 Defs.S_MARKET = 12
-Defs.STRUCT_KIND_COUNT = 13
+-- Empires Front (2026-10-31): the Border Wall (stones along the owner's frontier near it: SimStructures
+-- _raise_wall, F_WALL) and the Barracks (troops regrow faster: Rules.barracks_mult)
+Defs.S_WALL = 13
+Defs.S_BARRACKS = 14
+Defs.STRUCT_KIND_COUNT = 15
 Defs.STRUCT_NAMES = {
 	[0] = "city",
 	"port",
@@ -71,6 +75,8 @@ Defs.STRUCT_NAMES = {
 	"farm",
 	"mine",
 	"market",
+	"wall",
+	"barracks",
 }
 --- Empires Front: structure kinds kept in the code but not built (2026-10-31: no SAMs, silos, Arsenal, farms)
 Defs.DISABLED_STRUCT = {
@@ -95,6 +101,8 @@ Defs.STRUCT_TITLES = {
 	"Farm",
 	"Mine",
 	"Market",
+	"Border Wall",
+	"Barracks",
 }
 
 -- Unit kinds
@@ -143,11 +151,13 @@ Defs.UNLOCK = {
 }
 Defs.UNLOCK_ALL = 127
 --- The unlock a structure kind (Defs.S_*) / a munition (Defs.N_*) needs: 0 = none.
-Defs.STRUCT_UNLOCK = { [0] = 0, 0, 0, 0, 0, 0, 8, 16, 32, 0, 0, 0, 0 }
+Defs.STRUCT_UNLOCK = { [0] = 0, 0, 0, 0, 0, 0, 8, 16, 32, 0, 0, 0, 0, 0, 0 }
 Defs.NUKE_UNLOCK = { [0] = 0, 0, 0, 0, 1, 2, 8, 16, 32 }
 
 -- Tile flags (GameState.flags / delta "flags")
 Defs.F_FALLOUT = 1
+-- Empires Front: a Border Wall's stones on the tile (they fall when the tile changes hands)
+Defs.F_WALL = 2
 
 -- Unit removal reasons
 Defs.DEL_ARRIVED = 0

@@ -8,7 +8,23 @@ local UIMaps = {}
 
 UIMaps.DEFAULT_ID = "rome"
 --- The source manifests' featured_rank (the registry does not carry it).
-UIMaps.FEATURED_RANK = { rome = 1, persia = 2, mongol = 3, china = 4, ottoman = 5, spain = 6 }
+UIMaps.FEATURED_RANK = {
+	rome = 1,
+	persia = 2,
+	mongol = 3,
+	china = 4,
+	ottoman = 5,
+	russia = 6,
+	inca = 7,
+	aztec = 8,
+	mali = 9,
+	-- (the free-for-all maps)
+	world = 10,
+	europe = 11,
+	africa = 12,
+	northamerica = 13,
+	southamerica = 14,
+}
 
 local _entries: { any }? = nil
 local _by_id: { [string]: any } = {}

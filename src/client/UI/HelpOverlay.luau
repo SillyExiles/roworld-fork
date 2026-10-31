@@ -195,6 +195,9 @@ function HelpOverlay._fill_rules(text: string): string
 		spacing = tostring(Defs.round(R.STRUCT_MIN_DIST)),
 		def_mag = tostring(Defs.round(R.DEFENSE_POST_MAG)),
 		def_cost = tostring(Defs.round(R.DEFENSE_POST_COST)),
+		wall_mag = tostring(Defs.round(R.WALL_MAG or 6)),
+		wall_cost = tostring(Defs.round(R.WALL_COST or 5)),
+		bar_pct = tostring(math.floor((R.BARRACKS_GROWTH or 0.2) * 100 + 0.5)),
 		sam_r = tostring(Defs.round(R.sam_range(1))),
 		ws_retreat = tostring(
 			Defs.round((tonumber(UIRules.rules_const("WARSHIP_RETREAT_FRAC", 0.75)) or 0.75) * 100.0)
@@ -243,13 +246,25 @@ HelpOverlay.SECTIONS = {
 		title = "Build your economy",
 		builds = true,
 		wide = true,
-		text = "Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 8) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time.",
+		text = "Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 9, 0) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time.",
 	},
 	{
 		icon = "crown",
 		color = "gold",
-		title = "Glory or domination",
-		text = "Every empire has its own goal: hold all of its gold-starred cities at once for a minute and you win. Or hold {win}% of the land (scorched land doesn't count). Multiplayer matches end after 40 minutes and the largest nation wins. Lose all your land and you're out.",
+		title = "Victory, land & teams",
+		text = "Hold {win}% of the land to win (scorched land doesn't count). Hills and mountains are natural walls: armies cross them slowly and at a high cost. In team games your troops can march through your teammates' land, and when one of you is attacked the others send troops to hold the line. Multiplayer matches end after 40 minutes and the largest nation wins. Lose all your land and you're out.",
+	},
+	{
+		icon = "wall",
+		color = "orange",
+		title = "Walls, barracks & revolts",
+		text = "A Border Wall raises stones along your frontier near it: taking a walled tile costs {wall_mag}× the troops and {wall_cost}× the time, and the stones fall with the tile. Each Barracks level makes your army grow {bar_pct}% faster. A huge empire with too few troops can face a revolt: its far provinces break away as rebels, taking land and soldiers with them. Keep your army strong to keep the peace.",
+	},
+	{
+		icon = "ping",
+		color = "cyan",
+		title = "Signals",
+		text = "With teammates or allies, open the action menu on any spot and pick Signal: \"Attack here\" or \"Help here\" marks it on their maps. Or press G over the map (Shift + G asks for help).",
 	},
 }
 --- The "Credits & licence" card, last: the AGPL's Appropriate Legal Notices (a copyright notice, no

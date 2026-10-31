@@ -298,6 +298,7 @@ function ServerMain.start()
 				categories = m.categories,
 				land = m.land_tiles,
 				k_lin = m.k_lin,
+				ffa_only = m.ffa_only,
 			})
 		end
 		return out
@@ -865,11 +866,9 @@ function ServerMain.start()
 			end
 			-- a solo match starts its clock here (its Stars can't outrun it: server/Rewards)
 			local kind, mode = ...
+			-- (Empires Front 2026-10-31: finishing the tutorial no longer pays Stars)
 			if kind == "match_start" then
 				Rewards.solo_started(player, mode)
-			elseif kind == "tutorial" and mode == #TutorialData.FUNNEL then
-				-- the tutorial's last step: its Stars, once per player
-				task.spawn(Purchases.tutorial_bonus, player, TutorialData.STARS)
 			end
 		elseif op == OP.SOLO_RESULT then
 			local c_used = credit_budget[player] or 0

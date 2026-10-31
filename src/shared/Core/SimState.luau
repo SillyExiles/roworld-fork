@@ -23,6 +23,7 @@ local Coop = require("../Net/Coop")
 local MAXO = Defs.MAX_OWNERS
 local STRUCT_KINDS = 16
 local F_FALLOUT = Defs.F_FALLOUT
+local F_WALL = Defs.F_WALL
 
 local readi32 = buffer.readi32
 local writei32 = buffer.writei32
@@ -217,6 +218,17 @@ local function set_owner(self: any, t: number, nw: number)
 			local po = self.pending_out
 			po[#po + 1] = old
 			self.o_killer[old] = nw
+		end
+	end
+	-- Empires Front: a Border Wall's stones fall with the tile (Defs.F_WALL)
+	do
+		local flags = self.flags
+		local f = readu8(flags, t)
+		if bit32.band(f, F_WALL) ~= 0 then
+			f = bit32.band(f, bit32.bnot(F_WALL))
+			writeu8(flags, t, f)
+			local d_flags = self.d_flags
+			d_flags[#d_flags + 1] = t * 256 + f
 		end
 	end
 	if nw ~= 0 then

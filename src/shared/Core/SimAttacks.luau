@@ -36,14 +36,31 @@
 -- out wait in the sparse `over` (key → stack). The border set is the `fmark` i32 buffer (tile → aid
 -- of the attack whose border holds it); a tile in two attacks' borders at once goes to the second
 -- attack's `xb` set.
+--
+-- Empires Front, team games (2026-10-31):
+--   * passage: troops may march through a teammate's land. An order on land the player does not
+--     border starts from the teammate's tile next to it nearest the tap (`via`, see passage_tile), so
+--     a player boxed in by allies, with no coast, can still reach the enemy beyond them. Such an
+--     attack may take tiles that touch the teammate (not only the attacker) and is re-seeded from
+--     `via` when it absorbs a new order;
+--   * call to arms: every AID_PERIOD ticks, the teammates of a nation under attack send it troops
+--     (_team_aid_tick): each gives AID_SHARE of what it holds above AID_KEEP of its own cap, the lot
+--     no more than AID_COVER of the troops attacking and the room under the defender's cap.
+-- Empires Front, revolts (2026-10-31): an empire stretched thin (at least REVOLT_MIN_SHARE of the land,
+-- troops under REVOLT_LOW_TROOPS of its cap) may see its far provinces rise (_revolts_tick, every
+-- REVOLT_PERIOD ticks once play has run REVOLT_FROM_TICKS): the border tile farthest from its heart
+-- and the empire's land in a disk around it (about REVOLT_SHARE of its tiles) break away as a rebel
+-- tribe, with REVOLT_TROOPS of the empire's troops as defectors and a levy of their own.
 local Defs = require("./Defs")
 local Ev = require("./Ev")
 local Rules = require("./Rules")
 local SimState = require("./SimState")
+local NumberFormat = require("./NumberFormat")
 local Coop = require("../Net/Coop")
 
 local MAXO = Defs.MAX_OWNERS
 local F_FALLOUT = Defs.F_FALLOUT
+local F_WALL = Defs.F_WALL
 local RING = 256
 local RING_MASK = 255
 local PRIORITY_BASE = Rules.PRIORITY_BASE
@@ -58,6 +75,33 @@ local touches = SimState.touches
 
 local SimAttacks = {}
 SimAttacks.RING = RING
+
+--- Call to arms (team games): ticks between two rounds of aid (10 ticks = 1 s).
+SimAttacks.AID_PERIOD = 10
+--- Share of a teammate's spare troops (above AID_KEEP of its cap) sent each round.
+SimAttacks.AID_SHARE = 0.12
+--- A teammate keeps this share of its own cap at home whatever happens.
+SimAttacks.AID_KEEP = 0.35
+--- A round's aid to one defender is at most this share of the troops attacking it.
+SimAttacks.AID_COVER = 0.35
+--- Messages about the aid, once per pair in this many ticks.
+SimAttacks.AID_MSG_TICKS = 300
+
+--- Revolts: ticks between two checks (10 s), none in the first REVOLT_FROM_TICKS of play (5 min).
+SimAttacks.REVOLT_PERIOD = 100
+SimAttacks.REVOLT_FROM_TICKS = 3000
+--- Only an empire holding this share of the land, with troops under this share of its cap.
+SimAttacks.REVOLT_MIN_SHARE = 0.06
+SimAttacks.REVOLT_LOW_TROOPS = 0.25
+--- Chance per check for an empire that qualifies (scaled up to it by land: full at 15%).
+SimAttacks.REVOLT_CHANCE = 0.12
+--- One revolt per empire in this many ticks at most (3 min); this many per match at most.
+SimAttacks.REVOLT_COOLDOWN = 1800
+SimAttacks.REVOLT_MAX = 40
+--- The rebels take about this share of the empire's tiles and of its troops.
+SimAttacks.REVOLT_SHARE = 0.08
+SimAttacks.REVOLT_TROOPS = 0.25
+SimAttacks.REVOLT_COLOR = Defs.html_rgba("#8a5a44")
 
 --- A new Attack record (GDScript class SimAttacks.Attack).
 function SimAttacks.new_attack(): any
@@ -93,6 +137,8 @@ function SimAttacks.new_attack(): any
 		pend = 0.0,
 		--- Started while the target was attacking us (a counter-attack, not a declaration of war).
 		counter = false,
+		--- Team games: the teammate's tile the troops marched through (-1: none; passage_tile).
+		via = -1,
 		dead = false,
 	}
 end
@@ -397,6 +443,16 @@ local function _seed_from_border(self: any, a: any): number
 		_add_neighbors(self, a, b)
 		b = readi32(bnext, b * 4)
 	end
+	-- (an attack that marched through a teammate's land keeps its way in while the teammate holds it)
+	local via = a.via
+	if via ~= nil and via >= 0 then
+		local o = readi32(self.owner, via * 4)
+		if o ~= 0 and o ~= a.attacker and self:same_team(a.attacker, o) and self:allied(a.attacker, o) then
+			_add_neighbors(self, a, via)
+		else
+			a.via = -1
+		end
+	end
 	return a.front
 end
 
@@ -688,6 +744,12 @@ function SimAttacks.install(C: any)
 		if #self._merges > 0 then
 			self:_apply_merges()
 		end
+		if self.team_mode and tick % SimAttacks.AID_PERIOD == 0 then
+			self:_team_aid_tick()
+		end
+		if tick % SimAttacks.REVOLT_PERIOD == 0 and self.no_revolts ~= true then
+			self:_revolts_tick()
+		end
 		-- Compact dead attacks.
 		local w = 0
 		local n = #attacks
@@ -829,7 +891,13 @@ function SimAttacks.install(C: any)
 				return
 			end
 			local t = a.head
-			if t >= 0 and (readi32(owner, t * 4) ~= tg or not touches(self, t, at)) then
+			if
+				t >= 0
+				and (
+					readi32(owner, t * 4) ~= tg
+					or not (touches(self, t, at) or (a.via >= 0 and self:_touches_mate(t, at)))
+				)
+			then
 				a.head = -1
 				a.chew = 0.0
 				t = -1
@@ -844,7 +912,11 @@ function SimAttacks.install(C: any)
 					self:end_attack(a, true)
 					return
 				end
-				if readi32(owner, t * 4) ~= tg or readu8(land, t) == 0 or not touches(self, t, at) then
+				if
+					readi32(owner, t * 4) ~= tg
+					or readu8(land, t) == 0
+					or not (touches(self, t, at) or (a.via >= 0 and self:_touches_mate(t, at)))
+				then
 					continue
 				end
 				-- _add_neighbors(tile) runs before the tile changes hands.
@@ -860,9 +932,15 @@ function SimAttacks.install(C: any)
 				mag *= Rules.DEFENSE_POST_MAG
 				tc *= Rules.DEFENSE_POST_COST
 			end
-			if bit32.band(readu8(flags, t), F_FALLOUT) ~= 0 then
+			local tflags = readu8(flags, t)
+			if bit32.band(tflags, F_FALLOUT) ~= 0 then
 				mag *= fo_mod
 				tc *= fo_mod
+			end
+			-- Empires Front: a Border Wall's stones (Defs.F_WALL) cost the attacker dear
+			if not neutral and bit32.band(tflags, F_WALL) ~= 0 then
+				mag *= Rules.WALL_MAG
+				tc *= Rules.WALL_COST
 			end
 			local loss: number
 			local tf: number
@@ -1065,6 +1143,353 @@ function SimAttacks.install(C: any)
 	end
 
 	C.conquer = conquer
+
+	-- =========================================================================================
+	-- Empires Front: team games (passage through a teammate's land, call to arms)
+	-- =========================================================================================
+
+	--- True when `o` is a teammate of `id` still in the match (friendly through the team).
+	function C._is_mate(self: any, id: number, o: number): boolean
+		return o > 0 and o ~= id and self:same_team(id, o) and self:allied(id, o) and self.o_alive[o] == 1
+	end
+
+	--- True when a teammate of `id` owns a 4-neighbour of `t`.
+	function C._touches_mate(self: any, t: number, id: number): boolean
+		local owner = self.owner
+		local W = self.W
+		local x = t % W
+		local o
+		if x > 0 then
+			o = readi32(owner, (t - 1) * 4)
+			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+				return true
+			end
+		end
+		if x < W - 1 then
+			o = readi32(owner, (t + 1) * 4)
+			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+				return true
+			end
+		end
+		if t >= W then
+			o = readi32(owner, (t - W) * 4)
+			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+				return true
+			end
+		end
+		if t < self.N - W then
+			o = readi32(owner, (t + W) * 4)
+			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+				return true
+			end
+		end
+		return false
+	end
+
+	--- Team games: the way through a teammate's land to `target`'s land (0: unclaimed land) for `id`,
+	--- nearest tile `toward`: a teammate's border tile with a land neighbour of `target`, and that
+	--- teammate (-1, 0 when no teammate borders it).
+	function C.passage_tile(self: any, id: number, target: number, toward: number): (number, number)
+		if not self.team_mode or self.o_team[id] == 0 then
+			return -1, 0
+		end
+		local owner = self.owner
+		local land = self.land
+		local bnext = self.bnext
+		local W = self.W
+		local N = self.N
+		local tx, ty = toward % W, toward // W
+		local best, best_mate, best_d = -1, 0, math.huge
+		local seen = 0
+		for m = 1, self.owner_total do
+			if not self:_is_mate(id, m) then
+				continue
+			end
+			local b = self.bhead[m]
+			while b ~= -1 do
+				seen += 1
+				if seen % 4096 == 0 then
+					Coop.check()
+				end
+				local x = b % W
+				local hit = false
+				if x > 0 and readi32(owner, (b - 1) * 4) == target and readu8(land, b - 1) == 1 then
+					hit = true
+				elseif x < W - 1 and readi32(owner, (b + 1) * 4) == target and readu8(land, b + 1) == 1 then
+					hit = true
+				elseif b >= W and readi32(owner, (b - W) * 4) == target and readu8(land, b - W) == 1 then
+					hit = true
+				elseif b < N - W and readi32(owner, (b + W) * 4) == target and readu8(land, b + W) == 1 then
+					hit = true
+				end
+				if hit then
+					local dx, dy = x - tx, b // W - ty
+					local d = dx * dx + dy * dy
+					if d < best_d then
+						best, best_mate, best_d = b, m, d
+					end
+				end
+				b = readi32(bnext, b * 4)
+			end
+		end
+		return best, best_mate
+	end
+
+	--- Starts (or joins) an attack of `id` on `target` through teammate land at `via` (passage_tile)
+	--- with `troops` already taken from home. The attack or nil (troops refunded).
+	function C.start_passage_attack(self: any, id: number, target: number, troops: number, via: number): any?
+		local a = self:start_attack(id, target, troops, via)
+		if a ~= nil then
+			a.via = via
+		end
+		return a
+	end
+
+	--- Call to arms: the teammates of every nation under attack send it troops (see the header).
+	function C._team_aid_tick(self: any)
+		local o_alive = self.o_alive
+		local o_troops = self.o_troops
+		local o_cap = self.o_cap
+		local o_team = self.o_team
+		-- troops attacking each defender (non-friendly attackers only), and its strongest attacker
+		local pressure: { [number]: number } = {}
+		local enemy: { [number]: number } = {}
+		local strongest: { [number]: number } = {}
+		local order: { number } = {}
+		for _, a in self.attacks do
+			local v = a.target
+			if a.dead or v <= 0 or a.troops < 1.0 or a.retreat_at > 0 or o_alive[v] == 0 or o_team[v] == 0 then
+				continue
+			end
+			if self:allied(a.attacker, v) then
+				continue
+			end
+			if pressure[v] == nil then
+				pressure[v] = 0.0
+				strongest[v] = 0.0
+				table.insert(order, v)
+			end
+			pressure[v] += a.troops
+			if a.troops > strongest[v] then
+				strongest[v] = a.troops
+				enemy[v] = a.attacker
+			end
+		end
+		if #order == 0 then
+			return
+		end
+		table.sort(order)
+		local msg_at = self._aid_msg_tick
+		if msg_at == nil then
+			msg_at = {}
+			self._aid_msg_tick = msg_at
+		end
+		for _, v in order do
+			local room = math.max(0.0, (o_cap[v] or 0.0) - o_troops[v])
+			local want = math.min(room, pressure[v] * SimAttacks.AID_COVER)
+			if want < 1.0 then
+				continue
+			end
+			-- what each teammate can spare this round (a teammate under attack itself keeps its army)
+			local mates: { number } = {}
+			local spare: { [number]: number } = {}
+			local total = 0.0
+			for m = 1, self.owner_total do
+				if m == v or pressure[m] ~= nil or not self:_is_mate(v, m) then
+					continue
+				end
+				local s = (o_troops[m] - SimAttacks.AID_KEEP * (o_cap[m] or 0.0)) * SimAttacks.AID_SHARE
+				if s >= 1.0 then
+					table.insert(mates, m)
+					spare[m] = s
+					total += s
+				end
+			end
+			if total < 1.0 then
+				continue
+			end
+			local k = math.min(1.0, want / total)
+			local got = 0.0
+			for _, m in mates do
+				local amount = math.floor(spare[m] * k)
+				if amount < 1 then
+					continue
+				end
+				o_troops[m] -= amount
+				o_troops[v] += amount
+				got += amount
+				local mk = m * 1024 + v
+				if self:is_human(m) and self.tick - (msg_at[mk] or -100000) >= SimAttacks.AID_MSG_TICKS then
+					msg_at[mk] = self.tick
+					self:msg(
+						m,
+						Defs.MSG_INFO,
+						string.format(
+							"Call to arms: your troops march to defend %s against %s",
+							self.o_name[v],
+							self.o_name[enemy[v]] or "the enemy"
+						)
+					)
+				end
+			end
+			local vk = v * 1024
+			if got >= 1.0 and self:is_human(v) and self.tick - (msg_at[vk] or -100000) >= SimAttacks.AID_MSG_TICKS then
+				msg_at[vk] = self.tick
+				self:msg(
+					v,
+					Defs.MSG_GOOD,
+					string.format("Your team answers the call: %s troops sent to hold the line", NumberFormat.render_troops(got))
+				)
+			end
+		end
+	end
+
+	--- Revolts: which stretched-thin empires see a province rise this check (see the header).
+	function C._revolts_tick(self: any)
+		local since = self.playing_since or -1
+		if since < 0 or self.tick - since < SimAttacks.REVOLT_FROM_TICKS then
+			return
+		end
+		if (self._revolt_n or 0) >= SimAttacks.REVOLT_MAX then
+			return
+		end
+		local last = self._revolt_at
+		if last == nil then
+			last = {}
+			self._revolt_at = last
+		end
+		local o_alive = self.o_alive
+		local o_spawned = self.o_spawned
+		local o_kind = self.o_kind
+		local o_troops = self.o_troops
+		local o_cap = self.o_cap
+		local rng = self.rng
+		-- (owner_total grows as rebels appear: the bound is read once)
+		local total = self.owner_total
+		for id = 1, total do
+			if o_alive[id] == 0 or o_spawned[id] == 0 or o_kind[id] == Defs.KIND_TRIBE then
+				continue
+			end
+			local share = self:land_share(id)
+			if share < SimAttacks.REVOLT_MIN_SHARE then
+				continue
+			end
+			if o_troops[id] >= SimAttacks.REVOLT_LOW_TROOPS * (o_cap[id] or 0.0) then
+				continue
+			end
+			if self.tick - (last[id] or -1000000) < SimAttacks.REVOLT_COOLDOWN then
+				continue
+			end
+			local chance = SimAttacks.REVOLT_CHANCE * math.min(1.0, share / 0.15)
+			if rng:randf() >= chance then
+				continue
+			end
+			last[id] = self.tick
+			if self:_revolt(id) then
+				self._revolt_n = (self._revolt_n or 0) + 1
+				if self._revolt_n >= SimAttacks.REVOLT_MAX then
+					return
+				end
+			end
+		end
+	end
+
+	--- A province of `id` rises: returns true when rebels took land.
+	function C._revolt(self: any, id: number): boolean
+		local tiles = self.o_tiles[id]
+		if tiles < 40 then
+			return false
+		end
+		local owner = self.owner
+		local W = self.W
+		-- the heart of the empire: its centroid
+		local cx = self.o_cx[id] / tiles
+		local cy = self.o_cy[id] / tiles
+		-- the far province: the border tile farthest from the heart (a little noise so two revolts of
+		-- one empire do not always rise at the same end)
+		local salt = self.tick * 0.618 + id * 1.37
+		local best, bd = -1, -1.0
+		local t = self.bhead[id]
+		local seen = 0
+		while t ~= -1 do
+			local x = t % W
+			local y = t // W
+			local dx, dy = x - cx, y - cy
+			local h = math.sin(t * 12.9898 + salt) * 43758.5453
+			h -= math.floor(h)
+			local d = (dx * dx + dy * dy) * (0.75 + 0.5 * h)
+			if d > bd then
+				best, bd = t, d
+			end
+			seen += 1
+			if seen % 4096 == 0 then
+				Coop.check()
+			end
+			t = readi32(self.bnext, t * 4)
+		end
+		if best < 0 then
+			return false
+		end
+		-- the rebels' disk: about REVOLT_SHARE of the empire's tiles
+		local want = math.max(12, math.floor(tiles * SimAttacks.REVOLT_SHARE))
+		local r = math.clamp(math.sqrt(want / math.pi) * 1.25, 3.0, 80.0)
+		local take: { number } = {}
+		for _, c in self:disk_tiles(best, r, true) do
+			if readi32(owner, c * 4) == id then
+				take[#take + 1] = c
+			end
+		end
+		if #take < 8 then
+			return false
+		end
+		-- nearest the epicentre first, no more than `want` tiles
+		local range_d2 = self.range_d2
+		table.sort(take, function(a, b)
+			local da, db = range_d2(a, best), range_d2(b, best)
+			if da ~= db then
+				return da < db
+			end
+			return a < b
+		end)
+		local n_rebels = (self._revolt_names or {})[id] or 0
+		if self._revolt_names == nil then
+			self._revolt_names = {}
+		end
+		self._revolt_names[id] = n_rebels + 1
+		local name = self.o_name[id] .. " Rebels"
+		if n_rebels > 0 then
+			name ..= " " .. tostring(n_rebels + 1)
+		end
+		local rid = self:add_owner(name, SimAttacks.REVOLT_COLOR, Defs.KIND_TRIBE)
+		if rid <= 0 then
+			return false
+		end
+		local taken = 0
+		for i = 1, math.min(#take, want) do
+			set_owner(self, take[i], rid)
+			taken += 1
+		end
+		-- defectors from the empire's army, and a levy raised in the province
+		local defect = math.floor(self.o_troops[id] * SimAttacks.REVOLT_TROOPS)
+		self.o_troops[id] -= defect
+		local levy = math.floor(0.5 * self.R.max_troops(Defs.KIND_TRIBE, taken, 0, self.difficulty))
+		self.o_troops[rid] = defect + levy
+		self.o_spawned[rid] = 1
+		self.o_spawn_tile[rid] = best
+		self:ev({ Ev.SPAWNED, rid, best })
+		self:msg(
+			id,
+			Defs.MSG_BAD,
+			string.format(
+				"Revolt! Your far provinces rise: %d tiles and %s troops break away as the %s",
+				taken,
+				NumberFormat.render_troops(defect + levy),
+				name
+			)
+		)
+		self:msg_others(id, Defs.MSG_INFO, string.format("Revolt in %s: the %s take up arms", self.o_name[id], name))
+		return true
+	end
 
 	--- Overridden by SimStructures: true when a defense post of `id` covers tile `t`.
 	function C._defense_post_covers(_self: any, _t: number, _id: number): boolean

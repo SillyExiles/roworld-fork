@@ -810,6 +810,11 @@ function CommandBar.refresh(self, animate: boolean?)
 	-- at 0, so a nation above its cap after losing land reads +0/s), green while the rate is not
 	-- falling and orange once it is (sample_growth). Attacks spend troops but do not slow it.
 	local per_tick = Rules.troop_growth(o.kind, o.troops, math.max(o.max_troops, 1), self:_difficulty())
+	-- (Empires Front: Barracks raise the growth, never past the cap: Sim._economy_tick)
+	local bl = s:struct_level_sum(o.id, Defs.S_BARRACKS)
+	if bl > 0 and per_tick > 0 then
+		per_tick = math.min(per_tick * Rules.barracks_mult(bl), math.max(o.max_troops - o.troops, 0))
+	end
 	self._rate = per_tick * Defs.TICK_RATE
 	self._growth:set_text(UIRules().troop_rate_text(self._rate))
 	T.set_font_color(self._growth, if self._rate_up then T.GREEN else T.ORANGE)

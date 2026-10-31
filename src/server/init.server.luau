@@ -9,18 +9,6 @@ if type(dev) == "string" and dev ~= "" then
 		return
 	end
 end
--- Empires Front: achievements and badges (server/Achievements)
-do
-	local mod = script:FindFirstChild("Achievements")
-	if mod then
-		local ok, err = pcall(function()
-			require(mod).start()
-		end)
-		if not ok then
-			warn("[EmpiresFront] achievements: " .. tostring(err))
-		end
-	end
-end
 local Server = script:FindFirstChild("ServerMain")
 if Server then
 	require(Server).start()
