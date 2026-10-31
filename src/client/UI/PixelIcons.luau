@@ -175,6 +175,15 @@ PixelIcons.ALIASES = {
 	market = "market",
 	ore = "ore",
 	pact = "pact",
+	-- the ally's menu (2026-10-31)
+	alliance = "alliance",
+	betray = "betray",
+	donate = "donate",
+	renew = "renew",
+	pact_trade = "pact_trade",
+	pact_defense = "pact_defense",
+	ore_sell = "ore_sell",
+	ore_buy = "ore_buy",
 }
 
 function PixelIcons.has(name: string?): boolean

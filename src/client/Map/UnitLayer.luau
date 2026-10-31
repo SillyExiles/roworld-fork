@@ -43,6 +43,11 @@ local Sprites = require(Airfront:WaitForChild("Assets"):WaitForChild("MapSprites
 local WakeRoute = require(script.Parent:WaitForChild("WakeRoute")) :: any
 local TrailBudget = require(script.Parent:WaitForChild("TrailBudget")) :: any
 local FrameClock = require(script.Parent:WaitForChild("FrameClock")) :: any
+--- Empires Front: the eras' ships (Map/ShipArt), drawn instead of the base atlas' boats
+local ShipArt = require(script.Parent:WaitForChild("ShipArt")) :: any
+local SHIP_KIND = { [0] = "transport", [1] = "trade", [2] = "warship" }
+--- a ship sprite facing left is passed as its column + FLIP
+local FLIP = 100
 
 --- The one-image sprites (Sprites.units_one) are used once the atlas is known to have loaded: an image
 --- still in moderation would leave every unit invisible.
@@ -145,6 +150,10 @@ function UnitLayer.new(parent: Instance, view: any)
 	self.view = view
 	self._state = nil :: any
 	self._sprites = {} :: { [number]: Sprite }
+	--- ships' facing (1 right, -1 left) and last map x, by uid (kept small: never pruned per frame,
+	--- cleared with the state)
+	self._face = {} :: { [number]: number }
+	self._last_mx = {} :: { [number]: number }
 	self._seen = {} :: { [number]: boolean }
 	self._pool = {} :: { Sprite }
 	self._dots = {} :: { Frame }
@@ -176,6 +185,8 @@ end
 
 function UnitLayer.unbind(self: any)
 	self._state = nil
+	table.clear(self._face)
+	table.clear(self._last_mx)
 	for key, s in self._sprites do
 		self:_release(s)
 		self._sprites[key] = nil
@@ -288,12 +299,34 @@ function UnitLayer._sprite(
 		s = self:_acquire()
 		self._sprites[key] = s
 	end
-	if s.col ~= col then
+	if s.col ~= col or (s.ship and s.era ~= ShipArt.style()) then
 		s.col = col
-		local cell = Sprites.units.cell
-		s.fill.ImageRectOffset = Vector2.new(col * cell, 0)
-		if s.rim ~= nil then
-			s.rim.ImageRectOffset = Vector2.new(col * cell, cell)
+		local ship = SHIP_KIND[col % FLIP]
+		local content = if ship ~= nil then ShipArt.content(ship, col >= FLIP) else nil
+		if content ~= nil then
+			s.ship = true
+			s.era = ShipArt.style()
+			s.fill.ImageRectOffset = Vector2.zero
+			s.fill.ImageRectSize = Vector2.zero
+			s.fill.ImageContent = content
+			if s.rim ~= nil then
+				s.rim.Visible = false
+			end
+		else
+			local cell = Sprites.units.cell
+			if s.ship then
+				s.ship = false
+				s.fill.Image = if s.rim == nil and ONE ~= nil then ONE.id else Sprites.units.id
+				s.fill.ImageRectSize = Vector2.new(cell, cell)
+				if s.rim ~= nil then
+					s.rim.Visible = true
+				end
+			end
+			local c0 = col % FLIP
+			s.fill.ImageRectOffset = Vector2.new(c0 * cell, 0)
+			if s.rim ~= nil then
+				s.rim.ImageRectOffset = Vector2.new(c0 * cell, cell)
+			end
 		end
 	end
 	if s.owner ~= owner then
@@ -558,6 +591,20 @@ function UnitLayer.tick(self: any, _dt: number)
 		end
 		if pick then
 			self._screen[uid] = Vector2.new(x, y)
+		end
+		-- (a ship faces the way it sails: its map x against the last frame's)
+		if SHIP_KIND[col] ~= nil then
+			local mx = if wake ~= nil then wake.x else (UnitLayer.unit_uv(st, u, rt))
+			local face = self._face[uid] or 1
+			local last = self._last_mx[uid]
+			if last ~= nil and math.abs(mx - last) > 1e-4 then
+				face = if mx < last then -1 else 1
+			end
+			self._last_mx[uid] = mx
+			self._face[uid] = face
+			if face < 0 then
+				col += FLIP
+			end
 		end
 		self:_sprite(uid * 16, col, u.owner, x, y, px, seen)
 		drawn += 1

@@ -1361,21 +1361,22 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 			if type(s.has_pact) == "function" then
 				for _, pk in { { 1, "trade", "Trade Pact" }, { 2, "defense", "Defence Pact" } } do
 					local kid, kname, label = pk[1], pk[2], pk[3]
+					local picon = "pact_" .. kname
 					if s:has_pact(me, own, kid) then
-						table.insert(items, { id = "pact:" .. kname, label = label, icon = "pact", ok = false, reason = "Signed", danger = false })
+						table.insert(items, { id = "pact:" .. kname, label = label, icon = picon, ok = false, reason = "Signed", danger = false })
 					elseif s:pact_requested(own, me, kid) then
-						table.insert(items, { id = "pact_accept:" .. kname, label = "Accept " .. label, icon = "pact", ok = true, reason = "", danger = false })
+						table.insert(items, { id = "pact_accept:" .. kname, label = "Accept " .. label, icon = picon, ok = true, reason = "", danger = false })
 					elseif s:pact_requested(me, own, kid) then
-						table.insert(items, { id = "pact:" .. kname, label = label, icon = "pact", ok = false, reason = "Proposed", danger = false })
+						table.insert(items, { id = "pact:" .. kname, label = label, icon = picon, ok = false, reason = "Proposed", danger = false })
 					else
-						table.insert(items, { id = "pact:" .. kname, label = label, icon = "pact", ok = true, reason = "", danger = false })
+						table.insert(items, { id = "pact:" .. kname, label = label, icon = picon, ok = true, reason = "", danger = false })
 					end
 				end
 				local mo = s:get_owner(me)
 				local ore = if mo ~= nil then tonumber(mo.ore) or 0 else 0
 				if s:has_pact(me, own, 1) then
-					table.insert(items, { id = "trade:sell", label = "Sell Ore", icon = "ore", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to sell", danger = false })
-					table.insert(items, { id = "trade:buy", label = "Buy Ore", icon = "market", ok = true, reason = "", danger = false })
+					table.insert(items, { id = "trade:sell", label = "Sell Ore", icon = "ore_sell", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to sell", danger = false })
+					table.insert(items, { id = "trade:buy", label = "Buy Ore", icon = "ore_buy", ok = true, reason = "", danger = false })
 				else
 					table.insert(items, { id = "send:ore", label = "Send Ore", icon = "ore", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to spare", danger = false })
 				end
@@ -1386,7 +1387,7 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				table.insert(items, {
 					id = "ally_extend",
 					label = "Renew",
-					icon = "alliance",
+					icon = "renew",
 					ok = ai.can_extend,
 					reason = if ai.me_asked then "Renewal asked" else "",
 					danger = false,
