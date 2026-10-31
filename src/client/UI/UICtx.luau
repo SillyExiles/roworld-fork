@@ -49,7 +49,8 @@ UICtx.DEFAULT_DIFFICULTY = 0
 --- five set breakpoints, none below 10% or above 75%, which were never needed.
 --- Until then the ratio was anything from 1% to 100% (a free slider), set by dragging a
 --- knob along 96 px on a phone.
-UICtx.RATIO_STOPS = { 0.10, 0.25, 0.35, 0.50, 0.75 }
+--- Empires Front (2026-10-31): 35% made way for 100%, so the whole army at home can go to the front.
+UICtx.RATIO_STOPS = { 0.10, 0.25, 0.50, 0.75, 1.00 }
 --- Attack ratio before the player sets one: the stop beside 20 % (it was
 --- 20% while the slider had no stops).
 UICtx.DEFAULT_RATIO = 0.25

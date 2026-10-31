@@ -61,7 +61,10 @@ Tutorial.FLOOR_REASON = "Troops low. Let them grow back"
 --- spent below a fifth of its cap all but loses the match, and 23% of matches ended within their
 --- first 3 minutes (Match funnel, the week to 2026-10-26). The first order held back in a match
 --- says why (Coach "floor").
-Tutorial.ROOKIE_MATCHES = 5
+--- Empires Front (2026-10-31): off. The floor is a share of the army's CAP, so once the land grew a
+--- nation with 16k troops at home and many more at war could send nothing at all ("Troops low" /
+--- "No troops available" on every Attack-bar stop). Only the tutorial keeps its floor while it runs.
+Tutorial.ROOKIE_MATCHES = 0
 Tutorial.ROOKIE_FLOOR = 0.2
 
 --- True while a player with `matches_before` matches before this one is still a new player.

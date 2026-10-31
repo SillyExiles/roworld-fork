@@ -87,6 +87,27 @@ Defs.DISABLED_STRUCT = {
 	[Defs.S_RAILGUN] = true,
 	[Defs.S_FARM] = true,
 }
+--- Empires Front (2026-10-31): the structures the road network (the Way Stations' carts) links. Every
+--- one of them within a Way Station's reach becomes a station on the roads (SimStructures._activate).
+Defs.ROAD_KIND = {
+	[Defs.S_CITY] = true,
+	[Defs.S_PORT] = true,
+	[Defs.S_FACTORY] = true,
+	[Defs.S_DEFENSE] = true,
+	[Defs.S_FORGE] = true,
+	[Defs.S_MINE] = true,
+	[Defs.S_MARKET] = true,
+	[Defs.S_WALL] = true,
+	[Defs.S_BARRACKS] = true,
+}
+--- The stations a cart trades at (pays trainGold; carts head for them). The others on the roads (posts,
+--- forges, walls, barracks) only pass carts through and join networks together.
+Defs.TRADE_STOP = {
+	[Defs.S_CITY] = true,
+	[Defs.S_PORT] = true,
+	[Defs.S_MINE] = true,
+	[Defs.S_MARKET] = true,
+}
 Defs.STRUCT_TITLES = {
 	[0] = "City",
 	"Port",

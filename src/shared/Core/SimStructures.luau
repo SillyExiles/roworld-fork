@@ -36,7 +36,20 @@ local S_CITY = Defs.S_CITY
 local S_PORT = Defs.S_PORT
 local S_FACTORY = Defs.S_FACTORY
 --- Order of kinds within a grid cell when a factory pulls in stations (city, port, factory)
-local FACTORY_PULL_RANK = { [Defs.S_CITY] = 1, [Defs.S_PORT] = 2, [Defs.S_FACTORY] = 3 }
+local FACTORY_PULL_RANK = {
+	[Defs.S_CITY] = 1,
+	[Defs.S_PORT] = 2,
+	[Defs.S_FACTORY] = 3,
+	[Defs.S_MARKET] = 4,
+	[Defs.S_MINE] = 5,
+	[Defs.S_BARRACKS] = 6,
+	[Defs.S_FORGE] = 7,
+	[Defs.S_DEFENSE] = 8,
+	[Defs.S_WALL] = 9,
+}
+--- Empires Front: what the roads link, and where carts trade (Defs.ROAD_KIND / TRADE_STOP)
+local ROAD_KIND = Defs.ROAD_KIND
+local TRADE_STOP = Defs.TRADE_STOP
 local S_DEFENSE = Defs.S_DEFENSE
 local S_SAM = Defs.S_SAM
 local S_SILO = Defs.S_SILO
@@ -591,6 +604,16 @@ function SimStructures.install(C)
 
 		local p = self:place(id, kind, t)
 		local up = p.upgrade_sid
+		-- Empires Front: a per-player cap on some kinds (4 Barracks); upgrading one stays allowed
+		local lim = Rules.struct_limit(kind)
+		if up == 0 and lim ~= nil and self.o_scount[id * STRUCT_KINDS + kind] >= lim then
+			self:msg(
+				id,
+				Defs.MSG_INFO,
+				string.format("Limit reached: %d %s per player (upgrade one instead)", lim, struct_title(kind))
+			)
+			return false
+		end
 		if up ~= 0 then
 			local s = self.structs[up]
 			if s == nil then
@@ -753,14 +776,15 @@ function SimStructures.install(C)
 		end
 		local t = s.tile
 		if k == S_FACTORY then
-			-- A new factory becomes a station (it runs the trains), then
-			-- every city, port or factory (any owner) within trainStationMaxRange that has none.
+			-- A new factory becomes a station (it runs the trains), then every structure the roads
+			-- link (Defs.ROAD_KIND, any owner) within trainStationMaxRange that has none.
 			self:_make_station(s)
 			for _, c in self:_factory_pull_order(self:_stations_near(t, true)) do
 				self:_make_station(c)
 			end
-		elseif (k == S_CITY or k == S_PORT) and self:_factory_near(t) then
-			-- A city or port: a station when a factory is in range
+		elseif ROAD_KIND[k] and self:_factory_near(t) then
+			-- Empires Front: any structure the roads link (cities, ports, mines, markets, forges,
+			-- barracks, walls, posts) is a station when a Way Station (factory) is in range
 			self:_make_station(s)
 		end
 	end
@@ -836,10 +860,16 @@ function SimStructures.install(C)
 		if s == nil then
 			return
 		end
-		-- Captured structures change hands, except defense posts, which
-		-- are destroyed. Tribes keep what they capture until they delete it (SimAI).
-		-- (the Arsenal's structures too: they work only for an owner with their unlock)
-		if nw == 0 or s.kind == S_DEFENSE or s.kind >= S_ARTILLERY then
+		-- Empires Front: every captured structure changes hands (mines, markets, forges, barracks,
+		-- walls and defense posts included) with its levels; a Border Wall's old stones already fell
+		-- with their tiles and it raises new ones on its new owner's frontier. Only land left
+		-- ownerless razes, and the Arsenal's structures (they work only for an owner with their
+		-- unlock). Tribes keep what they capture until they delete it (SimAI).
+		local k = s.kind
+		-- (a kind with a per-player cap, the Barracks: one over the conqueror's cap is razed)
+		local lim = Rules.struct_limit(k)
+		local over = lim ~= nil and nw > 0 and self.o_scount[nw * STRUCT_KINDS + k] >= lim
+		if over or nw == 0 or k == S_ARTILLERY or k == Defs.S_AIRFIELD or k == Defs.S_RAILGUN then
 			self:destroy_struct(s)
 			if old > 0 and nw > 0 then
 				self:msg(
@@ -969,14 +999,14 @@ function SimStructures.install(C)
 		end
 	end
 
-	--- Cities, ports and factories (any owner) within trainStationMaxRange of `t` as { d2, struct },
+	--- Structures the roads link (Defs.ROAD_KIND, any owner) within trainStationMaxRange of `t` as { d2, struct },
 	--- nearest first (ties by sid); stations only unless `all`.
 	function C:_stations_near(t: number, all: boolean?): { { any } }
 		local range_d2 = self.range_d2
 		local rmax = self.R.ROAD_MAX_TILES
 		local out = {}
 		for _, c in self:structs_in_box(t, self.geo_span(t, rmax), math.ceil(rmax)) do
-			if c.kind > S_FACTORY or not c.active or c.dead or (not all and not c.station) then
+			if not ROAD_KIND[c.kind] or not c.active or c.dead or (not all and not c.station) then
 				continue
 			end
 			local d2 = range_d2(t, c.tile)
@@ -1227,7 +1257,7 @@ function SimStructures.install(C)
 		return if r[1] == sid then r[2] else r[1]
 	end
 
-	--- Cluster: connected stations share `cluster`; _cluster_trade[id] lists its cities and ports
+	--- Cluster: connected stations share `cluster`; _cluster_trade[id] lists its trade stops (Defs.TRADE_STOP)
 	--- (the trains' destinations). Recomputed lazily after the network changed.
 	function C:_ensure_clusters()
 		if not self._clusters_dirty then
@@ -1254,7 +1284,7 @@ function SimStructures.install(C)
 			while qi <= #queue do
 				local cur = queue[qi]
 				qi += 1
-				if cur.kind ~= S_FACTORY then
+				if TRADE_STOP[cur.kind] then
 					table.insert(list, cur)
 				end
 				for _, rid in cur.roads do
@@ -1691,9 +1721,9 @@ function SimStructures.install(C)
 				self:remove_unit(u, Defs.DEL_ARRIVED)
 				return
 			end
-			-- City and port stops pay trainGold(relation, stops so far) to
+			-- Trade stops (cities, ports, mines, markets) pay trainGold(relation, stops so far) to
 			-- the train's owner and, when different, the same again to the station's owner.
-			if s.kind ~= S_FACTORY then
+			if TRADE_STOP[s.kind] then
 				local rel = if s.owner == u.owner
 					then "self"					-- (an ally; a teammate pays a stranger's rate: trainGold "team" = "other")
 

@@ -232,12 +232,25 @@ local function build(K_LIN: number, into: any?): any
 	--- (Defs.F_WALL). Taking a walled tile costs the attacker WALL_MAG x the troops and WALL_COST x
 	--- the time; the stones fall with the tile.
 	Rules.WALL_RADIUS_FULL = 36.0
+	--- (v9 balance: a wall and a defense post don't stack any more; the time cost 5 -> 4 so walled
+	--- frontiers fall slowly, not never)
 	Rules.WALL_MAG = 6.0
-	Rules.WALL_COST = 5.0
+	Rules.WALL_COST = 4.0
 	--- Barracks: each level adds BARRACKS_GROWTH to the troop growth rate (up to BARRACKS_MAX_LEVELS
 	--- levels count); the troop cap is unchanged.
 	Rules.BARRACKS_GROWTH = 0.2
 	Rules.BARRACKS_MAX_LEVELS = 5
+	--- Empires Front (2026-10-31): at most BARRACKS_LIMIT Barracks per player in a match (captured
+	--- ones count; upgrading one you hold is always allowed).
+	Rules.BARRACKS_LIMIT = 4
+
+	--- How many structures of `kind` one player may hold (nil: no limit).
+	function Rules.struct_limit(kind: number): number?
+		if kind == Defs.S_BARRACKS then
+			return Rules.BARRACKS_LIMIT
+		end
+		return nil
+	end
 
 	--- Border Wall reach in OUR tiles (euclidean, map.range_d2).
 	function Rules.wall_radius(): number
@@ -536,6 +549,12 @@ local function build(K_LIN: number, into: any?): any
 			out.tile = r.tile
 			out.upgrade_sid = r.upgrade_sid
 			out.reason = r.reason
+			-- Empires Front: a per-player cap on some kinds (the Barracks); upgrades stay allowed
+			local lim = Rules.struct_limit(kind)
+			if lim ~= nil and r.upgrade_sid == 0 and state:count_structures(id, kind) >= lim then
+				out.tile = -1
+				out.reason = "limit"
+			end
 		end
 		local o = state.owners[id]
 		if out.reason == "" and (o == nil or o.gold < out.cost) then

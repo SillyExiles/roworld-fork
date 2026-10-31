@@ -40,6 +40,17 @@ local RINGED = {
 	[Defs.S_DEFENSE] = true,
 	[Defs.S_ARTILLERY] = true,
 	[Defs.S_AIRFIELD] = true,
+	-- Empires Front: a Way Station's road reach, shown while you place anything the roads link
+	[Defs.S_FACTORY] = true,
+}
+--- Build kinds the roads link (Defs.ROAD_KIND) by name: placing one shows your Way Stations' reach.
+local ROAD_BUILD = {
+	city = Defs.S_CITY,
+	port = Defs.S_PORT,
+	mine = Defs.S_MINE,
+	market = Defs.S_MARKET,
+	forge = Defs.S_FORGE,
+	barracks = Defs.S_BARRACKS,
 }
 
 local HOSTILE_TINT = Color3.new(1.0, 0.2, 0.16)
@@ -301,6 +312,8 @@ function RangeLayer._build_kind(self: any): number
 		elseif k == "wall" then
 			-- (Empires Front: the reach of a Border Wall's stones, while one is placed)
 			return Defs.S_WALL
+		elseif ROAD_BUILD[k] ~= nil then
+			return ROAD_BUILD[k]
 		end
 	elseif ak == "sam" then
 		return Defs.S_SAM
@@ -329,6 +342,8 @@ function RangeLayer._range_of(self: any, sid: number, kind: number, cur: number)
 		return VR.artillery_range()
 	elseif kind == Defs.S_AIRFIELD then
 		return VR.airfield_range()
+	elseif kind == Defs.S_FACTORY then
+		return VR.factory_range()
 	elseif kind ~= Defs.S_SAM then
 		return VR.defense_range()
 	end
@@ -473,6 +488,11 @@ function RangeLayer._rebuild(self: any)
 			elseif own and auto then
 				cls = C_OWN_DEF
 			end
+		elseif s[1] == Defs.S_FACTORY then
+			-- a Way Station's road reach: only while you place something the roads link
+			if own and bk >= 0 and Defs.ROAD_KIND[bk] then
+				cls = C_OWN_HI
+			end
 		elseif s[1] == Defs.S_AIRFIELD then
 			-- an airfield's reach: only while you aim an air strike or place another airfield
 			if own and (bk == Defs.S_AIRFIELD or (aiming_nuke and self._aim_detail == "airstrike")) then
@@ -516,7 +536,10 @@ function RangeLayer._rebuild(self: any)
 			self._grow_tick = cur
 		end
 	end
-	if bk >= 0 and self._aim_tile >= 0 then
+	-- (the kinds placed only for the roads have no range of their own: no ghost disc)
+	local ghost = bk >= 0 and (bk == Defs.S_SAM or bk == Defs.S_DEFENSE or bk == Defs.S_FACTORY
+		or bk == Defs.S_ARTILLERY or bk == Defs.S_AIRFIELD or bk == Defs.S_WALL)
+	if ghost and self._aim_tile >= 0 then
 		-- the ghost's range is a white disc (20 % fill) with a bright edge
 		local bc = WHITE
 		push(

@@ -102,14 +102,14 @@ UIRules.SHORT = {
 UIRules.BLURBS = {
 	city = "Raises your troop cap by {city}. Joins the road network.",
 	port = "Coastal. Sends trade ships for gold and builds warships.",
-	factory = "Road hub. Trucks pay gold at every stop they pass.",
+	factory = "Road hub: every building within its reach joins the roads. Carts pay gold at every city, port, mine and market they pass.",
 	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time.",
 	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}",
 	farm = "Grows {farm_food} Food a second for each level (less on hills or dry land). Your army eats: without Food it stops growing and deserts.",
-	mine = "Digs {mine_ore} Ore a second for each level. Only on hills or mountains (more in mountains).",
-	market = "Sells up to {mkt_ore} spare Ore a second for each level at the match's Ore price (it keeps what your next Forge level needs). Each trade pact raises what it gets by 20%.",
+	mine = "Digs {mine_ore} Ore a second for each level. Only on hills or mountains (more in mountains). On the roads (a Factory in reach): +50% Ore.",
+	market = "Sells up to {mkt_ore} spare Ore a second for each level at the match's Ore price (it keeps what your next Forge level needs). Each trade pact raises what it gets by 20%. On the roads: sells 50% more.",
 	wall = "Raises stone walls along your frontier within {wall_r} tiles: taking a walled tile costs {wall_mag}x the troops and {wall_cost}x the time. The stones follow the frontier and fall with the tile.",
-	barracks = "Trains troops: each level makes your army grow {bar_pct}% faster (up to {bar_max} levels). Your troop cap stays the same.",
+	barracks = "Trains troops: each level makes your army grow {bar_pct}% faster (up to {bar_max} levels). Your troop cap stays the same. At most 4 Barracks per player: build near one to upgrade it.",
 	sam = "Shoots down bombs aimed within {sam_r} tiles. MIRV warheads can't be stopped.",
 	silo = "Required to launch nuclear weapons.",
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
@@ -814,6 +814,7 @@ UIRules.PLACE_REASONS = {
 	no_coast = "Ports must be on your coast",
 	no_port = "Warships need a finished port on this water",
 	gold = "Not enough gold",
+	limit = "Limit reached: 4 Barracks per player (upgrade one instead)",
 	invalid = "Can't build here",
 }
 

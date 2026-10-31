@@ -58,15 +58,33 @@ def forge():
 
 
 def mine():
+    """v9: a mine shaft in the mountain (timber portal, dark tunnel) and a cart of ore on its rails."""
     im, d = canvas()
-    # rock pile
-    d.polygon([(10, 178), (40, 120), (78, 140), (112, 104), (150, 132), (182, 178)], fill=255)
-    d.polygon([(52, 160), (70, 150), (84, 168)], fill=0)
-    d.polygon([(118, 150), (134, 142), (146, 164)], fill=0)
-    # pickaxe
-    d.line([(52, 128), (150, 30)], fill=0, width=24)
-    d.line([(54, 126), (148, 32)], fill=255, width=12)                       # handle
-    d.arc([60, 4, 196, 110], start=200, end=320, fill=255, width=16)          # head
+    # the mountain, with a second peak
+    d.polygon([(0, 168), (66, 14), (98, 66), (126, 36), (192, 168)], fill=255)
+    # the tunnel: a dark mouth cut into the rock, framed in timber
+    d.rectangle([30, 98, 102, 168], fill=0)
+    d.rectangle([38, 108, 50, 168], fill=255)                               # left post
+    d.rectangle([82, 108, 94, 168], fill=255)                               # right post
+    d.rectangle([32, 98, 100, 110], fill=255)                               # lintel
+    d.polygon([(50, 110), (62, 110), (50, 122)], fill=255)                  # braces
+    d.polygon([(82, 110), (70, 110), (82, 122)], fill=255)
+    # the rails, out of the tunnel
+    d.rectangle([0, 172, 192, 180], fill=255)
+    for x in (8, 40, 72, 104, 136, 168):
+        d.rectangle([x, 182, x + 14, 190], fill=255)                        # sleepers
+    # the cart (a black gap keeps it apart from the mountain)
+    lumps = ((126, 114, 13), (150, 108, 15), (174, 114, 13), (138, 96, 10), (162, 96, 10))
+    d.polygon([(106, 122), (192, 122), (186, 166), (112, 166)], fill=0)
+    for cx, cy, r in lumps:
+        d.ellipse([cx - r - 5, cy - r - 5, cx + r + 5, cy + r + 5], fill=0)
+    d.polygon([(112, 128), (190, 128), (180, 160), (120, 160)], fill=255)   # body
+    d.rectangle([120, 138, 182, 142], fill=0)                               # plank line
+    for cx, cy, r in lumps:
+        d.ellipse([cx - r, cy - r, cx + r, cy + r], fill=255)                # ore lumps
+    for cx in (132, 170):
+        d.ellipse([cx - 13, 152, cx + 13, 178], fill=0)
+        d.ellipse([cx - 9, 156, cx + 9, 174], fill=255)                      # wheels
     return im
 
 

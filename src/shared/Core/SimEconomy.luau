@@ -48,6 +48,11 @@ SimEconomy.SHIP_ORE = 12.0
 SimEconomy.SHIP_PREMIUM = 1.25
 --- Deals between partners: the share of the seller's spare ore one deal moves.
 SimEconomy.DEAL_SHARE = 0.25
+--- Empires Front (2026-10-31): structures on the roads (stations: a Way Station in reach). A Mine on
+--- the roads digs ROAD_MINE_BONUS more ore (the carts haul it); a Market on the roads sells
+--- ROAD_MARKET_BONUS more ore a second.
+SimEconomy.ROAD_MINE_BONUS = 0.5
+SimEconomy.ROAD_MARKET_BONUS = 0.5
 
 local E = SimEconomy
 
@@ -123,9 +128,13 @@ function SimEconomy.install(C)
 					y = self:_yield(k, s.tile)
 					s.yield = y
 				end
+				if s.station then
+					y *= 1.0 + E.ROAD_MINE_BONUS
+				end
 				mine[s.owner] = (mine[s.owner] or 0) + s.level * E.MINE_ORE * y
 			elseif k == S_MARKET then
-				market[s.owner] = (market[s.owner] or 0) + s.level
+				market[s.owner] = (market[s.owner] or 0)
+					+ s.level * (if s.station then 1.0 + E.ROAD_MARKET_BONUS else 1.0)
 			end
 		end
 		self._mine_ore = mine

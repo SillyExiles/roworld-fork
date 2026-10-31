@@ -1,6 +1,6 @@
 --!nonstrict
 -- The Attack bar: the share of the army an order sends, bound to UICtx.ratio. Five stops in one row
--- (UICtx.RATIO_STOPS: 10% 25% 35% 50% 75%), each one a labelled target: tap a stop, or drag across
+-- (UICtx.RATIO_STOPS: 10% 25% 50% 75% 100%), each one a labelled target: tap a stop, or drag across
 -- them, and the amber thumb moves to it. The mouse wheel steps one stop.
 --
 -- It was a slider (a port of scripts/ui/ratio_slider.gd): 1% to 100% in steps of 1%, on a phone a

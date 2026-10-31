@@ -928,19 +928,19 @@ function SimAttacks.install(C: any)
 			local tt = readu8(terr, t)
 			local mag = ATTACK_MAG[tt]
 			local tc = ATTACK_TILE_COST[tt]
-			if not neutral and readu8(def_cover, t) > 0 and self:_defense_post_covers(t, tg) then
-				mag *= Rules.DEFENSE_POST_MAG
-				tc *= Rules.DEFENSE_POST_COST
-			end
 			local tflags = readu8(flags, t)
-			if bit32.band(tflags, F_FALLOUT) ~= 0 then
-				mag *= fo_mod
-				tc *= fo_mod
-			end
-			-- Empires Front: a Border Wall's stones (Defs.F_WALL) cost the attacker dear
+			-- Empires Front: a Border Wall's stones (Defs.F_WALL) cost the attacker dear. (v9 balance: a
+			-- wall and a defense post no longer stack, x30 the troops; the stronger one counts.)
 			if not neutral and bit32.band(tflags, F_WALL) ~= 0 then
 				mag *= Rules.WALL_MAG
 				tc *= Rules.WALL_COST
+			elseif not neutral and readu8(def_cover, t) > 0 and self:_defense_post_covers(t, tg) then
+				mag *= Rules.DEFENSE_POST_MAG
+				tc *= Rules.DEFENSE_POST_COST
+			end
+			if bit32.band(tflags, F_FALLOUT) ~= 0 then
+				mag *= fo_mod
+				tc *= fo_mod
 			end
 			local loss: number
 			local tf: number
