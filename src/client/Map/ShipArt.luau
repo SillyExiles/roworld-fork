@@ -23,6 +23,8 @@ ShipArt.STYLE_OF_ERA =
 		inca = "ancient",
 		aztec = "ancient",
 		mali = "ancient",
+		greece = "ancient",
+		japan = "junk",
 	}
 
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"

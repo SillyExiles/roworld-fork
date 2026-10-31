@@ -860,16 +860,24 @@ function SimStructures.install(C)
 		if s == nil then
 			return
 		end
-		-- Empires Front: every captured structure changes hands (mines, markets, forges, barracks,
-		-- walls and defense posts included) with its levels; a Border Wall's old stones already fell
-		-- with their tiles and it raises new ones on its new owner's frontier. Only land left
-		-- ownerless razes, and the Arsenal's structures (they work only for an owner with their
-		-- unlock). Tribes keep what they capture until they delete it (SimAI).
+		-- Empires Front: a captured structure changes hands (mines, markets, forges, barracks, cities,
+		-- ports, factories) with its levels. The defences are razed: a Border Wall or a defense post
+		-- (castrum) that was overrun is broken (v10). Land left ownerless razes too, and the Arsenal's
+		-- structures (they work only for an owner with their unlock). Tribes keep what they capture
+		-- until they delete it (SimAI).
 		local k = s.kind
 		-- (a kind with a per-player cap, the Barracks: one over the conqueror's cap is razed)
 		local lim = Rules.struct_limit(k)
 		local over = lim ~= nil and nw > 0 and self.o_scount[nw * STRUCT_KINDS + k] >= lim
-		if over or nw == 0 or k == S_ARTILLERY or k == Defs.S_AIRFIELD or k == Defs.S_RAILGUN then
+		if
+			over
+			or nw == 0
+			or k == S_DEFENSE
+			or k == S_WALL
+			or k == S_ARTILLERY
+			or k == Defs.S_AIRFIELD
+			or k == Defs.S_RAILGUN
+		then
 			self:destroy_struct(s)
 			if old > 0 and nw > 0 then
 				self:msg(

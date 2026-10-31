@@ -1,33 +1,31 @@
 --!strict
--- RoWorld General (2026-10-27): a monthly Roblox subscription, paid in Robux (Creator Dashboard ->
--- Monetization -> Subscriptions; Roblox renews and bills it, and players cancel it in Roblox's own
--- settings). A paying player spent 89 Robux on average against about 600 at the top 500
--- experiences (the week to 2026-10-26), and nothing they could buy came back every month. Every player
--- is greeted as Commander: a subscriber is a General. While subscribed (server/General):
---   * a crate every UTC day they play (Purchases.general_perks); where paid random items are
---     restricted (no crates there: PolicyService), DAILY_STARS Stars instead;
---   * +STARS_BONUS on every match's Stars, on top of 2x Stars (server/Rewards: the "general" line);
---   * the month's General skin (SKINS; Data/Cosmetics.general_skins), theirs to keep.
+-- Empires Front: the Imperial Crown, a monthly Roblox subscription paid in Robux (Creator Dashboard ->
+-- the game -> Monetization -> Subscriptions; Roblox renews and bills it, players cancel it in Roblox's
+-- own settings). While subscribed (server/General):
+--   * DAILY_STARS Stars every UTC day they play (Purchases.general_perks);
+--   * +STARS_BONUS on every match's Stars (server/Rewards: the "general" line);
+--   * the month's subscriber flag (SKINS: an Empire Shop flag never sold), theirs to keep;
+--   * the Imperial Banner: their flag flies beside their name (as the game pass does).
 --
--- `ID` is the subscription's id ("EXP-..."; "" = not created yet: nothing offers it), `STAGING` the
--- same subscription in Rofront Staging. Prod's was created inactive (2026-10-27): activate it on the
--- dashboard when the build that offers it goes to prod.
+-- (2026-10-31: not offered for now; nothing shows it while ID is "".)
+-- TO SELL IT: create the subscription on the dashboard and paste its id ("EXP-...") in ID ("" = not
+-- created yet: the shop says "Coming soon").
 local IS_ROBLOX = typeof(game) == "Instance"
 local Staging: any = if IS_ROBLOX then require((script :: any).Parent.Staging) else (require :: any)("./Staging")
 
 local Subscription = {}
 
-Subscription.ID = "EXP-6347955979564483083"
-Subscription.STAGING = "EXP-287838471589069369"
-Subscription.NAME = "RoWorld General"
+Subscription.ID = ""
+Subscription.STAGING = ""
+Subscription.NAME = "Imperial Crown"
 --- The price set on the dashboard (Robux a month); the interface shows Roblox's own.
-Subscription.ROBUX = 399
-Subscription.DAILY_STARS = 2500
+Subscription.ROBUX = 299
+Subscription.DAILY_STARS = 1500
 Subscription.STARS_BONUS = 0.5
 --- The General skin of each month ("YYYY-MM", UTC, oldest first): a month without its own gives the
 --- latest one before it.
 Subscription.SKINS = {
-	{ month = "2026-10", skin = "gen_chevrons" },
+	
 }
 
 --- The subscription's id in this experience ("" where there is none).

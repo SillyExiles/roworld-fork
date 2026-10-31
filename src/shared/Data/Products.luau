@@ -67,6 +67,23 @@ for sid, s in Shop.SETS do
 	end
 end
 
+--- Empires Front: the Empire Shop's Robux flags (Data/EmpireShop.ROBUX_PRODUCTS), granting
+--- "cosmetic:ef_<key>".
+local EmpireShop: any = if typeof(game) == "Instance"
+	then require((script :: any).Parent.EmpireShop)
+	else (require :: any)("./EmpireShop")
+for _, f in EmpireShop.flags() do
+	if (f.robux or 0) > 0 then
+		PRODUCTS["ef_" .. f.key] = {
+			id = EmpireShop.ROBUX_PRODUCTS[f.key] or 0,
+			robux = f.robux,
+			grants = "cosmetic:" .. EmpireShop.item_id(f.key),
+			staging = EmpireShop.ROBUX_PRODUCTS[f.key] or 0,
+			empire_flag = f.key,
+		}
+	end
+end
+
 --- Rofront Staging (Data/Staging): there every product is its `staging` one.
 local Staging: any = if typeof(game) == "Instance"
 	then require((script :: any).Parent.Staging)

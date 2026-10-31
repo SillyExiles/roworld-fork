@@ -201,6 +201,49 @@ MAPS = [
              ("Bohemia", "cz", 14.4, 49.5), ("Croatia", "hr", 15.9, 45.6), ("Sinai", "eg", 33.8, 29.5),
              ("Upper Egypt", "eg", 32.6, 25.7), ("Nubia", "sd", 31.5, 19.5), ("Kurdistan", "iq", 45.0, 36.0),
          ]),
+    dict(id="greece", sites=[("Athenai", 23.73, 37.98), ("Sparta", 22.43, 37.07), ("Korinthos", 22.93, 37.94), ("Thebai", 23.32, 38.32), ("Syrakousai", 15.29, 37.07)], name="Ancient Greece", module="Greece", era="greece", year="431 BC",
+         lon0=11.0, lon1=36.0, lat_top=43.5, lat_bottom=33.5, ppd=52.0, lat_std=38.5, lakes=9,
+         categories=["featured", "empire", "antiquity"], frequency=10, modifiers=[], min_gap=26,
+         nations=[
+             ("Athenai", "gr", 23.73, 37.98), ("Sparta", "gr", 22.43, 37.07), ("Korinthos", "gr", 22.93, 37.94),
+             ("Thebai", "gr", 23.32, 38.32), ("Argos", "gr", 22.72, 37.63), ("Makedonia", "gr", 22.5, 40.6),
+             ("Thessalia", "gr", 22.4, 39.5), ("Epeiros", "gr", 20.8, 39.6), ("Aitolia", "gr", 21.6, 38.7),
+             ("Phokis", "gr", 22.5, 38.5), ("Achaia", "gr", 21.9, 38.1), ("Elis", "gr", 21.4, 37.7),
+             ("Messenia", "gr", 21.9, 37.1), ("Arkadia", "gr", 22.2, 37.5), ("Megara", "gr", 23.35, 38.0),
+             ("Euboia", "gr", 23.8, 38.6), ("Chalkidike", "gr", 23.4, 40.3), ("Thrake", "bg", 25.5, 41.4),
+             ("Byzantion", "tr", 28.9, 41.0), ("Lydia", "tr", 28.0, 38.5), ("Ionia", "tr", 27.2, 38.0),
+             ("Karia", "tr", 28.0, 37.2), ("Phrygia", "tr", 30.5, 39.0), ("Lykia", "tr", 29.6, 36.6),
+             ("Pisidia", "tr", 31.0, 37.8), ("Bithynia", "tr", 30.0, 40.6), ("Troas", "tr", 26.6, 39.8),
+             ("Kreta", "gr", 24.9, 35.25), ("Rhodos", "gr", 28.0, 36.2), ("Kypros", "cy", 33.3, 35.1),
+             ("Lesbos", "gr", 26.3, 39.2), ("Chios", "gr", 26.0, 38.4), ("Samos", "gr", 26.8, 37.7),
+             ("Naxos", "gr", 25.4, 37.1), ("Kerkyra", "gr", 19.9, 39.6), ("Illyria", "al", 19.8, 41.3),
+             ("Paionia", "mk", 21.7, 41.6), ("Odrysia", "bg", 24.7, 42.4), ("Syrakousai", "it", 15.29, 37.07),
+             ("Akragas", "it", 13.6, 37.3), ("Taras", "it", 17.2, 40.5), ("Kroton", "it", 17.1, 39.1),
+             ("Rhegion", "it", 15.7, 38.1), ("Kyrene", "ly", 21.86, 32.8), ("Lokris", "gr", 22.9, 38.7),
+             ("Akarnania", "gr", 21.2, 38.8), ("Dodekanesa", "gr", 27.0, 36.9), ("Pamphylia", "tr", 30.8, 37.0),
+             ("Kilikia", "tr", 34.6, 36.9), ("Kappadokia", "tr", 34.8, 38.6), ("Galatia", "tr", 32.8, 39.9),
+         ]),
+    dict(id="japan", sites=[("Kyoto", 135.77, 35.01), ("Owari", 136.9, 35.18), ("Kai", 138.57, 35.66), ("Echigo", 138.25, 37.4), ("Satsuma", 130.55, 31.6)], name="Sengoku Japan", module="Japan", era="japan", year="1560",
+         lon0=128.5, lon1=146.0, lat_top=45.6, lat_bottom=30.6, ppd=60.0, lat_std=37.0, lakes=9,
+         categories=["featured", "empire", "gunpowder"], frequency=10, modifiers=[], min_gap=20,
+         nations=[
+             ("Ashikaga Shogunate", "jp", 135.77, 35.01), ("Oda", "jp", 136.9, 35.18), ("Takeda", "jp", 138.57, 35.66),
+             ("Uesugi", "jp", 138.25, 37.4), ("Imagawa", "jp", 138.38, 34.97), ("Hojo", "jp", 139.15, 35.25),
+             ("Mori", "jp", 132.46, 34.4), ("Shimazu", "jp", 130.55, 31.6), ("Otomo", "jp", 131.6, 33.24),
+             ("Chosokabe", "jp", 133.53, 33.56), ("Date", "jp", 140.87, 38.27), ("Asai", "jp", 136.27, 35.38),
+             ("Asakura", "jp", 136.22, 36.06), ("Saito", "jp", 136.76, 35.42), ("Miyoshi", "jp", 135.5, 34.69),
+             ("Tokugawa", "jp", 137.17, 34.95), ("Amago", "jp", 133.05, 35.47), ("Ryuzoji", "jp", 130.3, 33.26),
+             ("Mogami", "jp", 140.34, 38.25), ("Nanbu", "jp", 141.15, 40.5), ("Satake", "jp", 140.47, 36.37),
+             ("Satomi", "jp", 140.1, 35.0), ("Hatakeyama", "jp", 136.9, 36.75), ("Jinbo", "jp", 137.2, 36.7),
+             ("Kitabatake", "jp", 136.5, 34.5), ("Ise", "jp", 136.7, 34.4), ("Ikko-ikki", "jp", 136.6, 36.55),
+             ("Kono", "jp", 132.77, 33.84), ("Ito", "jp", 131.42, 31.9), ("Sagara", "jp", 130.76, 32.2),
+             ("Murakami Pirates", "jp", 133.0, 34.2), ("Ukita", "jp", 133.93, 34.66), ("Akamatsu", "jp", 134.69, 34.83),
+             ("Tsutsui", "jp", 135.8, 34.68), ("Isshiki", "jp", 135.2, 35.5), ("Takeda of Wakasa", "jp", 135.75, 35.5),
+             ("Ogasawara", "jp", 137.97, 36.24), ("Murakami", "jp", 138.3, 36.6), ("Utsunomiya", "jp", 139.88, 36.55),
+             ("Ashina", "jp", 139.93, 37.49), ("Soma", "jp", 140.92, 37.8), ("Kakizaki", "jp", 140.1, 41.8),
+             ("Ainu of Ezo", "jp", 142.5, 43.3), ("Ryukyu", "jp", 129.5, 31.0), ("Joseon", "kr", 129.0, 35.5),
+             ("Tsushima So", "jp", 129.3, 34.3), ("Kiso", "jp", 137.7, 35.85), ("Toki", "jp", 137.2, 35.6),
+         ]),
 ]
 
 
@@ -516,6 +559,7 @@ def main():
     ap.add_argument("--only")
     ap.add_argument("--preview")
     ap.add_argument("--patch", action="store_true", help="only rewrite nations and sites of built modules")
+    ap.add_argument("--no-registry", action="store_true", help="leave Data/MapList as it is")
     a = ap.parse_args()
     only = set(a.only.split(",")) if a.only else None
     sources = load_sources(a.old)
@@ -525,9 +569,10 @@ def main():
             rows.append(patch_sites(spec, a.old))
         elif only is None or spec["id"] in only:
             rows.append(build(spec, a.ne, sources, a.old, a.preview))
-        else:
+        elif not a.no_registry:
             rows.append(read_row(spec))
-    write_registry(rows)
+    if not a.no_registry:
+        write_registry(rows)
 
 
 if __name__ == "__main__":

@@ -27,6 +27,9 @@ local ShopFlags: any = if IS_ROBLOX
 local Shop: any = if IS_ROBLOX
 	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.Shop)
 	else require("./Shop")
+local EmpireShop: any = if IS_ROBLOX
+	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.EmpireShop)
+	else require("./EmpireShop")
 
 local Cosmetics = {}
 
@@ -400,6 +403,36 @@ for _, f in Shop.flags() do
 	table.insert(shop_items, it)
 end
 
+-- Empires Front: the Empire Shop's flags (Data/EmpireShop): territory skins of several colours, bought
+-- with Stars or Robux; they resolve by id and stay out of `order` (no crates, no bot players).
+local empire_items: { Item } = {}
+for _, f in EmpireShop.flags() do
+	local it: any = {
+		id = EmpireShop.item_id(f.key),
+		kind = "skin",
+		empire = true,
+		key = f.key,
+		name = f.name,
+		rarity = f.tier,
+		era = f.era,
+		stars = f.stars,
+		robux = f.robux,
+		scale = 1,
+		alpha = 215,
+		colors = f.colors,
+		mask = f.mask,
+		-- (the subscription's flag: given by server/Purchases.general_perks, never sold)
+		general = f.subscriber == true,
+	}
+	items[it.id] = it
+	table.insert(empire_items, it)
+end
+
+--- The Empire Shop's flags, as items (Data/EmpireShop order).
+function Cosmetics.empire_items(): { Item }
+	return empire_items
+end
+
 function Cosmetics.item(id: any): Item?
 	return if type(id) == "string" then items[id] else nil
 end
@@ -452,7 +485,7 @@ function Cosmetics.crate_owned(owned: { [string]: any }): number
 	local n = 0
 	for id in owned do
 		local it = items[id]
-		if it ~= nil and not it.exclusive and not it.shop and not it.general then
+		if it ~= nil and not it.exclusive and not it.shop and not it.general and not it.empire then
 			n += 1
 		end
 	end

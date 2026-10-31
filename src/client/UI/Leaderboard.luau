@@ -19,6 +19,7 @@
 local UITheme = require("./UITheme")
 local W = require("./Widgets")
 local GlassPanel = require("./GlassPanel")
+local FlagArt = require("./FlagArt")
 local Cosmetics: any = if typeof(game) == "Instance"
 	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.Cosmetics)
 	else (require :: any)("../../shared/Data/Cosmetics")
@@ -164,7 +165,10 @@ function Row.set_row(self, o: any, r: number)
 	if fid ~= self._flag_id then
 		self._flag_id = fid
 		local it = if fid ~= "" then Cosmetics.item(fid) else nil
-		if it ~= nil and it.kind == "flag" then
+		if it ~= nil and it.empire and FlagArt.apply(self._flag_img, it) then
+			self.flag:set_visible(true)
+		elseif it ~= nil and it.kind == "flag" then
+			self._flag_img.ImageContent = Content.none
 			self._flag_img.Image = Cosmetics.flag_image(it)
 			self._flag_img.ImageRectOffset = Vector2.new(it.x, it.y)
 			self._flag_img.ImageRectSize = Vector2.new(it.w, it.h)

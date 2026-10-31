@@ -299,11 +299,30 @@ def sword():
     return im
 
 
+def flagshop():
+    """v10: the Empire Shop: a banner on its pole."""
+    im, d = canvas()
+    d.rectangle([30, 14, 44, 182], fill=255)                                   # pole
+    d.ellipse([24, 6, 50, 32], fill=255)                                      # finial
+    pts = []
+    for i in range(0, 121, 4):
+        x = 48 + i
+        y = 30 + 10 * math.sin(i / 120 * 2 * math.pi)
+        pts.append((x, y))
+    bottom = [(x, y + 84) for x, y in reversed(pts)]
+    d.polygon(pts + bottom, fill=255)                                         # cloth
+    d.polygon([(78, 60), (90, 84), (116, 84), (96, 100), (104, 126), (82, 110), (60, 126), (68, 100),
+               (48, 84), (74, 84)], fill=0) if False else None
+    d.ellipse([88, 52, 128, 92], fill=0)                                      # emblem
+    d.ellipse([98, 62, 118, 82], fill=255)
+    return im
+
+
 ICONS = {"city_era": temple, "road_era": wagon, "forge": forge, "mine": mine, "market": market,
          "ore": ore, "pact": pact, "ship_era": ship, "alliance": handshake, "betray": dagger,
          "donate": donate, "renew": hourglass, "pact_trade": trade_pact, "pact_defense": defense_pact,
          "ore_sell": ore_arrow(True), "ore_buy": ore_arrow(False), "medal": medal, "crown": crown,
-         "laurel": laurel, "sword": sword}
+         "laurel": laurel, "sword": sword, "flagshop": flagshop}
 
 
 def main(out_luau):

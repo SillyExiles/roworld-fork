@@ -399,11 +399,11 @@ local function build_hud(player: Player)
 	make_button(h, "settings", "settings", "Settings", 5, function()
 		call(Main.ui, "open_settings")
 	end)
-	-- Empires Front: the achievements (client/Achievements), after Settings
-	make_button(h, "medals", "medal", "Achievements", 6, function()
-		local A = optional(script.Parent, { "Achievements" })
-		if A ~= nil then
-			A.toggle()
+	-- Empires Front: the Empire Shop (client/EmpireShop), after Settings
+	make_button(h, "shop", "flagshop", "Empire Shop", 6, function()
+		local S = optional(script.Parent, { "EmpireShop" })
+		if S ~= nil then
+			S.toggle()
 		end
 	end)
 	make_button(h, "menu", "exit", "Game menu", 7, function()
@@ -504,9 +504,9 @@ function Main.start()
 	local session = Session.new()
 	Main.session = session
 	do
-		local A = optional(script.Parent, { "Achievements" })
-		if A ~= nil then
-			A.start(Main)
+		local S = optional(script.Parent, { "EmpireShop" })
+		if S ~= nil then
+			S.start(Main)
 		end
 	end
 	Main.boot.session_new = os.clock()

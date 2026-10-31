@@ -372,7 +372,7 @@ function GameOver._stars_spec(self): { [string]: any }
 	end
 	return {
 		title = "Stars earned",
-		body = "Stars unlock new weapons in the Arsenal.",
+		body = "Spend Stars on empire flags in the Shop (the top bar's shop button).",
 		rows = rows,
 		hint = string.format("You have %s Stars", UICtx.commas(a.balance or 0)),
 		hint_color = UITheme.GOLD,
@@ -383,7 +383,9 @@ end
 --- The match's payout ({ lines, total, balance }, Session.stars_awarded), or nil: the pill counts up.
 --- (Empires Front 2026-10-31: no Stars on the result screen: the payout pill, the next unlock
 --- "MEGA NUKE x / 20,000" and the 2x Stars offer stay hidden, whatever the server pays)
-GameOver.SHOW_STARS = false
+GameOver.SHOW_STARS = true
+--- (Empires Front v10: the Stars buy flags in the Empire Shop; no Arsenal offers under the buttons)
+GameOver.SHOW_OFFERS = false
 function GameOver.set_award(self, award: any)
 	if not GameOver.SHOW_STARS or award == nil or (tonumber(award.total) or 0) <= 0 then
 		self._award = nil
@@ -410,7 +412,7 @@ end
 
 --- The offers for the payout shown (hidden without one, and while the takeover offer stands).
 function GameOver._refresh_offers(self)
-	if not GameOver.SHOW_STARS then
+	if not GameOver.SHOW_STARS or not GameOver.SHOW_OFFERS then
 		self._goal_key = nil
 		self._goal_wanted = false
 		self._x2_wanted = false

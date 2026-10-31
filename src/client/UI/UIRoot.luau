@@ -518,7 +518,13 @@ end
 --- "offer" (one of the result screen's offers).
 --- A solo match stands still while it is open.
 function UIRoot.open_arsenal(self, focus: string?, from: string?)
-	do -- Empires Front: no shop, crates or offers
+	do -- Empires Front: no Arsenal nor RoWorld shop: the Empire Shop (client/EmpireShop) opens instead
+		local mod = script.Parent.Parent:FindFirstChild("EmpireShop")
+		if mod ~= nil then
+			pcall(function()
+				require(mod).open()
+			end)
+		end
 		return
 	end
 	if self.arsenal == nil then
@@ -534,7 +540,13 @@ end
 --- The flag shop (FlagShop; Data/Shop): the title's shop button. Opening it marks today's shop seen
 --- (the button's NEW sticker goes).
 function UIRoot.open_shop(self)
-	do -- Empires Front: no shop, crates or offers
+	do -- Empires Front: no Arsenal nor RoWorld shop: the Empire Shop (client/EmpireShop) opens instead
+		local mod = script.Parent.Parent:FindFirstChild("EmpireShop")
+		if mod ~= nil then
+			pcall(function()
+				require(mod).open()
+			end)
+		end
 		return
 	end
 	local fs = self.flag_shop

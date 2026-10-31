@@ -61,6 +61,9 @@ local Shop: any = if IS_ROBLOX
 local Subscription: any = if IS_ROBLOX
 	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.Subscription)
 	else require("../shared/Data/Subscription")
+local EmpireShop: any = if IS_ROBLOX
+	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.EmpireShop)
+	else require("../shared/Data/EmpireShop")
 
 local Purchases = {}
 
@@ -111,6 +114,9 @@ local inv: { [any]: any } = {}
 --- player -> the load that is still trying to read their record (a token: a newer load, a write
 --- that brought the record, or leaving ends it)
 local loading: { [any]: any } = {}
+--- Empires Front: players whose flag flies beside their name (the Imperial Banner game pass, or the
+--- Imperial Crown subscription): server/ServerMain says so (Purchases.set_banner)
+local banner: { [any]: boolean } = {}
 
 function Purchases.configure(d: { [string]: any })
 	for k, v in d do
@@ -340,7 +346,21 @@ function Purchases.inventory(player: any): any
 		stars = if i ~= nil then i.stars else 0,
 		unlocks = unlocks,
 		starter = Purchases.starter_state(player),
+		banner = banner[player] == true,
 	}
+end
+
+--- Empires Front: the Imperial Banner (game pass or subscription) on or off for `player`.
+function Purchases.set_banner(player: any, on: boolean)
+	if (banner[player] == true) == on then
+		return
+	end
+	banner[player] = if on then true else nil
+	notify(player)
+end
+
+function Purchases.has_banner(player: any): boolean
+	return banner[player] == true
 end
 
 --- The starter pack for this player: false (none: not eligible, bought, ended, or not on sale here),
@@ -416,7 +436,12 @@ function Purchases.equipped(player: any): any
 	if i == nil or (i.equipped.skin == nil and i.equipped.flag == nil) then
 		return nil
 	end
-	return table.clone(i.equipped)
+	local eq = table.clone(i.equipped)
+	-- Empires Front: with the Imperial Banner, the Empire Shop flag worn on the land flies by the name too
+	if banner[player] and EmpireShop.flag_of(eq.skin) ~= nil then
+		eq.flag = eq.skin
+	end
+	return eq
 end
 
 --- Roblox's ProcessReceipt: store the credit, then say granted (never before it is stored).
@@ -449,6 +474,26 @@ function Purchases.grant(user_id: number, kind: string, receipt: string, n: numb
 			if table.find(rec.receipts, receipt) then
 				stored = rec -- granted before (a retry): nothing to add
 				return nil
+			end
+			-- Empires Front: an Empire Shop flag bought for Robux (Data/EmpireShop): owned and worn
+			local cosmetic = string.match(kind, "^cosmetic:(.+)$")
+			if cosmetic ~= nil then
+				local cit = Cosmetics.item(cosmetic)
+				if cit == nil or rec.owned[cosmetic] then
+					local p = Products["ef_" .. ((cit and cit.key) or "")]
+					local back = math.floor((if p ~= nil then p.robux else 0) * Purchases.DUPLICATE_STARS_PER_ROBUX)
+					rec.stars = math.min(rec.stars + back, Purchases.MAX_STARS)
+				else
+					rec.owned[cosmetic] = true
+					rec.equipped.skin = cosmetic
+				end
+				table.insert(rec.receipts, receipt)
+				while #rec.receipts > Purchases.RECEIPTS_KEPT do
+					table.remove(rec.receipts, 1)
+				end
+				rec.paid = true
+				stored = rec
+				return rec
 			end
 			local unlock_key = string.match(kind, "^unlock:(.+)$")
 			local it = if unlock_key ~= nil then Arsenal.item(unlock_key) else nil
@@ -634,6 +679,7 @@ function Purchases.release(player: any)
 	loading[player] = nil
 	cache[player] = nil
 	inv[player] = nil
+	banner[player] = nil
 end
 
 --- Open one crate: spend a crate credit and add an item the player doesn't own (Cosmetics.roll, the
@@ -860,6 +906,11 @@ end
 --- Unlock Arsenal item `key` with Stars: one write takes its price and unlocks it. Yields.
 --- (ok) or (false, "unknown item" | "robux only" | "owned" | "not enough" | "store unavailable: ...").
 function Purchases.buy_unlock(player: any, item_key: any): (boolean, string?)
+	-- Empires Front: "cosmetic:<id>" buys an Empire Shop flag with Stars
+	local cid = if type(item_key) == "string" then string.match(item_key, "^cosmetic:(.+)$") else nil
+	if cid ~= nil then
+		return Purchases.buy_cosmetic(player, cid)
+	end
 	local it = Arsenal.item(item_key)
 	if it == nil then
 		return false, "unknown item"
@@ -903,6 +954,53 @@ function Purchases.buy_unlock(player: any, item_key: any): (boolean, string?)
 		pcall(deps.unlocked, player, it.key)
 	end
 	log(string.format("%d unlocked %s for %d Stars", player.UserId, it.key, it.stars))
+	return true, nil
+end
+
+--- Empires Front: buy Empire Shop flag `id` with Stars (Data/EmpireShop): one write takes its price, owns
+--- it and wears it. Yields. (ok) or (false, "unknown item" | "robux only" | "owned" | "not enough" | ...).
+function Purchases.buy_cosmetic(player: any, id: any): (boolean, string?)
+	local price = EmpireShop.stars_price(id)
+	if Cosmetics.item(id) == nil or EmpireShop.flag_of(id) == nil then
+		return false, "unknown item"
+	end
+	if price == nil then
+		return false, "robux only"
+	end
+	local why = "store unavailable"
+	local done = false
+	local stored: Record? = nil
+	local ok, err = pcall(function()
+		deps.datastore:UpdateAsync(key(player.UserId), function(old: any): any
+			done = false
+			local rec = clean(old, player.UserId)
+			stored = rec
+			if rec.owned[id] then
+				why = "owned"
+				return nil
+			end
+			if rec.stars < price then
+				why = "not enough"
+				return nil
+			end
+			rec.stars -= price
+			rec.owned[id] = true
+			rec.equipped.skin = id
+			done = true
+			return rec
+		end)
+	end)
+	if not ok then
+		return false, "store unavailable: " .. tostring(err)
+	end
+	if stored ~= nil then
+		remember(player, stored :: Record)
+	end
+	notify(player)
+	if not done then
+		return false, why
+	end
+	log(string.format("%d bought %s for %d Stars", player.UserId, tostring(id), price))
 	return true, nil
 end
 

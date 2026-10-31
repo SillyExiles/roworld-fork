@@ -24,6 +24,7 @@ local Sprites = require(RS:WaitForChild("Airfront"):WaitForChild("Assets"):WaitF
 local Cosmetics = require(RS:WaitForChild("Airfront"):WaitForChild("Data"):WaitForChild("Cosmetics")) :: any
 local Coop = require(RS:WaitForChild("Airfront"):WaitForChild("Net"):WaitForChild("Coop")) :: any
 local FrameClock = require(script.Parent:WaitForChild("FrameClock")) :: any
+local FlagArt = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("FlagArt")) :: any
 
 local readi32 = buffer.readi32
 local readu8 = buffer.readu8
@@ -635,7 +636,11 @@ function NameLayer.tick(self: any, dt: number)
 		if fid ~= p.flag_id then
 			p.flag_id = fid
 			local it = if fid ~= "" then Cosmetics.item(fid) else nil
-			if it ~= nil and it.kind == "flag" then
+			if it ~= nil and it.empire and FlagArt.apply(p.flag, it) then
+				-- (Empires Front: an Empire Shop flag with the Imperial Banner)
+				p.flag.Visible = true
+			elseif it ~= nil and it.kind == "flag" then
+				p.flag.ImageContent = Content.none
 				p.flag.Image = Cosmetics.flag_image(it)
 				p.flag.ImageRectOffset = Vector2.new(it.x, it.y)
 				p.flag.ImageRectSize = Vector2.new(it.w, it.h)

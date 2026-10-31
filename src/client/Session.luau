@@ -497,7 +497,12 @@ function Session._apply_own_cosmetics(self: any, id: number)
 	local eq = self.inventory.equipped or {}
 	-- (and their own head shot beside their name, as in a public match)
 	local uid = if type(self.env.user_id) == "function" then self.env.user_id() else 0
-	st:set_cosmetics({ [id] = { skin = eq.skin, flag = eq.flag, face = uid } }, true)
+	-- Empires Front: with the Imperial Banner the Empire Shop flag on the land also flies by the name
+	local flag = eq.flag
+	if self.inventory.banner and type(eq.skin) == "string" and string.sub(eq.skin, 1, 3) == "ef_" then
+		flag = eq.skin
+	end
+	st:set_cosmetics({ [id] = { skin = eq.skin, flag = flag, face = uid } }, true)
 end
 
 --- Does the player have Arsenal item `key`?
@@ -1474,6 +1479,7 @@ function Session._on_net(self: any, op: number, ...: any)
 				unlocks = {},
 				loaded = true,
 				starter = Session._starter_of(inv.starter),
+				banner = inv.banner == true,
 			}
 			local was = self._unlocks_seen
 			local fresh = {}

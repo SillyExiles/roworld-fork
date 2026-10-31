@@ -45,6 +45,13 @@ local SettingsStore = require(script.Parent.SettingsStore) :: any
 local Analytics = require(script.Parent.Analytics) :: any
 local Purchases = require(script.Parent.Purchases) :: any
 local Rewards = require(script.Parent.Rewards) :: any
+local EmpireShop = require(game:GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.EmpireShop) :: any
+-- Empires Front: who has the Imperial Banner, from the game pass or the subscription
+local banner_from_pass: { [Player]: boolean } = {}
+local banner_from_sub: { [Player]: boolean } = {}
+local function update_banner(player: Player)
+	Purchases.set_banner(player, banner_from_pass[player] == true or banner_from_sub[player] == true)
+end
 local General = require(script.Parent.General) :: any
 local Subscription = require(Shared.Data.Subscription) :: any
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -1402,10 +1409,15 @@ function ServerMain.start()
 			while policy_known[player] == nil and player.Parent == Players and os.clock() - t0 < 15 do
 				task.wait(0.5)
 			end
-			return Purchases.general_perks(player, day, skin, crates_allowed[player] == true)
+			return Purchases.general_perks(player, day, skin, false) -- (Empires Front: no crates: Stars)
 		end,
 		send = function(player: Player, state: any)
 			send(player, OP.GENERAL, state)
+			-- Empires Front: the Imperial Crown includes the Imperial Banner
+			if type(state) == "table" then
+				banner_from_sub[player] = state.on == true
+				update_banner(player)
+			end
 		end,
 		subscribed = function(player: Player)
 			pcall(Analytics.report, player, "general", "subscribed")
@@ -1426,6 +1438,32 @@ function ServerMain.start()
 			pcall(General.tick)
 		end
 	end)
+	-- Empires Front: the Imperial Banner game pass (Data/EmpireShop.BANNER_GAMEPASS)
+	local function check_banner_pass(player: Player)
+		local id = EmpireShop.BANNER_GAMEPASS
+		if id == 0 then
+			return
+		end
+		local ok, owns = pcall(function()
+			return MarketplaceService:UserOwnsGamePassAsync(player.UserId, id)
+		end)
+		if ok then
+			banner_from_pass[player] = owns == true
+			update_banner(player)
+		end
+	end
+	MarketplaceService.PromptGamePassPurchaseFinished:Connect(function(player: Player, pass_id: number, bought: boolean)
+		if bought and pass_id == EmpireShop.BANNER_GAMEPASS and pass_id ~= 0 then
+			banner_from_pass[player] = true
+			update_banner(player)
+		end
+	end)
+	Players.PlayerAdded:Connect(function(player: Player)
+		task.spawn(check_banner_pass, player)
+	end)
+	for _, p in Players:GetPlayers() do
+		task.spawn(check_banner_pass, p)
+	end
 	MarketplaceService.ProcessReceipt = function(info: any): Enum.ProductPurchaseDecision
 		local ok, r = pcall(Purchases.process_receipt, info)
 		if ok and r == "granted" then
@@ -1462,6 +1500,8 @@ function ServerMain.start()
 		SettingsStore.load(p)
 	end
 	Players.PlayerRemoving:Connect(function(player: Player)
+		banner_from_pass[player] = nil
+		banner_from_sub[player] = nil
 		server:peer_disconnected(player)
 		listening[player] = nil
 		hop_at[player] = nil
