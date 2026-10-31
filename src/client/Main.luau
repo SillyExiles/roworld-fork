@@ -399,7 +399,14 @@ local function build_hud(player: Player)
 	make_button(h, "settings", "settings", "Settings", 5, function()
 		call(Main.ui, "open_settings")
 	end)
-	make_button(h, "menu", "exit", "Game menu", 6, function()
+	-- Empires Front: the achievements (client/Achievements), after Settings
+	make_button(h, "medals", "medal", "Achievements", 6, function()
+		local A = optional(script.Parent, { "Achievements" })
+		if A ~= nil then
+			A.toggle()
+		end
+	end)
+	make_button(h, "menu", "exit", "Game menu", 7, function()
 		call(Main.ui, "open_pause_menu")
 	end)
 	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(layout_hud)
@@ -496,6 +503,12 @@ function Main.start()
 	end
 	local session = Session.new()
 	Main.session = session
+	do
+		local A = optional(script.Parent, { "Achievements" })
+		if A ~= nil then
+			A.start(Main)
+		end
+	end
 	Main.boot.session_new = os.clock()
 	local audio = AudioDirector.new("menu")
 	audio:bind_settings(session)
