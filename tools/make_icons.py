@@ -221,10 +221,71 @@ def ore_arrow(out):
         return base
     return f
 
+def medal():
+    im, d = canvas()
+    d.polygon([(52, 6), (92, 6), (110, 70), (84, 86)], fill=255)      # ribbon left
+    d.polygon([(140, 6), (100, 6), (82, 70), (108, 86)], fill=255)    # ribbon right
+    d.line([(70, 10), (94, 76)], fill=0, width=6)
+    d.line([(122, 10), (98, 76)], fill=0, width=6)
+    d.ellipse([40, 70, 152, 182], fill=255)
+    d.ellipse([56, 86, 136, 166], fill=0)
+    pts = []
+    for k in range(10):
+        r = 34 if k % 2 == 0 else 14
+        a = -math.pi / 2 + k * math.pi / 5
+        pts.append((96 + r * math.cos(a), 128 + r * math.sin(a)))
+    d.polygon(pts, fill=255)
+    return im
+
+
+def crown():
+    im, d = canvas()
+    d.polygon([(22, 150), (14, 56), (58, 100), (96, 30), (134, 100), (178, 56), (170, 150)], fill=255)
+    d.rounded_rectangle([20, 156, 172, 178], radius=6, fill=255)
+    for x, y in ((14, 50), (96, 24), (178, 50)):
+        d.ellipse([x - 12, y - 12, x + 12, y + 12], fill=255)
+    for x in (60, 96, 132):
+        d.ellipse([x - 9, 120, x + 9, 138], fill=0)
+    return im
+
+
+def laurel():
+    im, d = canvas()
+    cx, cy, r = 96, 96, 64
+    leaf = Image.new("L", (40, 40), 0)
+    ImageDraw.Draw(leaf).ellipse([12, 2, 28, 38], fill=255)
+    for side in (-1, 1):
+        angles = [96 + k * 20 for k in range(8)] if side < 0 else [84 - k * 20 for k in range(8)]
+        pts = [(cx + r * math.cos(math.radians(a)), cy + r * math.sin(math.radians(a))) for a in angles]
+        d.line(pts, fill=255, width=7)
+        for k, a in enumerate(angles[1:], 1):
+            for off in (-14, 14):
+                t = math.radians(a)
+                rr = r + off
+                px, py = cx + rr * math.cos(t), cy + rr * math.sin(t)
+                # the leaf leans along the branch, toward its tip
+                rot = -a + (60 if side < 0 else -60) * (1 if off > 0 else -1) * -1
+                lf = leaf.rotate(rot, resample=Image.BICUBIC)
+                im.paste(255, (int(px - 20), int(py - 20)), lf)
+    d.polygon([(84, 158), (108, 158), (118, 184), (96, 174), (74, 184)], fill=255)
+    return im
+
+
+def sword():
+    im, d = canvas()
+    d.polygon([(150, 14), (178, 14), (178, 42), (76, 144), (48, 116)], fill=255)   # blade
+    d.line([(166, 26), (66, 126)], fill=0, width=5)
+    d.line([(34, 98), (94, 158)], fill=255, width=16)                               # guard
+    d.line([(52, 140), (24, 168)], fill=255, width=18)                              # grip
+    d.ellipse([8, 160, 34, 186], fill=255)                                          # pommel
+    return im
+
+
 ICONS = {"city_era": temple, "road_era": wagon, "forge": forge, "mine": mine, "market": market,
          "ore": ore, "pact": pact, "ship_era": ship, "alliance": handshake, "betray": dagger,
          "donate": donate, "renew": hourglass, "pact_trade": trade_pact, "pact_defense": defense_pact,
-         "ore_sell": ore_arrow(True), "ore_buy": ore_arrow(False)}
+         "ore_sell": ore_arrow(True), "ore_buy": ore_arrow(False), "medal": medal, "crown": crown,
+         "laurel": laurel, "sword": sword}
 
 
 def main(out_luau):
@@ -243,4 +304,5 @@ def main(out_luau):
         f.write("}\n")
 
 
-main(sys.argv[1])
+if __name__ == "__main__":
+    main(sys.argv[1])

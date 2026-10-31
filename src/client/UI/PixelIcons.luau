@@ -184,6 +184,11 @@ PixelIcons.ALIASES = {
 	pact_defense = "pact_defense",
 	ore_sell = "ore_sell",
 	ore_buy = "ore_buy",
+	-- achievements
+	medal = "medal",
+	crown = "crown",
+	laurel = "laurel",
+	sword = "sword",
 }
 
 function PixelIcons.has(name: string?): boolean
