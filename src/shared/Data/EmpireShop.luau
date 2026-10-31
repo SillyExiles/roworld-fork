@@ -18,12 +18,12 @@ local EmpireShop = {}
 
 --- Developer product ids of the Robux flags (key -> id); 0 = not created yet.
 EmpireShop.ROBUX_PRODUCTS = {
-	rome = 0,
-	mongol = 0,
-	ottoman = 0,
-	spain_imp = 0,
-	brazil_imp = 0,
-	papal = 0,
+	rome = 3725276090,
+	mongol = 3725277108,
+	ottoman = 3725277983,
+	spain_imp = 3725282465,
+	brazil_imp = 3725281334,
+	papal = 3725278597,
 }
 
 --- Tiers: their colour in the shop and their order.
