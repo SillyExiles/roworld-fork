@@ -37,7 +37,7 @@ TitleScreen.WORD_MAX_W = 0.35
 --- The credits line under the dock (desktop, phones). It points at the help window by its top-bar name
 --- (2026-10-25: "See Help & Credits" instead of "see How to play"; 2026-10-26: no map credit, the World
 --- map is RoWorld's own, made from public-domain data).
-TitleScreen.CREDITS = "© OpenFront and Contributors  ·  Based on RoWorld  ·  Music by Rodrigo Flores  ·  "
+TitleScreen.CREDITS = "© OpenFront and Contributors  ·  Based on RoWorld  ·  Music: APM Music  ·  "
 	.. "GNU AGPL v3, no warranty: See Help & Credits"
 TitleScreen.CREDITS_SHORT = "© OpenFront and Contributors  ·  Based on RoWorld  ·  GNU AGPL v3"
 

@@ -260,7 +260,7 @@ HelpOverlay.SECTIONS = {
 HelpOverlay.LEGAL = {
 	"Empires Front is a modified version of RoWorld (© 2026 Snick Co.), itself a modified version of OpenFront. © OpenFront and Contributors. Changes © 2026 Empires Front's authors.",
 	"Empires Front is free software: you can redistribute it and/or modify it under the terms of the GNU Affero General Public License, version 3, with the additional terms in its LICENSE file. It comes with ABSOLUTELY NO WARRANTY. The licence comes with the game's source code.",
-	"Maps made with Natural Earth and NOAA ETOPO1 data (public domain). Country flags from Wikimedia Commons (public domain). Music by Rodrigo Flores.",
+	"Maps made with Natural Earth and NOAA ETOPO1 data (public domain). Country flags from Wikimedia Commons (public domain). Music courtesy of APM Music and DistroKid via the Roblox Creator Store.",
 	"Empires Front is not affiliated with or endorsed by OpenFront or RoWorld.",
 }
 --- Where the source lives, under the credits: plain text with the GitHub mark, since Roblox games
