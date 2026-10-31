@@ -389,7 +389,7 @@ function HelpOverlay._build(self)
 	local paused = ctx:mode() == UICtx.MODE_SOLO and ctx:in_match()
 	tv:add_child(
 		UITheme.label(
-			"Conquer the real world in seven ideas." .. (if paused then "  ·  Game paused" else ""),
+			"Rebuild an empire in eight ideas." .. (if paused then "  ·  Game paused" else ""),
 			13,
 			500,
 			UITheme.TEXT_2
