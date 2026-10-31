@@ -206,6 +206,11 @@ function HelpOverlay._fill_rules(text: string): string
 			then " Defense Posts also fire on enemy boats in range."
 			else "",
 		win = tostring(Defs.round(R.WIN_SHARE * 100.0)),
+		-- Empires Front: the terrain card's numbers (Rules.ATTACK_MAG / ATTACK_TILE_COST against plains)
+		hill_mag = string.format("%.1f", R.ATTACK_MAG[Defs.T_HIGHLAND] / R.ATTACK_MAG[Defs.T_PLAINS]),
+		hill_cost = string.format("%.1f", R.ATTACK_TILE_COST[Defs.T_HIGHLAND] / R.ATTACK_TILE_COST[Defs.T_PLAINS]),
+		mtn_mag = string.format("%.1f", R.ATTACK_MAG[Defs.T_MOUNTAIN] / R.ATTACK_MAG[Defs.T_PLAINS]),
+		mtn_cost = string.format("%.1f", R.ATTACK_TILE_COST[Defs.T_MOUNTAIN] / R.ATTACK_TILE_COST[Defs.T_PLAINS]),
 	})
 end
 
@@ -221,6 +226,12 @@ HelpOverlay.SECTIONS = {
 		color = "orange",
 		title = "Expand & attack",
 		text = "Click neutral land beside you to expand, or a nation you border to attack it. Hills cost about twice the troops and time to take, mountains five times: ranges are natural walls. The Attack bar sets the share of troops you send (Q / E, or Shift + wheel). Troops regrow on their own, fastest well below your cap.",
+	},
+	{
+		icon = "mine",
+		color = "green",
+		title = "Terrain",
+		text = "Plains (green fields, forests, sand and steppe) are the fastest land to take and the best for cities. Hills (tan and brown) cost attackers {hill_mag}× the troops and {hill_cost}× the time, and mountains (grey rock and snow) {mtn_mag}× the troops and {mtn_cost}× the time: ranges are natural walls, so defend behind them and attack around them. Mines can only be dug in hills and mountains, and mountain mines dig more Ore. Ports go on your coast. Seas, lakes and rivers wider than a step are crossed only by boat, and the polar ice can't be claimed.",
 	},
 	{
 		icon = "boat",
@@ -258,7 +269,7 @@ HelpOverlay.SECTIONS = {
 		icon = "wall",
 		color = "orange",
 		title = "Walls, barracks & revolts",
-		text = "A Border Wall raises stones along your frontier near it: taking a walled tile costs {wall_mag}× the troops and {wall_cost}× the time, and the stones fall with the tile. Each Barracks level makes your army grow {bar_pct}% faster. A huge empire with too few troops can face a revolt: its far provinces break away as rebels, taking land and soldiers with them. Keep your army strong to keep the peace.",
+		text = "A Border Wall raises stones along your frontier near it: taking a walled tile costs {wall_mag}× the troops and {wall_cost}× the time (a wall and a Defense Post don't stack), and the stones fall with the tile. A wall or a Defense Post that is overrun is destroyed; mines, markets, barracks and cities are captured instead (at most 4 Barracks each). Each Barracks level makes your army grow {bar_pct}% faster. A huge empire with too few troops can face a revolt: its far provinces break away as rebels, taking land and soldiers with them. Keep your army strong to keep the peace.",
 	},
 	{
 		icon = "ping",

@@ -47,7 +47,7 @@ Stars.MAX_FIELD = 1024
 
 Stars.LINES = { "played", "survived", "territory", "conquests", "placed", "victory" }
 Stars.LABELS = {
-	played = "Match played",
+	played = "Performance",
 	survived = "Time survived",
 	territory = "Land held",
 	conquests = "Nations conquered",
@@ -83,37 +83,56 @@ function Stars.place_score(place: number, field: number): number
 	return s * s
 end
 
---- The Stars `r` pays in `mode` ("public" / "solo0".."solo2"); `double` = the player owns 2x Stars.
-function Stars.payout(r: Result, mode: string?, double: boolean?): { lines: { { any } }, total: number }
+--- Empires Front (v10): a match pays by performance, at most MAX_PLAY Stars (lost, or still playing at the
+--- end) and at most MAX_WIN when the player (or their team) won. performance() is 0..1:
+---   PERF_PLACE x the place score, PERF_LAND x the peak land (LAND_FULL fair shares = all of it),
+---   PERF_KILLS x the nations conquered (KILLS_FULL = all of it), PERF_TIME x the minutes in play
+---   (TIME_FULL = all of it). A win pays WIN_BASE of MAX_WIN for winning, the rest by performance.
+Stars.MAX_PLAY = 500
+Stars.MAX_WIN = 1000
+Stars.WIN_BASE = 0.5
+Stars.PERF_PLACE = 0.35
+Stars.PERF_LAND = 0.30
+Stars.PERF_KILLS = 0.20
+Stars.PERF_TIME = 0.15
+Stars.LAND_FULL = 3.0
+Stars.KILLS_FULL = 3
+Stars.TIME_FULL = 15.0
+
+--- How well `r` went, 0..1.
+function Stars.performance(r: Result): number
+	local minutes = math.clamp(r.minutes, 0, Stars.MAX_MINUTES)
+	local place = if r.left then 0 else Stars.place_score(r.place, r.field)
+	local land = math.clamp(math.max(r.shares, 0) / Stars.LAND_FULL, 0, 1)
+	local kills = math.clamp(math.max(r.kills, 0) / Stars.KILLS_FULL, 0, 1)
+	local time = math.clamp(minutes / Stars.TIME_FULL, 0, 1)
+	return math.clamp(
+		Stars.PERF_PLACE * place + Stars.PERF_LAND * land + Stars.PERF_KILLS * kills + Stars.PERF_TIME * time,
+		0,
+		1
+	)
+end
+
+--- The Stars `r` pays in `mode` ("public" / "solo0".."solo2"); `double` is ignored in Empires Front (no
+--- 2x Stars). Lines: what the performance earned ("played" for a lost match, "victory" for a win).
+function Stars.payout(r: Result, mode: string?, _double: boolean?): { lines: { { any } }, total: number }
 	local lines: { { any } } = {}
-	local total = 0
 	if not r.spawned then
 		return { lines = lines, total = 0 }
 	end
 	local mult = Stars.MODE_MULT[mode or "public"] or 1.0
-	local minutes = math.clamp(r.minutes, 0, Stars.MAX_MINUTES)
-	local function add(key: string, amount: number)
-		local a = quantum(amount * mult)
-		if a > 0 then
-			table.insert(lines, { key, a })
-			total += a
+	local perf = Stars.performance(r)
+	local total
+	if r.won and not r.left then
+		total = quantum(Stars.MAX_WIN * (Stars.WIN_BASE + (1 - Stars.WIN_BASE) * perf) * mult)
+		total = math.min(total, Stars.MAX_WIN)
+		table.insert(lines, { "victory", total })
+	else
+		total = quantum(Stars.MAX_PLAY * perf * mult)
+		total = math.min(total, Stars.MAX_PLAY)
+		if total > 0 then
+			table.insert(lines, { "played", total })
 		end
-	end
-	if not r.left then
-		add("played", Stars.FLOOR)
-	end
-	add("survived", Stars.PER_MINUTE * minutes)
-	add("territory", Stars.PER_SHARE * math.max(r.shares, 0))
-	add("conquests", Stars.PER_KILL * math.max(r.kills, 0))
-	if not r.left then
-		add("placed", Stars.PLACE_RATE * Stars.place_score(r.place, r.field) * minutes)
-		if r.won then
-			add("victory", Stars.WIN_RATE * minutes)
-		end
-	end
-	if double and total > 0 then
-		table.insert(lines, { "double", total })
-		total *= 2
 	end
 	return { lines = lines, total = total }
 end

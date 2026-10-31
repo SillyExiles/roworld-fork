@@ -3,7 +3,6 @@
 -- your land instead of its plain colour (Data/EmpireShop, Data/EmpireFlags; worn as a territory skin).
 --   Stars           most flags, bought with the Stars every match pays (server/Purchases.buy_cosmetic).
 --   Robux           a few flags sold as developer products (Data/EmpireShop.ROBUX_PRODUCTS).
---   Banner          the Imperial Banner game pass: your flag also flies beside your name.
 -- Owned flags are put on (or taken off) from their card.
 local Players = game:GetService("Players")
 local RS = game:GetService("ReplicatedStorage")
@@ -125,17 +124,6 @@ local function equip(it: any, on: boolean)
 	s:equip("skin", if on then it.id else false)
 end
 
-local function buy_banner()
-	local id = EmpireShopData.BANNER_GAMEPASS
-	if id == 0 then
-		toast("The Imperial Banner is coming soon")
-		return
-	end
-	pcall(function()
-		MarketplaceService:PromptGamePassPurchase(Players.LocalPlayer, id)
-	end)
-end
-
 -- =============================================================================================
 -- The window
 -- =============================================================================================
@@ -239,82 +227,16 @@ local function flag_card(it: any, order: number, parent: Instance)
 	b.Activated:Connect(fn)
 end
 
-local function perk_card(title: string, price: string, lines: { string }, active: boolean, button: string, fn: () -> (), order: number, parent: Instance)
-	local card = make("Frame", {
-		Name = title,
-		LayoutOrder = order,
-		BackgroundColor3 = if active then CARD_ON else CARD,
-	}, parent)
-	make("UICorner", { CornerRadius = UDim.new(0, 12) }, card)
-	make("UIStroke", { Color = GOLD, Transparency = if active then 0 else 0.5, Thickness = 1.5 }, card)
-	make("TextLabel", {
-		BackgroundTransparency = 1,
-		FontFace = FONT,
-		Text = title,
-		TextSize = 18,
-		TextColor3 = GOLD,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.fromOffset(16, 12),
-		Size = UDim2.new(1, -32, 0, 22),
-	}, card)
-	make("TextLabel", {
-		BackgroundTransparency = 1,
-		FontFace = FONT_MED,
-		Text = price,
-		TextSize = 13,
-		TextColor3 = TEXT2,
-		TextXAlignment = Enum.TextXAlignment.Left,
-		Position = UDim2.fromOffset(16, 34),
-		Size = UDim2.new(1, -32, 0, 16),
-	}, card)
-	make("TextLabel", {
-		BackgroundTransparency = 1,
-		FontFace = FONT_MED,
-		Text = "• " .. table.concat(lines, "\n• "),
-		TextSize = 13,
-		TextWrapped = true,
-		TextColor3 = Color3.new(1, 1, 1),
-		TextXAlignment = Enum.TextXAlignment.Left,
-		TextYAlignment = Enum.TextYAlignment.Top,
-		Position = UDim2.fromOffset(16, 58),
-		Size = UDim2.new(1, -32, 1, -108),
-	}, card)
-	local b = make("TextButton", {
-		AutoButtonColor = true,
-		BackgroundColor3 = if active then GREEN else ROBUX_GREEN,
-		FontFace = FONT,
-		Text = if active then "ACTIVE  ✓" else button,
-		TextSize = 15,
-		TextColor3 = Color3.new(1, 1, 1),
-		Position = UDim2.new(0, 16, 1, -46),
-		Size = UDim2.new(1, -32, 0, 34),
-	}, card)
-	make("UICorner", { CornerRadius = UDim.new(0, 8) }, b)
-	if not active then
-		b.Activated:Connect(fn)
-	end
-end
-
 local function fill()
 	if grid == nil then
 		return
 	end
 	for _, c in grid:GetChildren() do
-		if not c:IsA("UIGridLayout") then
+		if not c:IsA("UIGridLayout") and not c:IsA("UIPadding") then
 			c:Destroy()
 		end
 	end
 	local layout = grid:FindFirstChildOfClass("UIGridLayout")
-	if tab == "crown" then
-		layout.CellSize = UDim2.fromOffset(330, 250)
-		local inv = inventory() or {}
-		perk_card("Imperial Banner", string.format("Game pass  ·  R$ %d once", EmpireShopData.BANNER_ROBUX), {
-			"The Empire Shop flag you wear flies beside your name on the map",
-			"...and beside your name on the leaderboard",
-			"Yours for good",
-		}, inv.banner == true, if EmpireShopData.BANNER_GAMEPASS == 0 then "COMING SOON" else "BUY", buy_banner, 2, grid)
-		return
-	end
 	layout.CellSize = UDim2.fromOffset(150, 160)
 	local list = {}
 	local inv = inventory() or {}
@@ -499,7 +421,7 @@ local function build()
 		Padding = UDim.new(0, 8),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, tabs)
-	for i, t in { { "stars", "★ STARS" }, { "robux", "ROBUX" }, { "inventory", "INVENTORY" }, { "crown", "BANNER" } } do
+	for i, t in { { "stars", "★ STARS" }, { "robux", "ROBUX" }, { "inventory", "INVENTORY" } } do
 		local b = make("TextButton", {
 			Name = t[1],
 			LayoutOrder = i,

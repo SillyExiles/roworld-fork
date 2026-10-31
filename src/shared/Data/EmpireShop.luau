@@ -3,15 +3,12 @@
 -- land instead of its plain colour (territory skins: Data/EmpireFlags, made by tools/make_empire_flags.py).
 --
 --   Stars   every match pays Stars (Data/Stars, server/Rewards); most flags sell for Stars, by tier.
---   Robux   a few flags (Rome, the Mongols, the Ottomans) also sell for Robux (developer products: set
---           their ids below); they can be bought with Stars too, at a higher price.
---   Banner  a gamepass: your flag also flies beside your name on the map and the leaderboard.
+--   Robux   a few flags sell for Robux only, as developer products (one of each per player: the purchase
+--           is saved in the player's record, server/Purchases).
 --
--- TO SELL FOR ROBUX: in the Creator Dashboard (the game > Monetization) create
---   * one Developer Product per Robux flag (Roman, Mongol, Ottoman Empire: 149 Robux each) and paste its id
---     in ROBUX_PRODUCTS;
---   * one Game Pass "Imperial Banner" (149 Robux) and paste its id in BANNER_GAMEPASS.
--- With an id of 0 the button says "Coming soon" (in Studio the prompt still opens as a test purchase).
+-- TO SELL FOR ROBUX: in the Creator Dashboard (the game > Monetization > Developer Products) create one
+-- product per Robux flag (Roman, Mongol, Ottoman, Spanish Empire, Empire of Brazil, Papal States: 149 Robux
+-- each) and paste its id in ROBUX_PRODUCTS. With an id of 0 the button says "SOON".
 local IS_ROBLOX = typeof(game) == "Instance"
 local Flags: any = if IS_ROBLOX
 	then require((script :: any).Parent.EmpireFlags)
@@ -21,14 +18,13 @@ local EmpireShop = {}
 
 --- Developer product ids of the Robux flags (key -> id); 0 = not created yet.
 EmpireShop.ROBUX_PRODUCTS = {
+	rome = 0,
 	mongol = 0,
 	ottoman = 0,
-	rome = 0,
+	spain_imp = 0,
+	brazil_imp = 0,
+	papal = 0,
 }
-
---- The "Imperial Banner" game pass (your flag beside your name); 0 = not created yet.
-EmpireShop.BANNER_GAMEPASS = 0
-EmpireShop.BANNER_ROBUX = 149
 
 --- Tiers: their colour in the shop and their order.
 EmpireShop.TIERS = {
@@ -45,12 +41,13 @@ function EmpireShop.item_id(key: string): string
 	return EmpireShop.PREFIX .. key
 end
 
---- The flag of item id `id` (nil: not an Empire Shop flag).
 local by_key: { [string]: any } = {}
 for i, f in Flags do
 	f.order = i
 	by_key[f.key] = f
 end
+
+--- The flag of item id `id` (nil: not an Empire Shop flag).
 function EmpireShop.flag_of(id: any): any
 	if type(id) ~= "string" or string.sub(id, 1, #EmpireShop.PREFIX) ~= EmpireShop.PREFIX then
 		return nil
