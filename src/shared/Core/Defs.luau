@@ -72,6 +72,15 @@ Defs.STRUCT_NAMES = {
 	"mine",
 	"market",
 }
+--- Empires Front: structure kinds kept in the code but not built (2026-10-31: no SAMs, silos, Arsenal, farms)
+Defs.DISABLED_STRUCT = {
+	[Defs.S_SAM] = true,
+	[Defs.S_SILO] = true,
+	[Defs.S_ARTILLERY] = true,
+	[Defs.S_AIRFIELD] = true,
+	[Defs.S_RAILGUN] = true,
+	[Defs.S_FARM] = true,
+}
 Defs.STRUCT_TITLES = {
 	[0] = "City",
 	"Port",

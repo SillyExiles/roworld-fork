@@ -31,6 +31,9 @@ local Defs = require(Airfront:WaitForChild("Core"):WaitForChild("Defs")) :: any
 local PixelIcons = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PixelIcons")) :: any
 --- Empires Front's structure kinds: the base plate (shape column) each borrows, and its glyph
 local EXTRA_KINDS = {
+	-- (the City and the road hub drawn in the eras' style: a temple, a wagon)
+	[Defs.S_CITY] = { plate = 0, glyph = "city" },
+	[Defs.S_FACTORY] = { plate = 2, glyph = "factory" },
 	[Defs.S_FORGE] = { plate = 3, glyph = "forge" },
 	[Defs.S_FARM] = { plate = 1, glyph = "farm" },
 	[Defs.S_MINE] = { plate = 0, glyph = "mine" },

@@ -94,10 +94,10 @@ local function new_owner_info(id: number)
 		max_troops = 0,
 		income = 0, -- gold per second
 		-- Empires Front's economy (SimEconomy): stock and net change a second
-		food = 0,
-		food_rate = 0,
 		ore = 0,
 		ore_rate = 0,
+		ore_price = 0,
+		trade_gold = 0, -- gold its trade made last second
 		traitor_until = 0, -- tick
 		killer = 0,
 		-- sums of the owned tiles' x and y (territory centroid = (cx, cy) / tiles); cz unused (0)
@@ -1086,10 +1086,11 @@ function GameState._apply_stats(self: GameState, stats: { number })
 		o.gold = stats[b + 4]
 		o.max_troops = stats[b + 5]
 		o.income = stats[b + 6]
-		o.food = stats[b + 7]
-		o.food_rate = stats[b + 8] / 10
-		o.ore = stats[b + 9]
-		o.ore_rate = stats[b + 10] / 10
+		o.ore = stats[b + 7]
+		o.ore_rate = stats[b + 8] / 10
+		o.ore_price = stats[b + 9]
+		o.trade_gold = stats[b + 10]
+		self.ore_price = stats[b + 9]
 	end
 	self.stats_changed:Fire()
 end

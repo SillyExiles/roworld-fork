@@ -5,7 +5,7 @@
 -- solo games start at once.
 local MapList = {}
 
-MapList.DEFAULT = "world"
+MapList.DEFAULT = "rome"
 MapList.LICENSE = "Public domain"
 MapList.ATTRIBUTION = "Natural Earth, NOAA"
 MapList.CREDITS = "Maps made with Natural Earth and NOAA ETOPO1 data (public domain)."
@@ -13,12 +13,10 @@ MapList.CREDITS = "Maps made with Natural Earth and NOAA ETOPO1 data (public dom
 --- {id, name, module, era, year, width, height, k_lin, categories, multiplayer_frequency,
 --- forced_modifiers, land_tiles, nations (count), replicated} in play order.
 MapList.maps = {
-	{ id = "rome", name = "Roman Empire", module = "Rome", era = "rome", year = "117 AD", width = 1241, height = 972, k_lin = 1.0, categories = { "featured", "empire", "antiquity" }, multiplayer_frequency = 10, land_tiles = 881342, nations = 63 },
+	{ id = "rome", name = "Roman Empire", module = "Rome", era = "rome", year = "117 AD", width = 1241, height = 972, k_lin = 1.0, categories = { "featured", "empire", "antiquity" }, multiplayer_frequency = 10, land_tiles = 881342, nations = 63, replicated = true },
 	{ id = "persia", name = "Persian Empire", module = "Persia", era = "persia", year = "500 BC", width = 1247, height = 912, k_lin = 1.0, categories = { "featured", "empire", "antiquity" }, multiplayer_frequency = 10, land_tiles = 854416, nations = 56 },
 	{ id = "china", name = "Ming China", module = "China", era = "china", year = "1450", width = 1216, height = 972, k_lin = 1.0, categories = { "featured", "empire", "gunpowder" }, multiplayer_frequency = 10, land_tiles = 678331, nations = 72 },
 	{ id = "spain", name = "Spanish Empire", module = "Spain", era = "spain", year = "1580", width = 1233, height = 1008, k_lin = 1.0, categories = { "featured", "empire", "age_of_sail" }, multiplayer_frequency = 10, land_tiles = 341930, nations = 59 },
-	{ id = "world", name = "British Empire", module = "World", era = "britain", year = "1897", width = 2000, height = 1000, k_lin = 1.0, categories = { "featured", "empire", "industrial", "world" }, multiplayer_frequency = 30, forced_modifiers = { "isCrowded:50" }, land_tiles = 689018, nations = 89, replicated = true },
-	{ id = "russia", name = "Russian Empire", module = "Russia", era = "russia", year = "1914", width = 1394, height = 630, k_lin = 1.0, categories = { "featured", "empire", "industrial" }, multiplayer_frequency = 10, land_tiles = 610970, nations = 63 },
 }
 
 local by_id: { [string]: any } = {}

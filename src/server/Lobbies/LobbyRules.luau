@@ -40,7 +40,7 @@ LobbyRules.TARGETS_WITH_TEAMS = { ffa = 1, team = 1, world = 1 }
 --- active map); World's join and a team game's take only their own.
 function LobbyRules.takes_from(mode: string): { string }
 	if mode == LobbyRules.MODE_FFA then
-		return { LobbyRules.MODE_FFA, LobbyRules.MODE_WORLD }
+		return { LobbyRules.MODE_FFA }
 	end
 	return { mode }
 end
@@ -49,15 +49,14 @@ end
 --- open at least (more when the demand calls for them: missing_starts).
 function LobbyRules.kinds(team_games: boolean?): { { mode: string, target: number } }
 	if team_games then
+		-- (Empires Front: no World mode; the empires' maps rotate in the free-for-all)
 		return {
 			{ mode = LobbyRules.MODE_FFA, target = LobbyRules.TARGETS_WITH_TEAMS.ffa },
-			{ mode = LobbyRules.MODE_WORLD, target = LobbyRules.TARGETS_WITH_TEAMS.world },
 			{ mode = LobbyRules.MODE_TEAM, target = LobbyRules.TARGETS_WITH_TEAMS.team },
 		}
 	end
 	return {
 		{ mode = LobbyRules.MODE_FFA, target = LobbyRules.TARGET_OPEN },
-		{ mode = LobbyRules.MODE_WORLD, target = LobbyRules.TARGETS_WITH_TEAMS.world },
 	}
 end
 --- Public matches play their map at this % of its width and height (the full-size maps felt huge,

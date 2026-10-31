@@ -470,6 +470,13 @@ function SimNaval.install(C)
 		self:remove_unit(u, Defs.DEL_ARRIVED)
 		local g = self.R.trade_gold(u.traveled + #u.path)
 		local dst = self.structs[u.dst_sid]
+		-- Empires Front: ships between trade-pact partners pay half again, and carry ore (SimEconomy)
+		if u.orig_owner == 0 and dst ~= nil and dst.owner ~= u.owner and self.has_pact ~= nil then
+			if self:has_pact(u.owner, dst.owner, 1) then
+				g *= 1.5
+			end
+			self:ship_ore(u.owner, dst.owner)
+		end
 		-- Each earner's map shows the gold over a port (Ev.BONUS, a person
 		-- only). The sender's is the port the ship left (its home port; the one it reached when that port
 		-- is gone or lost), the receiver's and a captor's the port it reached.

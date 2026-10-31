@@ -563,6 +563,10 @@ function SimStructures.install(C)
 		if kind < 0 or t < 0 or t >= self.N then
 			return false
 		end
+		-- Empires Front: SAMs, silos, the Arsenal's structures and farms are out of the game
+		if Defs.DISABLED_STRUCT[kind] then
+			return false
+		end
 		-- the Arsenal's structures need their unlock (SimArsenal)
 		if not self:has_unlock(id, Defs.STRUCT_UNLOCK[kind] or 0) then
 			self:msg(id, Defs.MSG_INFO, string.format("Unlock %s in the Arsenal first", struct_title(kind)))

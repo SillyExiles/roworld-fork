@@ -57,8 +57,10 @@ end
 local trunc = Defs.trunc
 
 --- Builds the rules table for maps whose tiles are `K_LIN` full-size tiles across.
-local function build(K_LIN: number): any
-	local Rules: any = {}
+local function build(K_LIN: number, into: any?): any
+	-- (Empires Front: `into` rebuilds a cached table in place, so every closure below keeps
+	-- referring to the table the other modules hold: rebuild_for_era)
+	local Rules: any = into or {}
 	Rules.TICK_RATE = 10
 	--- Full-size tiles per one of our tiles, linear and by area (the map's k_lin).
 	Rules.K_LIN = K_LIN
@@ -613,10 +615,13 @@ local function build(K_LIN: number): any
 	-- ---------------------------------------------------------------------------------------------
 	--- terrainAttackBase by our terrain code (ocean, lake, plains, highland, mountain, tundra, icecap):
 	--- mag (bloodiness) and tileCost (slowness). Tundra uses the highland numbers.
-	Rules.ATTACK_MAG = f32t({ 80.0, 80.0, 80.0, 100.0, 120.0, 100.0, 80.0 })
-	Rules.ATTACK_TILE_COST = f32t({ 16.5, 16.5, 16.5, 20.0, 25.0, 20.0, 16.5 })
+	-- Empires Front (2026-10-31): hills and above all mountains are natural walls: taking a mountain
+	-- tile costs an attacker almost 5x the troops and 5x the time of a plain (hills about 2x), so ranges
+	-- such as the Alps, the Zagros or the Andes become real frontiers. (Base game: 100 / 120, 20 / 25.)
+	Rules.ATTACK_MAG = f32t({ 80.0, 80.0, 80.0, 150.0, 380.0, 100.0, 80.0 })
+	Rules.ATTACK_TILE_COST = f32t({ 16.5, 16.5, 16.5, 30.0, 80.0, 20.0, 16.5 })
 	--- Attack-front priority terrain magnitude (plains 1 / highland 1.5 / mountain 2).
-	Rules.PRIORITY_MAG = f32t({ 1.0, 1.0, 1.0, 1.5, 2.0, 1.5, 1.0 })
+	Rules.PRIORITY_MAG = f32t({ 1.0, 1.0, 1.0, 2.0, 4.0, 1.5, 1.0 })
 	Rules.LARGE_TERRITORY_MIDPOINT = 300000.0
 	Rules.LARGE_TERRITORY_STEEPNESS = 2.5
 	Rules.LARGE_ATTACKER_DEPTH = 0.7
@@ -1214,10 +1219,10 @@ local base = for_k(1.0)
 --- set by Core/Era). Modules keep their references: the tables' contents change, not the tables.
 function base.rebuild_for_era()
 	for k, r in cache do
-		local fresh = build(k)
-		for key, v in fresh do
-			r[key] = v
-		end
+		local fk, fm, rb = r.for_k, r.for_map, r.rebuild_for_era
+		table.clear(r)
+		build(k, r)
+		r.for_k, r.for_map, r.rebuild_for_era = fk, fm, rb
 	end
 end
 

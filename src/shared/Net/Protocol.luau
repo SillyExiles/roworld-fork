@@ -136,7 +136,8 @@ Protocol.INTENT_TYPES = {
 	-- Empires Front
 	"pact", -- {target, kind = "trade" | "defense"}: propose a pact to an ally
 	"pact_reply", -- {target, kind, accept}
-	"send", -- {target, kind = "food" | "ore" | "gold", troops = amount}: send resources to an ally
+	"send", -- {target, kind = "ore" | "gold", troops = amount}: send resources to an ally
+	"trade", -- {target, kind = "sell" | "buy"}: an ore deal with a trade-pact partner
 }
 local INTENT_INDEX: { [string]: number } = {}
 for i, name in Protocol.INTENT_TYPES do

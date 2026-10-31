@@ -84,7 +84,8 @@ SimAIEconomy.PERCEIVED_COST_STEP = zt({ 1.0, 1.0, 1.0, 0.0, f32(0.3), 1.0 }) -- 
 -- existing structure of the chosen kind instead of placing a new one.
 SimAIEconomy.UPGRADE_DENSITY_FULL_TILES = 1500.0
 -- Build order after defense posts; a city when none of these is due or possible.
-SimAIEconomy.BUILD_ORDER = { Defs.S_FARM, S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FORGE, S_SAM, S_SILO }
+-- (Empires Front: no farms, SAMs or silos)
+SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FORGE }
 -- Crowded map: more nations than one per this many full-size land tiles.
 SimAIEconomy.CROWDED_FULL_TILES_PER_NATION = 7500.0
 -- A coastal nation's first structure is a port whatever the map's density.
@@ -280,9 +281,11 @@ function SimAIEconomy.install(C)
 			if sim.o_kind[id] == Defs.KIND_TRIBE then
 				return false
 			end
-			local prod, use = sim:resource_rates(id)
-			local want = math.max(use, sim.o_troops[id] * 0.0005, sim.o_cap[id] * 0.0005 * 0.95)
-			return prod < want * 1.05 or (sim.o_food[id] < 1500 and sim.o_food_rate[id] < 0)
+			-- (farms still being built count too, at a typical yield)
+			local per = 0.0005
+			local want = math.max(sim.o_troops[id], sim.o_cap[id] * 0.95) * per
+			local expect = sim.o_cap[id] * per * 0.8 + sim:struct_levels(id, Defs.S_FARM) * 45 * 0.7
+			return expect < want * 1.1
 		elseif kind == Defs.S_MINE then
 			return sim.o_kind[id] ~= Defs.KIND_TRIBE
 				and sim:struct_levels(id, Defs.S_MINE) < math.min(6, 1 + cities // 2)

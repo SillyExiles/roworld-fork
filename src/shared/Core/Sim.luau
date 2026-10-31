@@ -1008,6 +1008,8 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		self:pact_request(id, _int(it, "target", 0), _str(it, "kind"))
 	elseif kind == "pact_reply" then
 		self:pact_reply(id, _int(it, "target", 0), _str(it, "kind"), it.accept == true)
+	elseif kind == "trade" then
+		self:trade_ore(id, _int(it, "target", 0), _str(it, "kind"))
 	elseif kind == "send" then
 		self:send_resource(id, _int(it, "target", 0), _str(it, "kind"), _int(it, "troops", 0))
 	end
@@ -1888,11 +1890,11 @@ function Sim._stats_rows(self: any): { number }
 		s[n + 4] = self:_gold_int(id)
 		s[n + 5] = trunc(self.o_cap[id])
 		s[n + 6] = trunc(self.o_income[id] + self.o_bonus_rate[id])
-		-- Empires Front: food and ore, their rates a second x 10
-		s[n + 7] = trunc(self.o_food[id])
-		s[n + 8] = trunc(self.o_food_rate[id] * 10)
-		s[n + 9] = trunc(self.o_ore[id])
-		s[n + 10] = trunc(self.o_ore_rate[id] * 10)
+		-- Empires Front: ore, ore dug a second x 10, the match's ore price, trade gold last second
+		s[n + 7] = trunc(self.o_ore[id])
+		s[n + 8] = trunc(self.o_ore_rate[id] * 10)
+		s[n + 9] = trunc(self.ore_price)
+		s[n + 10] = trunc(self.o_trade_gold[id])
 		n += 10
 	end
 	return s

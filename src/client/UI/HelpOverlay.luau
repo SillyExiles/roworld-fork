@@ -217,7 +217,7 @@ HelpOverlay.SECTIONS = {
 		icon = "attack",
 		color = "orange",
 		title = "Expand & attack",
-		text = "Click neutral land beside you to expand, or a nation you border to attack it. The Attack bar sets the share of troops you send (Q / E, or Shift + wheel). Troops regrow on their own, fastest well below your cap.",
+		text = "Click neutral land beside you to expand, or a nation you border to attack it. Hills cost about twice the troops and time to take, mountains five times: ranges are natural walls. The Attack bar sets the share of troops you send (Q / E, or Shift + wheel). Troops regrow on their own, fastest well below your cap.",
 	},
 	{
 		icon = "boat",
@@ -229,7 +229,13 @@ HelpOverlay.SECTIONS = {
 		icon = "alliance",
 		color = "violet",
 		title = "Alliances & betrayal",
-		text = "Right-click a nation to propose an alliance. Allies can't attack each other and can donate troops. Breaking an alliance brands you a Traitor for {traitor_s} s: everyone knows, and attacks against you cost only {traitor_def}% of the troops and land faster.",
+		text = "Right-click a nation to propose an alliance. Allies can't attack each other, can donate troops and send each other Ore, and can sign a Trade Pact (more income, dearer Market prices) or a Defence Pact (whoever attacks one partner makes an enemy of the other). Breaking an alliance brands you a Traitor for {traitor_s} s: everyone knows, and attacks against you cost only {traitor_def}% of the troops and land faster.",
+	},
+	{
+		icon = "ore",
+		color = "green",
+		title = "Ore, trade & the Forge",
+		text = "Mines dig Ore in your hills and mountains. Markets sell your spare Ore at the match's price, which falls when everyone sells and recovers when they stop: watch it under your gold. Each Forge level arms every troop you have (the era's swords, shields, crossbows, pikes...) and needs Ore. Trade ships carry Ore too, and pay more between trade-pact partners, who can also buy and sell Ore from each other.",
 	},
 	{
 		icon = "city",
@@ -237,19 +243,13 @@ HelpOverlay.SECTIONS = {
 		title = "Build your economy",
 		builds = true,
 		wide = true,
-		text = "Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 7) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time.",
-	},
-	{
-		icon = "atom",
-		color = "red",
-		title = "Nukes & SAMs",
-		text = "A Missile Silo lets you launch Atom bombs, Hydrogen bombs and MIRVs. Blasts erase troops and structures and leave fallout: land that stays poisoned until someone re-conquers it, slowly and at a high cost. SAM Launchers shoot down bombs aimed inside their range ({sam_r} tiles); MIRV warheads can't be stopped.",
+		text = "Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 8) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time.",
 	},
 	{
 		icon = "crown",
 		color = "gold",
-		title = "Win at 80%",
-		text = "Hold {win}% of the world's land to win (fallout doesn't count). Multiplayer matches end after 40 minutes and the largest nation wins. Lose all your land and you're out.",
+		title = "Glory or domination",
+		text = "Every empire has its own goal: hold all of its gold-starred cities at once for a minute and you win. Or hold {win}% of the land (scorched land doesn't count). Multiplayer matches end after 40 minutes and the largest nation wins. Lose all your land and you're out.",
 	},
 }
 --- The "Credits & licence" card, last: the AGPL's Appropriate Legal Notices (a copyright notice, no
@@ -311,6 +311,7 @@ local COLORS = {
 	gold = "GOLD",
 	red = "RED",
 	violet = "VIOLET",
+	green = "GREEN",
 }
 
 local function col(name: string): Color3

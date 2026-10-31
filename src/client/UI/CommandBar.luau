@@ -160,14 +160,14 @@ function CommandBar._build_sections(self)
 	self._gold = CountLabel.new(20, 700, T.GOLD, T.fmt_num)
 	gv:add_child(self._gold)
 	self._gold_box:add_child(gv)
-	-- Empires Front: food and ore under the gold (SimEconomy)
+	-- Empires Front: ore and the match's ore price under the gold (SimEconomy)
 	local rrow = T.hbox(4)
-	rrow:add_child(T.icon_rect("food", 11.0, T.GREEN))
-	self._food = T.label("0", 11, 700, T.TEXT)
-	rrow:add_child(self._food)
-	rrow:add_child(T.icon_rect("ore", 11.0, T.TEXT_3))
+	rrow:add_child(T.icon_rect("ore", 11.0, T.TEXT_2))
 	self._ore = T.label("0", 11, 700, T.TEXT)
 	rrow:add_child(self._ore)
+	rrow:add_child(T.icon_rect("market", 11.0, T.GOLD))
+	self._food = T.label("", 11, 700, T.GOLD)
+	rrow:add_child(self._food)
 	self._gold_box:add_child(rrow)
 	self._gold_box:set_min_size(Vector2.new(118, 0))
 
@@ -261,17 +261,23 @@ function CommandBar._build_sections(self)
 	self._builds2:set_alignment(W.ALIGN_CENTER)
 	self._tray_v = T.vbox(8)
 	local R = UIRules()
-	for i, k in ipairs(R.ACTIONS) do
-		if k == "atom" then
-			self._nuke_div = T.vdivider(40.0)
-			local wrap = W.Margin.new()
-			wrap:set_mouse_filter(W.MOUSE_IGNORE)
-			wrap:add_theme_constant_override("margin_left", 6)
-			wrap:add_theme_constant_override("margin_right", 6)
-			wrap:add_child(self._nuke_div)
-			self._nuke_wrap = wrap
-			self._builds:add_child(wrap)
+	-- (the divider before the bombs; Empires Front has none in the bar: it stays hidden)
+	do
+		self._nuke_div = T.vdivider(40.0)
+		local wrap: any = W.Margin.new()
+		wrap:set_mouse_filter(W.MOUSE_IGNORE)
+		wrap:add_theme_constant_override("margin_left", 6)
+		wrap:add_theme_constant_override("margin_right", 6)
+		wrap:add_child(self._nuke_div)
+		self._nuke_wrap = wrap
+		self._builds:add_child(wrap)
+		local base_set = wrap.set_visible
+		wrap.set_visible = function(node: any, _on: boolean)
+			base_set(node, false)
 		end
+		wrap:set_visible(false)
+	end
+	for i, k in ipairs(R.ACTIONS) do
 		local b = BuildButton.new(ctx, k, R.HOTKEYS[i])
 		b.chosen:Connect(function(kind: string)
 			self.build_chosen:Fire(kind)
@@ -792,11 +798,12 @@ function CommandBar.refresh(self, animate: boolean?)
 	self._m_troops_bar:set_target(o.troops / math.max(o.max_troops, 1.0), not anim)
 	self._income:set_text(T.fmt_rate(o.income))
 	do
-		local food, fr = tonumber(o.food) or 0, tonumber(o.food_rate) or 0
+		-- ore held and dug a second; the ore price (green when high, orange when low)
 		local ore, orr = tonumber(o.ore) or 0, tonumber(o.ore_rate) or 0
-		self._food:set_text(string.format("%s %s%d", T.fmt_num(food), if fr >= 0 then "+" else "", math.floor(fr + 0.5)))
-		T.set_font_color(self._food, if food <= 0 and fr <= 0 then T.RED elseif fr < 0 then T.ORANGE else T.TEXT)
+		local price = tonumber(o.ore_price) or 0
 		self._ore:set_text(string.format("%s +%d", T.fmt_num(ore), math.floor(orr + 0.5)))
+		self._food:set_text(string.format("%dg", math.floor(price + 0.5)))
+		T.set_font_color(self._food, if price >= 250 then T.GREEN elseif price < 160 then T.ORANGE else T.GOLD)
 	end
 	T.set_font_color(self._income, if o.income > 0 then T.GREEN else T.TEXT_3)
 	-- Growth: the troop-rate label — "+{troops gained per second}/s" (NumberFormat clamps

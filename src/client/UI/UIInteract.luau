@@ -1094,6 +1094,10 @@ function UIInteract.on_radial(self: any, id: string, tile: number)
 	elseif string.sub(id, 1, 12) == "pact_accept:" then
 		ctx:send({ type = "pact_reply", target = own, kind = string.sub(id, 13), accept = true })
 		self:_float("Pact signed", "pact", T().VIOLET, pos)
+	elseif string.sub(id, 1, 6) == "trade:" then
+		local how = string.sub(id, 7)
+		ctx:send({ type = "trade", target = own, kind = how })
+		self:_float(if how == "sell" then "Ore offered" else "Ore asked for", "market", T().GOLD, pos)
 	elseif string.sub(id, 1, 5) == "send:" then
 		-- a quarter of the stock at a time
 		local what = string.sub(id, 6)

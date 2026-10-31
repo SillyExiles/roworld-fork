@@ -57,7 +57,7 @@ Coach.TIPS = {
 	},
 	attacked = {
 		icon = "defense",
-		desktop = "You are under attack! Track every front in the Attacks panel. Defense Posts (7) make borders much harder to take.",
+		desktop = "You are under attack! Track every front in the Attacks panel. Defense Posts (6) make borders much harder to take.",
 		touch = "You are under attack! Track every front in the Attacks panel. Defense Posts make borders much harder to take.",
 	},
 }

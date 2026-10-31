@@ -19,7 +19,6 @@ MapPicker.TABS = {
 	{ "Empires", { featured = true } },
 	{ "Antiquity", { antiquity = true } },
 	{ "Gunpowder · Sail", { gunpowder = true, age_of_sail = true } },
-	{ "Industrial", { industrial = true } },
 	{ "All", nil },
 }
 MapPicker.CARD = Vector2.new(168, 132)

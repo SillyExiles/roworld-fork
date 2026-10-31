@@ -33,32 +33,18 @@ end
 local UIRules = {}
 UIRules.__index = UIRules
 
-UIRules.BUILD_KINDS = { "city", "farm", "mine", "market", "port", "factory", "defense", "forge", "sam", "silo", "warship" }
-UIRules.NUKE_KINDS = { "atom", "hydrogen", "mirv" }
+-- (Empires Front: no SAMs, silos, bombs or Arsenal; no farms: 2026-10-31)
+UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship" }
+UIRules.NUKE_KINDS = {}
 --- Hotkeys 1..9, 0 in this order.
-UIRules.ACTIONS = {
-	"city",
-	"farm",
-	"mine",
-	"market",
-	"port",
-	"factory",
-	"defense",
-	"forge",
-	"sam",
-	"silo",
-	"warship",
-	"atom",
-	"hydrogen",
-	"mirv",
-}
-UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]" }
+UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship" }
+UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8" }
 --- The Arsenal's kinds (Data/Arsenal: unlocked with Stars or Robux), in the order of its tray:
 --- structures, munitions launched like a nuke (the last two from their own structure: strikes), and
 --- the Reinforcements call. A locked one is offered in the Arsenal instead of doing anything.
-UIRules.ARSENAL_BUILD = { "artillery", "airfield", "railgun" }
-UIRules.ARSENAL_NUKES = { "mega", "scatter", "airstrike", "slug" }
-UIRules.ARSENAL = { "artillery", "airfield", "railgun", "mega", "scatter", "airstrike", "slug", "reinforce" }
+UIRules.ARSENAL_BUILD = {}
+UIRules.ARSENAL_NUKES = {}
+UIRules.ARSENAL = {}
 
 UIRules.TITLES = {
 	city = "City",
@@ -116,7 +102,7 @@ UIRules.BLURBS = {
 	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}",
 	farm = "Grows {farm_food} Food a second for each level (less on hills or dry land). Your army eats: without Food it stops growing and deserts.",
 	mine = "Digs {mine_ore} Ore a second for each level. Only on hills or mountains (more in mountains).",
-	market = "Sells up to {mkt_ore} Ore and your spare Food a second for each level. Trade pacts raise its prices.",
+	market = "Sells up to {mkt_ore} spare Ore a second for each level at the match's Ore price (it keeps what your next Forge level needs). Each trade pact raises what it gets by 20%.",
 	sam = "Shoots down bombs aimed within {sam_r} tiles. MIRV warheads can't be stopped.",
 	silo = "Required to launch nuclear weapons.",
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
@@ -1386,10 +1372,13 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 					end
 				end
 				local mo = s:get_owner(me)
-				local food = if mo ~= nil then tonumber(mo.food) or 0 else 0
 				local ore = if mo ~= nil then tonumber(mo.ore) or 0 else 0
-				table.insert(items, { id = "send:food", label = "Send Food", icon = "food", ok = food >= 4, reason = if food >= 4 then "" else "No Food to spare", danger = false })
-				table.insert(items, { id = "send:ore", label = "Send Ore", icon = "ore", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to spare", danger = false })
+				if s:has_pact(me, own, 1) then
+					table.insert(items, { id = "trade:sell", label = "Sell Ore", icon = "ore", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to sell", danger = false })
+					table.insert(items, { id = "trade:buy", label = "Buy Ore", icon = "market", ok = true, reason = "", danger = false })
+				else
+					table.insert(items, { id = "send:ore", label = "Send Ore", icon = "ore", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to spare", danger = false })
+				end
 			end
 			-- the last ALLIANCE_EXTEND_WINDOW_TICKS: ask to renew (renewed once both asked)
 			local ai = s:alliance_info(me, own)
