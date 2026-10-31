@@ -438,7 +438,7 @@ function Purchases.equipped(player: any): any
 	end
 	local eq = table.clone(i.equipped)
 	-- Empires Front: with the Imperial Banner, the Empire Shop flag worn on the land flies by the name too
-	if banner[player] and EmpireShop.flag_of(eq.skin) ~= nil then
+	if EmpireShop.flag_of(eq.skin) ~= nil then -- (Empires Front: the flag worn on the land flies by the name too)
 		eq.flag = eq.skin
 	end
 	return eq
