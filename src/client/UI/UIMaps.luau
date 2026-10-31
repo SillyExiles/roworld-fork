@@ -8,7 +8,7 @@ local UIMaps = {}
 
 UIMaps.DEFAULT_ID = "rome"
 --- The source manifests' featured_rank (the registry does not carry it).
-UIMaps.FEATURED_RANK = { rome = 1, persia = 2, china = 3, spain = 4 }
+UIMaps.FEATURED_RANK = { rome = 1, persia = 2, mongol = 3, china = 4, ottoman = 5, spain = 6 }
 
 local _entries: { any }? = nil
 local _by_id: { [string]: any } = {}
@@ -53,6 +53,8 @@ function UIMaps.entries(): { any }
 					width = m.width,
 					height = m.height,
 					categories = m.categories or {},
+					era = m.era,
+					year = m.year,
 					featured_rank = m.featured_rank or UIMaps.FEATURED_RANK[norm(m.id)],
 					thumb = tnorm[norm(m.id)] or tnorm[norm(m.name or "")],
 				}

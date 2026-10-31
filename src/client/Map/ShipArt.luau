@@ -10,7 +10,8 @@ local ShipData = require(script.Parent:WaitForChild("ShipData")) :: any
 
 local ShipArt = {}
 
-ShipArt.STYLE_OF_ERA = { rome = "ancient", persia = "ancient", china = "junk", spain = "sail" }
+ShipArt.STYLE_OF_ERA =
+	{ rome = "ancient", persia = "ancient", china = "junk", spain = "sail", mongol = "junk", ottoman = "ancient" }
 
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local INV: { [number]: number } = {}

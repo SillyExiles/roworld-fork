@@ -18,6 +18,7 @@ local MapPicker = W.class(W.Control)
 MapPicker.TABS = {
 	{ "Empires", { featured = true } },
 	{ "Antiquity", { antiquity = true } },
+	{ "Medieval", { medieval = true } },
 	{ "Gunpowder · Sail", { gunpowder = true, age_of_sail = true } },
 	{ "All", nil },
 }
@@ -167,7 +168,10 @@ function MapPicker._card(self, e: any, order: number): TextButton
 	local img = Instance.new("ImageLabel")
 	img.Name = "Thumb"
 	img.BackgroundTransparency = 1
-	img.Image = e.thumb or ""
+	-- (Empires Front: the map's own preview, drawn from Assets/MapPreviews: UI/MapPreview)
+	if not (e.thumb == nil and (require("./MapPreview") :: any).apply(img, e.id)) then
+		img.Image = e.thumb or ""
+	end
 	img.ScaleType = Enum.ScaleType.Fit
 	img.Position = UDim2.fromOffset(math.floor(8 * s), math.floor(8 * s))
 	img.Size = UDim2.new(1, -math.floor(16 * s), 1, -math.floor(46 * s))
@@ -192,7 +196,8 @@ function MapPicker._card(self, e: any, order: number): TextButton
 	sub.FontFace = Font.fromId(12187365977, Enum.FontWeight.Medium)
 	sub.TextSize = math.floor(11 * s)
 	sub.TextColor3 = Color3.fromRGB(170, 180, 205)
-	sub.Text = if e.width and e.height then string.format("%d × %d", e.width, e.height) else ""
+	local era = if e.era ~= nil then (UICtx.data("Eras") :: any).get(e.era) else nil
+	sub.Text = if era ~= nil then era.period elseif e.width and e.height then string.format("%d × %d", e.width, e.height) else ""
 	sub.Position = UDim2.new(0, math.floor(8 * s), 1, -math.floor(18 * s))
 	sub.Size = UDim2.new(1, -math.floor(16 * s), 0, math.floor(14 * s))
 	sub.TextXAlignment = Enum.TextXAlignment.Left

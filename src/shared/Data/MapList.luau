@@ -17,6 +17,8 @@ MapList.maps = {
 	{ id = "persia", name = "Persian Empire", module = "Persia", era = "persia", year = "500 BC", width = 1247, height = 912, k_lin = 1.0, categories = { "featured", "empire", "antiquity" }, multiplayer_frequency = 10, land_tiles = 854416, nations = 56 },
 	{ id = "china", name = "Ming China", module = "China", era = "china", year = "1450", width = 1216, height = 972, k_lin = 1.0, categories = { "featured", "empire", "gunpowder" }, multiplayer_frequency = 10, land_tiles = 678331, nations = 72 },
 	{ id = "spain", name = "Spanish Empire", module = "Spain", era = "spain", year = "1580", width = 1233, height = 1008, k_lin = 1.0, categories = { "featured", "empire", "age_of_sail" }, multiplayer_frequency = 10, land_tiles = 341930, nations = 59 },
+	{ id = "mongol", name = "Mongol Empire", module = "Mongol", era = "mongol", year = "1279", width = 1159, height = 572, k_lin = 1.0, categories = { "featured", "empire", "medieval" }, multiplayer_frequency = 10, land_tiles = 546014, nations = 53 },
+	{ id = "ottoman", name = "Ottoman Empire", module = "Ottoman", era = "ottoman", year = "1566", width = 1119, height = 836, k_lin = 1.0, categories = { "featured", "empire", "gunpowder" }, multiplayer_frequency = 10, land_tiles = 743925, nations = 52 },
 }
 
 local by_id: { [string]: any } = {}

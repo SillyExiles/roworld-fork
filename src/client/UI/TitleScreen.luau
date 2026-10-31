@@ -1435,7 +1435,9 @@ function TitleScreen._refresh_kind_card(self, card: { [string]: any }, kind: str
 		card.icon:set_visible(false)
 		card.thumb_node:set_visible(true)
 		local e = UIMaps.get(map)
-		card.thumb.Image = if e and e.thumb then e.thumb else ""
+		if not (e ~= nil and e.thumb == nil and (require("./MapPreview") :: any).apply(card.thumb, e.id)) then
+			card.thumb.Image = if e and e.thumb then e.thumb else ""
+		end
 		card.title:set_text(string.upper(tostring(map_name or map)))
 	else
 		card.icon:set_visible(true)
