@@ -21,6 +21,7 @@ local EmpireShopData = require(Data:WaitForChild("EmpireShop")) :: any
 local Cosmetics = require(Data:WaitForChild("Cosmetics")) :: any
 local UI = script.Parent:WaitForChild("UI")
 local FlagArt = require(UI:WaitForChild("FlagArt")) :: any
+local Prices = require(UI:WaitForChild("Prices")) :: any
 local PixelIcons = require(UI:WaitForChild("PixelIcons")) :: any
 
 local Shop = {}
@@ -64,6 +65,7 @@ local stars_tween: any = nil
 local anim_conn: RBXScriptConnection? = nil
 local closing = false
 local celebrate_id: string? = nil
+local opened_at = 0
 
 local function make(class: string, props: { [string]: any }, parent: Instance?): any
 	local i = Instance.new(class)
@@ -206,6 +208,18 @@ local function buy_stars(it: any)
 	else
 		toast("The shop is offline right now")
 	end
+end
+
+--- A Robux flag's button text: Roblox's price for this player (regional pricing), "..." until Roblox
+--- answers, "SOON" while its product isn't made.
+local price_buttons: { [string]: TextButton } = {}
+local function robux_text(it: any): string
+	local pid = EmpireShopData.product_of(it.id) or 0
+	if pid == 0 then
+		return "SOON"
+	end
+	local p = Prices.regional("ef_" .. it.key)
+	return if p ~= nil then "R$ " .. commas(p) else "R$ ..."
 end
 
 local function buy_robux(it: any)
@@ -388,10 +402,11 @@ local function flag_card(it: any, order: number)
 			Shop.open("inventory")
 		end)
 	elseif (it.robux or 0) > 0 then
-		local pid = EmpireShopData.product_of(it.id) or 0
-		card_button(body, (if pid == 0 then "SOON  " else "") .. "R$ " .. it.robux, ROBUX_GREEN, nil, function()
+		-- (the price Roblox charges this player: regional pricing, UI/Prices; never a number of ours)
+		local b = card_button(body, robux_text(it), ROBUX_GREEN, nil, function()
 			buy_robux(it)
 		end)
+		price_buttons[it.id] = b
 	elseif pending[it.id] then
 		card_button(body, "BUYING...", GREY, nil, function() end)
 	else
@@ -468,6 +483,17 @@ end
 local function fill()
 	if grid == nil then
 		return
+	end
+	table.clear(price_buttons)
+	if tab == "robux" then
+		-- Roblox's own (regional) prices for the Robux flags, asked for when the tab shows them
+		local keys = {}
+		for _, it in Cosmetics.empire_items() do
+			if (it.robux or 0) > 0 then
+				table.insert(keys, "ef_" .. it.key)
+			end
+		end
+		Prices.fetch_keys(keys)
 	end
 	table.clear(shimmers)
 	for _, c in grid:GetChildren() do
@@ -566,7 +592,10 @@ local function build()
 		Size = UDim2.fromScale(1, 1),
 	}, g)
 	;(dim :: TextButton).Activated:Connect(function()
-		Shop.close()
+		-- (the release of the click that opened the shop lands on the dim: not a close)
+		if os.clock() - opened_at > 0.35 then
+			Shop.close()
+		end
 	end)
 	local p = make("CanvasGroup", {
 		Name = "Panel",
@@ -873,6 +902,9 @@ function Shop.open(which: string?)
 	hook()
 	local was_open = gui.Enabled and not closing
 	closing = false
+	if not was_open then
+		opened_at = os.clock()
+	end
 	if which ~= nil then
 		tab = which
 	end
@@ -920,6 +952,15 @@ end
 --- Main (the client entry) hands over itself: its session and UI.
 function Shop.start(m: any)
 	main = m
+	-- a regional price arrived: the Robux buttons show it
+	Prices.changed:Connect(function()
+		for id, b in price_buttons do
+			local it = Cosmetics.item(id)
+			if it ~= nil and b.Parent ~= nil then
+				b.Text = robux_text(it)
+			end
+		end
+	end)
 	-- (a Robux flag bought: the server's receipt brings the inventory, and with it the refresh)
 	MarketplaceService.PromptProductPurchaseFinished:Connect(function(_uid, _pid, bought: boolean)
 		if bought then

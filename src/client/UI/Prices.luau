@@ -30,6 +30,11 @@ local asking = false
 --- (fetch_keys: when each product was last asked for)
 local key_asked: { [string]: number } = {}
 
+--- Roblox's price of product `key` for this player (regional pricing), nil until Roblox has answered.
+function Prices.regional(key: string): number?
+	return known[key]
+end
+
 function Prices.robux(key: string): number
 	local p = Products[key]
 	return known[key] or (if type(p) == "table" then tonumber(p.robux) or 0 else 0)
