@@ -282,6 +282,7 @@ PixelIcons.ALIASES = {
 	sword = "sword",
 	-- the Empire Shop (v10)
 	flagshop = "flagshop",
+	chest = "chest",
 }
 
 function PixelIcons.has(name: string?): boolean

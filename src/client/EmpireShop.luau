@@ -102,6 +102,11 @@ local function buy_stars(it: any)
 end
 
 local function buy_robux(it: any)
+	local inv = inventory()
+	if inv ~= nil and inv.owned ~= nil and inv.owned[it.id] then
+		toast("You already own " .. it.name)
+		return
+	end
 	local id = EmpireShopData.product_of(it.id) or 0
 	if id == 0 then
 		toast(it.name .. " is coming soon to the Robux shop")
@@ -183,13 +188,25 @@ local function flag_card(it: any, order: number, parent: Instance)
 		Size = UDim2.new(1, -16, 0, 12),
 	}, card)
 	local text, color, fn
-	if worn then
+	if tab == "inventory" then
+		-- the inventory: put on or take off what is owned
+		if worn then
+			text, color, fn = "EQUIPPED  ✓", GREEN, function()
+				equip(it, false)
+			end
+		else
+			text, color, fn = "EQUIP", Color3.fromRGB(70, 110, 200), function()
+				equip(it, true)
+			end
+		end
+	elseif worn then
 		text, color, fn = "EQUIPPED  ✓", GREEN, function()
-			equip(it, false)
+			Shop.open("inventory")
 		end
 	elseif owned then
-		text, color, fn = "EQUIP", Color3.fromRGB(70, 110, 200), function()
-			equip(it, true)
+		-- (one of each: an owned flag can't be bought again; it is worn from the inventory)
+		text, color, fn = "OWNED  ✓", Color3.fromRGB(70, 74, 92), function()
+			Shop.open("inventory")
 		end
 	elseif (it.robux or 0) > 0 then
 		local pid = EmpireShopData.product_of(it.id) or 0
@@ -300,22 +317,72 @@ local function fill()
 	end
 	layout.CellSize = UDim2.fromOffset(150, 160)
 	local list = {}
+	local inv = inventory() or {}
+	local owned = inv.owned or {}
 	for _, it in Cosmetics.empire_items() do
+		if tab == "inventory" then
+			if owned[it.id] then
+				table.insert(list, it)
+			end
+			continue
+		end
 		if it.general then
-			continue -- (the subscription's flag: shown only to whoever has it, under Stars)
+			continue -- (never sold)
 		end
 		local robux = (it.robux or 0) > 0
 		if (tab == "robux") == robux then
 			table.insert(list, it)
 		end
 	end
-	-- the subscription's flag, owned: wearable from the Stars tab
-	local inv = inventory() or {}
-	if tab == "stars" then
-		for _, it in Cosmetics.empire_items() do
-			if it.general and inv.owned ~= nil and inv.owned[it.id] then
-				table.insert(list, 1, it)
+	if tab == "inventory" then
+		-- first: your own colour (no flag)
+		local worn_none = inv.equipped == nil or EmpireShopData.flag_of(inv.equipped.skin) == nil
+		local card = make("Frame", { Name = "None", LayoutOrder = 0, BackgroundColor3 = if worn_none then CARD_ON else CARD }, grid)
+		make("UICorner", { CornerRadius = UDim.new(0, 10) }, card)
+		local sw = make("Frame", {
+			AnchorPoint = Vector2.new(0.5, 0),
+			Position = UDim2.new(0.5, 0, 0, 10),
+			Size = UDim2.fromOffset(108, 72),
+			BackgroundColor3 = Color3.fromRGB(90, 120, 200),
+		}, card)
+		make("UICorner", { CornerRadius = UDim.new(0, 4) }, sw)
+		make("TextLabel", {
+			BackgroundTransparency = 1,
+			FontFace = FONT,
+			Text = "Your colour",
+			TextSize = 13,
+			TextColor3 = Color3.new(1, 1, 1),
+			Position = UDim2.fromOffset(8, 86),
+			Size = UDim2.new(1, -16, 0, 16),
+		}, card)
+		local b = make("TextButton", {
+			AutoButtonColor = true,
+			BackgroundColor3 = if worn_none then GREEN else Color3.fromRGB(70, 110, 200),
+			FontFace = FONT,
+			Text = if worn_none then "EQUIPPED  ✓" else "EQUIP",
+			TextSize = 13,
+			TextColor3 = Color3.new(1, 1, 1),
+			Position = UDim2.new(0, 8, 1, -34),
+			Size = UDim2.new(1, -16, 0, 26),
+		}, card)
+		make("UICorner", { CornerRadius = UDim.new(0, 8) }, b)
+		b.Activated:Connect(function()
+			local s = session()
+			if s ~= nil and not worn_none then
+				s:equip("skin", false)
 			end
+		end)
+		if #list == 0 then
+			make("TextLabel", {
+				Name = "Empty",
+				LayoutOrder = 1,
+				BackgroundTransparency = 1,
+				FontFace = FONT_MED,
+				Text = "No flags yet: buy them with Stars or Robux in the other tabs.",
+				TextSize = 13,
+				TextWrapped = true,
+				TextColor3 = TEXT2,
+			}, grid)
 		end
 	end
 	table.sort(list, function(a, b)
@@ -432,7 +499,7 @@ local function build()
 		Padding = UDim.new(0, 8),
 		SortOrder = Enum.SortOrder.LayoutOrder,
 	}, tabs)
-	for i, t in { { "stars", "★ STARS" }, { "robux", "ROBUX" }, { "crown", "BANNER" } } do
+	for i, t in { { "stars", "★ STARS" }, { "robux", "ROBUX" }, { "inventory", "INVENTORY" }, { "crown", "BANNER" } } do
 		local b = make("TextButton", {
 			Name = t[1],
 			LayoutOrder = i,

@@ -406,7 +406,17 @@ local function build_hud(player: Player)
 			S.toggle()
 		end
 	end)
-	make_button(h, "menu", "exit", "Game menu", 7, function()
+	make_button(h, "inventory", "chest", "Inventory: your flags", 7, function()
+		local S = optional(script.Parent, { "EmpireShop" })
+		if S ~= nil then
+			if S.is_open() then
+				S.close()
+			else
+				S.open("inventory")
+			end
+		end
+	end)
+	make_button(h, "menu", "exit", "Game menu", 8, function()
 		call(Main.ui, "open_pause_menu")
 	end)
 	GuiService:GetPropertyChangedSignal("TopbarInset"):Connect(layout_hud)

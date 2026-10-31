@@ -318,11 +318,26 @@ def flagshop():
     return im
 
 
+def chest():
+    """v10: the inventory: a chest."""
+    im, d = canvas()
+    d.rounded_rectangle([18, 40, 174, 100], radius=26, fill=255)              # lid
+    d.rectangle([18, 74, 174, 100], fill=255)
+    d.rectangle([18, 108, 174, 176], fill=255)                                # body
+    d.rectangle([18, 100, 174, 108], fill=0)                                  # seam
+    d.rectangle([80, 86, 112, 132], fill=0)                                   # lock plate
+    d.rectangle([86, 92, 106, 126], fill=255)
+    d.rectangle([93, 104, 99, 118], fill=0)                                   # keyhole
+    for x in (44, 140):
+        d.rectangle([x, 40, x + 8, 176], fill=0)                              # bands
+    return im
+
+
 ICONS = {"city_era": temple, "road_era": wagon, "forge": forge, "mine": mine, "market": market,
          "ore": ore, "pact": pact, "ship_era": ship, "alliance": handshake, "betray": dagger,
          "donate": donate, "renew": hourglass, "pact_trade": trade_pact, "pact_defense": defense_pact,
          "ore_sell": ore_arrow(True), "ore_buy": ore_arrow(False), "medal": medal, "crown": crown,
-         "laurel": laurel, "sword": sword, "flagshop": flagshop}
+         "laurel": laurel, "sword": sword, "flagshop": flagshop, "chest": chest}
 
 
 def main(out_luau):
