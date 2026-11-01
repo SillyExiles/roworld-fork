@@ -308,6 +308,13 @@ function TopStatus.refresh(self)
 	local T = UITheme
 	local Defs = T.core("Defs")
 	local s = ctx.state
+	-- (Empires Front: the goal follows the match's own: the first match is won at a lower share)
+	local goal = T.core("Rules").WIN_SHARE
+	if self._goal_share ~= goal then
+		self._goal_share = goal
+		self._bar.goal = goal
+		self._goal:set_text(string.format("Goal %d%%", math.floor(goal * 100 + 0.5)))
+	end
 	if s == nil then
 		return
 	end

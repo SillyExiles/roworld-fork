@@ -371,8 +371,14 @@ function UIRoot.start_tutorial(self)
 	self.tutorial:begin()
 	ctx:session_call("start_solo", {
 		TutorialData.DIFFICULTY,
-		UIMaps.DEFAULT_ID,
-		{ tribes = TutorialData.TRIBES, countdown_ticks = TutorialData.COUNTDOWN_TICKS },
+		UIMaps.valid(TutorialData.MAP or UIMaps.DEFAULT_ID),
+		{
+			tribes = TutorialData.TRIBES,
+			countdown_ticks = TutorialData.COUNTDOWN_TICKS,
+			-- (Empires Front: a short first match, Data/Tutorial)
+			nation_limit = TutorialData.NATIONS,
+			win_share = TutorialData.WIN_SHARE,
+		},
 	})
 end
 

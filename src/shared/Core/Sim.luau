@@ -119,6 +119,11 @@ function Sim.new(p_map: any, config: { [string]: any }?): any
 	self.winner_team = 0
 	self._team_n = {} :: { [number]: number }
 	self.nation_limit = if type(cfg.nation_limit) == "number" then math.max(Defs.trunc(cfg.nation_limit), 0) else nil
+	--- Empires Front: the share of the land that wins (Rules.WIN_SHARE unless the config sets one: the
+	--- first match, Data/Tutorial.WIN_SHARE). A solo match runs on the player's device, so Rules.WIN_SHARE
+	--- (what the HUD shows) follows it there; Sim.new sets it back for every other match.
+	self.win_share = if type(cfg.win_share) == "number" then math.clamp(cfg.win_share, 0.3, 1.0) else Sim.DEFAULT_WIN_SHARE
+	Rules.WIN_SHARE = self.win_share
 	--- Wall-clock microseconds of the last step() (diagnostics).
 	self.last_step_usec = 0
 	--- When true, step() accumulates per-subsystem microseconds into `prof` (see PROF_NAMES).
@@ -1022,6 +1027,8 @@ end
 --- Ev.PING (MatchServer sends it to that player alone) and a line in the feed. At most one Signal
 --- per PING_COOLDOWN ticks per player.
 Sim.PING_COOLDOWN = 15
+--- (Empires Front) the land share that wins a match unless its config says otherwise (Rules' own)
+Sim.DEFAULT_WIN_SHARE = Rules.WIN_SHARE
 --- (Empires Front) the share of its army an AI ally sends when it answers a Signal, and how many answer
 Sim.PING_AI_SHARE = 0.25
 Sim.PING_AI_MAX = 2
@@ -1827,7 +1834,7 @@ function Sim._check_victory(self: any)
 		end
 		bt = tt
 	end
-	if best > 0 and bt >= Rules.WIN_SHARE * (self.map.contestable_count - self.fallout_count) then
+	if best > 0 and bt >= self.win_share * (self.map.contestable_count - self.fallout_count) then
 		self:_game_over(best, Defs.OVER_DOMINATION, team)
 		return
 	end

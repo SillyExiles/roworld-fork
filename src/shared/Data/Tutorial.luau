@@ -28,8 +28,14 @@ Tutorial.STARS = 0
 --- The last card (two short lines).
 Tutorial.DONE_TEXT = "Your empire is ready!\nGrow, ally and conquer to win"
 --- Tribes on the tutorial's map (a normal match has Rules.DEFAULT_TRIBES, 400): room to grow fast.
-Tutorial.TRIBES = 60
+Tutorial.TRIBES = 12
 Tutorial.DIFFICULTY = 0
+--- Empires Front (2026-11-01): the first match is short and winnable, about 8 minutes: a small map
+--- (Ancient Greece), few nations (NATIONS of the map's, at random), the gentlest AI, and a win at
+--- WIN_SHARE of the land instead of Rules.WIN_SHARE (80%). A player who wins their first match comes back.
+Tutorial.MAP = "greece"
+Tutorial.NATIONS = 5
+Tutorial.WIN_SHARE = 0.5
 --- Ticks (10 a second) from placing the capital to the match starting. A solo match waits 50, but
 --- (2026-10-04) a 5 s wait after placing the capital confused new players, so the tutorial's round
 --- starts much sooner.
