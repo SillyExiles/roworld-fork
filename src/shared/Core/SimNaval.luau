@@ -329,6 +329,12 @@ function SimNaval.install(C)
 				continue
 			end
 			p.rejections = 0
+			-- (Empires Front 2026-11-01, balance: an owner's port levels past PORT_FULL_LEVELS launch
+			-- less, sqrt(full / levels) each, so 40 captured ports don't take the world's trade)
+			local plv = self:struct_levels(p.owner, Defs.S_PORT)
+			if plv > Rules.PORT_FULL_LEVELS and rng:randf() > math.sqrt(Rules.PORT_FULL_LEVELS / plv) then
+				continue
+			end
 			local dst = self:_pick_trade_port(p)
 			if dst == nil then
 				continue

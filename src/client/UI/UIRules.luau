@@ -149,8 +149,37 @@ function UIRules.format(text: string, values: { [string]: string }): string
 	)
 end
 
+--- The per-player cap on `kind` in words ("" if none or the blurb says it already).
+function UIRules.limit_note(kind: string, text: string): string
+	local R = Rules()
+	if string.find(text, "At most", 1, true) or string.find(text, "Only one", 1, true) then
+		return ""
+	end
+	if kind == "warship" then
+		return string.format(" At most %d at sea.", R.WARSHIP_LIMIT)
+	end
+	local sk = Defs.struct_kind_from_name(kind)
+	if sk < 0 then
+		return ""
+	end
+	local lim, lv = R.struct_limit(sk), R.level_limit(sk)
+	if lim ~= nil and lv ~= nil then
+		return string.format(" At most %d per player, %d levels in all.", lim, lv)
+	elseif lim ~= nil then
+		return string.format(" At most %d per player.", lim)
+	elseif kind == "city" or kind == "port" or kind == "factory" then
+		return " Each one past the 4th costs more."
+	end
+	return ""
+end
+
 --- Blurb with its numbers filled in from Rules.
 function UIRules.blurb(kind: string): string
+	local text = UIRules._blurb(kind)
+	return text .. UIRules.limit_note(kind, text)
+end
+
+function UIRules._blurb(kind: string): string
 	local R = Rules()
 	return UIRules.format(UIRules.BLURBS[kind] or "", {
 		city = T().fmt_troops(R.CITY_TROOPS),
@@ -711,6 +740,21 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 		out.locked = true
 		return out
 	end
+	-- Empires Front: the per-player caps (Rules.STRUCT_LIMITS / LEVEL_LIMITS / WARSHIP_LIMIT)
+	local sk = Defs.struct_kind_from_name(kind)
+	if sk >= 0 then
+		local R = Rules()
+		local up = R.is_upgradable(sk) and self:struct_count(sk) > 0
+		if not R.under_limit(sk, self:struct_count(sk), s:struct_level_sum(ctx:me(), sk), up) then
+			out.reason = R.limit_text(kind)
+			out.locked = true
+			return out
+		end
+	elseif kind == "warship" and s:count_units(ctx:me(), Defs.U_WARSHIP) >= Rules().WARSHIP_LIMIT then
+		out.reason = Rules().limit_text(kind)
+		out.locked = true
+		return out
+	end
 	if (o.gold or 0) < c then
 		out.reason = "Need " .. T().fmt_num(c - o.gold) .. " more gold"
 		return out
@@ -777,6 +821,13 @@ function UIRules.bulk_max(self: any, kind: string): number
 	local cap = UIRules.MAX_BULK
 	if UIRules.is_nuke(kind) then
 		cap = math.min(cap, self:ready_missiles())
+	end
+	-- (the per-player level caps: Rules.LEVEL_LIMITS)
+	local sk = Defs.struct_kind_from_name(kind)
+	local lv = if sk >= 0 then Rules().level_limit(sk) else nil
+	local st = self.ctx.state
+	if lv ~= nil and st ~= nil then
+		cap = math.min(cap, math.max(0, lv - st:struct_level_sum(self.ctx:me(), sk)))
 	end
 	local max = 0
 	for n = 1, cap do
@@ -846,7 +897,7 @@ UIRules.PLACE_REASONS = {
 	no_coast = "Ports must be on your coast",
 	no_port = "Warships need a finished port on this water",
 	gold = "Not enough gold",
-	limit = "Limit reached: at most 4 Barracks and 2 Forges per player (upgrade one instead)",
+	limit = "Limit reached for this building",
 	invalid = "Can't build here",
 }
 
@@ -884,14 +935,19 @@ function UIRules.resolve_placement(self: any, kind: string, tile: number): { [st
 		if code == "" and not s.map:is_water(tile) then
 			out.reason = "Tap the sea where the warship should patrol"
 		elseif code ~= "" then
-			out.reason = UIRules.PLACE_REASONS[code] or "Can't build here"
+			out.reason = if code == "limit"
+				then Rules().limit_text(kind)
+				else (UIRules.PLACE_REASONS[code] or "Can't build here")
 		end
 		return out
 	end
 	-- Gold is shown on the slot itself; the preview still shows where it would go.
 	out.ok = code == "" or code == "gold"
 	out.tile = if rtile >= 0 then rtile else tile
-	out.reason = if code ~= "" then (UIRules.PLACE_REASONS[code] or "Can't build here") else ""
+	out.reason = if code == "limit"
+		then Rules().limit_text(kind)
+		elseif code ~= "" then (UIRules.PLACE_REASONS[code] or "Can't build here")
+		else ""
 	out.code = code
 	local sid = tonumber(r.upgrade_sid) or 0
 	if sid > 0 and s.structures[sid] ~= nil then

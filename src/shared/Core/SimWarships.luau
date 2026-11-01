@@ -153,6 +153,10 @@ function SimWarships.install(C)
 			self:msg(id, Defs.MSG_INFO, "You need a port on that sea to build warships")
 			return false
 		end
+		if self.o_warships[id] >= Rules.WARSHIP_LIMIT then
+			self:msg(id, Defs.MSG_INFO, Rules.limit_text(Rules.WARSHIP_KIND_NAME))
+			return false
+		end
 		local cost = Rules.build_cost(
 			Rules.WARSHIP_KIND_NAME,
 			math.min(self.o_warships[id], self.o_built[id * STRUCT_KINDS + Rules.BUILT_WARSHIP])

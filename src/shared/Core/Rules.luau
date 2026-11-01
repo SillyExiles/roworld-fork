@@ -122,6 +122,15 @@ local function build(K_LIN: number, into: any?): any
 	-- Troops (maxTroops, troopIncreaseRate, cityTroopIncrease)
 	-- ---------------------------------------------------------------------------------------------
 	Rules.CITY_TROOPS = 250000.0
+	--- Empires Front (2026-11-01, balance): city levels past CITY_FULL_LEVELS add CITY_EXTRA_MULT of
+	--- CITY_TROOPS each, so a conqueror holding 70 cities doesn't field 17M more troops than everyone.
+	Rules.CITY_FULL_LEVELS = 15
+	Rules.CITY_EXTRA_MULT = 0.5
+	function Rules.city_troops(levels: number): number
+		local n = math.max(levels, 0)
+		local full = math.min(n, Rules.CITY_FULL_LEVELS)
+		return (full + (n - full) * Rules.CITY_EXTRA_MULT) * Rules.CITY_TROOPS
+	end
 	--- Tribes: maxTroops / 3, growth x 0.5.
 	Rules.TRIBE_CAP_DIV = 3.0
 	Rules.TRIBE_GROWTH_MULT = 0.5
@@ -141,7 +150,7 @@ local function build(K_LIN: number, into: any?): any
 
 	--- maxTroops = 2 * (numTiles^0.6 * 1000 + 50000) + cities * 250k, numTiles in full-size tiles.
 	function Rules.max_troops(kind: number, tiles: number, cities: number, difficulty: number): number
-		local m = 2.0 * ((math.max(tiles, 0) * K_AREA) ^ 0.6 * 1000.0 + 50000.0) + cities * 250000.0
+		local m = 2.0 * ((math.max(tiles, 0) * K_AREA) ^ 0.6 * 1000.0 + 50000.0) + Rules.city_troops(cities)
 		if kind == KIND_TRIBE then
 			return m / 3.0
 		end
@@ -264,22 +273,65 @@ local function build(K_LIN: number, into: any?): any
 	Rules.FORTRESS_LIMIT = 2
 	Rules.UNIVERSITY_LIMIT = 2
 
+	--- (2026-11-01, balance) caps on the buildings that, stacked by one rich or conquering player, made
+	--- matches lopsided: Mines and Markets (an ore monopoly: a conqueror held 44 Mines and 26 Markets),
+	--- Farms (73 of them). STRUCT_LIMITS: structures a player may hold
+	--- (captured ones count: one over the cap is razed when taken); LEVEL_LIMITS: their levels
+	--- together (upgrades stop there too). Warships: WARSHIP_LIMIT afloat at once.
+	Rules.STRUCT_LIMITS = {
+		[Defs.S_BARRACKS] = Rules.BARRACKS_LIMIT,
+		[Defs.S_FORGE] = Rules.FORGE_LIMIT,
+		[Defs.S_TEMPLE] = Rules.TEMPLE_LIMIT,
+		[Defs.S_PALACE] = Rules.PALACE_LIMIT,
+		[Defs.S_FORTRESS] = Rules.FORTRESS_LIMIT,
+		[Defs.S_UNIVERSITY] = Rules.UNIVERSITY_LIMIT,
+		[Defs.S_MINE] = 8,
+		[Defs.S_MARKET] = 3,
+		[Defs.S_FARM] = 6,
+	}
+	Rules.LEVEL_LIMITS = {
+		[Defs.S_MINE] = 16,
+		[Defs.S_MARKET] = 6,
+		[Defs.S_FARM] = 12,
+	}
+	Rules.WARSHIP_LIMIT = 8
+
 	--- How many structures of `kind` one player may hold (nil: no limit).
 	function Rules.struct_limit(kind: number): number?
-		if kind == Defs.S_BARRACKS then
-			return Rules.BARRACKS_LIMIT
-		elseif kind == Defs.S_FORGE then
-			return Rules.FORGE_LIMIT
-		elseif kind == Defs.S_TEMPLE then
-			return Rules.TEMPLE_LIMIT
-		elseif kind == Defs.S_PALACE then
-			return Rules.PALACE_LIMIT
-		elseif kind == Defs.S_FORTRESS then
-			return Rules.FORTRESS_LIMIT
-		elseif kind == Defs.S_UNIVERSITY then
-			return Rules.UNIVERSITY_LIMIT
+		return Rules.STRUCT_LIMITS[kind]
+	end
+
+	--- How many levels of `kind` one player may hold in all (nil: no limit).
+	function Rules.level_limit(kind: number): number?
+		return Rules.LEVEL_LIMITS[kind]
+	end
+
+	--- Whether `count` structures with `levels` levels of `kind` leave room for one more structure
+	--- (`upgrade` false) or one more level (`upgrade` true).
+	function Rules.under_limit(kind: number, count: number, levels: number, upgrade: boolean): boolean
+		local lim = Rules.STRUCT_LIMITS[kind]
+		if not upgrade and lim ~= nil and count >= lim then
+			return false
 		end
-		return nil
+		local lv = Rules.LEVEL_LIMITS[kind]
+		return lv == nil or levels < lv
+	end
+
+	--- The player-facing line for a reached limit on `kind_name`.
+	function Rules.limit_text(kind_name: string): string
+		if kind_name == Rules.WARSHIP_KIND_NAME then
+			return string.format("Warship limit reached: at most %d at sea per player", Rules.WARSHIP_LIMIT)
+		end
+		local kind = Defs.struct_kind_from_name(kind_name)
+		local title = Defs.STRUCT_TITLES[kind] or kind_name
+		local lim, lv = Rules.STRUCT_LIMITS[kind], Rules.LEVEL_LIMITS[kind]
+		if lim ~= nil and lv ~= nil then
+			return string.format("%s limit reached: at most %d per player, %d levels in all", title, lim, lv)
+		elseif lim ~= nil then
+			local up = if Rules.UPGRADABLE[kind] == 1 then " (upgrade one instead)" else ""
+			return string.format("%s limit reached: at most %d per player%s", title, lim, up)
+		end
+		return string.format("%s limit reached: at most %d levels per player", title, lv or 0)
 	end
 
 	-- ---------------------------------------------------------------------------------------------
@@ -377,7 +429,12 @@ local function build(K_LIN: number, into: any?): any
 	function Rules.build_cost(kind_name: string, owned_count: number): number
 		local n = math.max(owned_count, 0)
 		if kind_name == "city" or kind_name == "port" or kind_name == "factory" then
-			return math.min(1000000, 125000 * 2 ^ math.min(n, 4))
+			-- (Empires Front 2026-11-01, balance: past the 4th, +250k each up to 4M instead of 1M
+			-- for ever, so gold piled up can't buy them by the dozen)
+			if n < 4 then
+				return 125000 * 2 ^ n
+			end
+			return math.min(4000000, 1000000 + 250000 * (n - 3))
 		elseif kind_name == "defense" then
 			return math.min(250000, 50000 * (n + 1))
 		elseif kind_name == "sam" then
@@ -629,6 +686,9 @@ local function build(K_LIN: number, into: any?): any
 			local p = Rules.warship_port(state, id, tile)
 			out.tile = p
 			out.reason = if p >= 0 then "" else "no_port"
+			if p >= 0 and state:count_units(id, Defs.U_WARSHIP) >= Rules.WARSHIP_LIMIT then
+				out.reason = "limit"
+			end
 		else
 			local kind = Defs.struct_kind_from_name(kind_name)
 			local r = Rules.place_site(
@@ -644,9 +704,16 @@ local function build(K_LIN: number, into: any?): any
 			out.tile = r.tile
 			out.upgrade_sid = r.upgrade_sid
 			out.reason = r.reason
-			-- Empires Front: a per-player cap on some kinds (the Barracks); upgrades stay allowed
-			local lim = Rules.struct_limit(kind)
-			if lim ~= nil and r.upgrade_sid == 0 and state:count_structures(id, kind) >= lim then
+			-- Empires Front: per-player caps on some kinds (STRUCT_LIMITS, LEVEL_LIMITS)
+			if
+				r.reason == ""
+				and not Rules.under_limit(
+					kind,
+					state:count_structures(id, kind),
+					state:struct_level_sum(id, kind),
+					r.upgrade_sid ~= 0
+				)
+			then
 				out.tile = -1
 				out.reason = "limit"
 			end
@@ -927,6 +994,9 @@ local function build(K_LIN: number, into: any?): any
 		local d = path_tiles * K_LIN
 		return (75000.0 / (1.0 + math.exp(-0.03 * (d - 300.0))) + 50.0 * d) * Rules.TRADE_SCALE
 	end
+
+	--- Empires Front (2026-11-01, balance): port levels an owner holds at full trade (see ports_tick).
+	Rules.PORT_FULL_LEVELS = 8
 
 	--- tradeShipSaturation(ships): world-wide spawn throttle.
 	function Rules.trade_saturation(ships: number): number

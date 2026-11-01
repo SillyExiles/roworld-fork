@@ -608,14 +608,10 @@ function SimStructures.install(C)
 
 		local p = self:place(id, kind, t)
 		local up = p.upgrade_sid
-		-- Empires Front: a per-player cap on some kinds (4 Barracks); upgrading one stays allowed
-		local lim = Rules.struct_limit(kind)
-		if up == 0 and lim ~= nil and self.o_scount[id * STRUCT_KINDS + kind] >= lim then
-			self:msg(
-				id,
-				Defs.MSG_INFO,
-				string.format("Limit reached: %d %s per player (upgrade one instead)", lim, struct_title(kind))
-			)
+		-- Empires Front: per-player caps on some kinds (Rules.STRUCT_LIMITS, LEVEL_LIMITS)
+		local b = id * STRUCT_KINDS + kind
+		if not Rules.under_limit(kind, self.o_scount[b], self.o_slevel[b], up ~= 0) then
+			self:msg(id, Defs.MSG_INFO, Rules.limit_text(Defs.STRUCT_NAMES[kind]))
 			return false
 		end
 		if up ~= 0 then
@@ -878,7 +874,12 @@ function SimStructures.install(C)
 		local k = s.kind
 		-- (a kind with a per-player cap, the Barracks: one over the conqueror's cap is razed)
 		local lim = Rules.struct_limit(k)
-		local over = lim ~= nil and nw > 0 and self.o_scount[nw * STRUCT_KINDS + k] >= lim
+		local lvl = Rules.level_limit(k)
+		local over = nw > 0
+			and (
+				(lim ~= nil and self.o_scount[nw * STRUCT_KINDS + k] >= lim)
+				or (lvl ~= nil and self.o_slevel[nw * STRUCT_KINDS + k] + s.level > lvl)
+			)
 		if
 			over
 			or nw == 0

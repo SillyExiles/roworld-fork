@@ -116,7 +116,7 @@ SimAIEconomy.RETINT_PER_MINUTE = 4
 -- Chance that a nation answers a sunk transport / captured trade ship / incoming invasion with a
 -- new warship (Easy never, Medium 15 %, Hard 50 %); with 10+ warships it re-tasks one.
 SimAIEconomy.WARSHIP_RETALIATE_P = zt({ 0.0, f32(0.15), 0.5 }) -- PackedFloat32Array
-SimAIEconomy.WARSHIP_FLEET_CAP = 10
+SimAIEconomy.WARSHIP_FLEET_CAP = 8 -- (Rules.WARSHIP_LIMIT)
 
 local E = SimAIEconomy
 local NUKE_AGE = E.NUKE_AGE
@@ -349,13 +349,22 @@ function SimAIEconomy.install(C)
 		if gold < perceived then
 			return false
 		end
+		-- (the per-player caps: at the count cap upgrade one, at the level cap nothing)
+		local count, levels = sim:struct_count(id, kind), sim:struct_levels(id, kind)
+		if not Rules.under_limit(kind, count, levels, true) then
+			return false
+		end
+		local capped = not Rules.under_limit(kind, count, levels, false)
+		if capped and not Rules.is_upgradable(kind) then
+			return false
+		end
 		-- on a crowded territory upgrade instead (or leave it: a construction is under way)
-		if Rules.is_upgradable(kind) and sim:struct_count(id, kind) > 0 then
+		if Rules.is_upgradable(kind) and count > 0 then
 			local total = 0
 			for k = 0, Defs.STRUCT_KIND_COUNT - 1 do
 				total += sim:struct_count(id, k)
 			end
-			if total * E.UPGRADE_DENSITY_FULL_TILES > sim.o_tiles[id] * sim.R.K_AREA then
+			if capped or total * E.UPGRADE_DENSITY_FULL_TILES > sim.o_tiles[id] * sim.R.K_AREA then
 				local ready = {}
 				for _, s in sim:structs_of(id, kind) do
 					if s.active then

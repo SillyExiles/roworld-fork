@@ -13,17 +13,19 @@ local minutes = tonumber(args[2]) or 15
 local sim = Sim.new(WorldMap.get(mapid), { seed = tonumber(args[3]) or 3, difficulty = 1, tribes = 60, max_humans = 0 })
 
 local acc = { passive = 0, trade = 0, bonus = 0, conquest = 0, spent = 0, builds = {} }
+local per = {} -- trade + bonus gold by owner this minute
+local function add_per(id, g) per[id] = (per[id] or 0) + g end
 local function nation(id)
 	return sim.o_kind[id] ~= Defs.KIND_TRIBE
 end
 local tg = sim._trade_gold
 sim._trade_gold = function(self, id, g)
-	if nation(id) and g > 0 then acc.trade += g end
+	if nation(id) and g > 0 then acc.trade += g; add_per(id, g) end
 	return tg(self, id, g)
 end
 local ab = sim.add_bonus_gold
 sim.add_bonus_gold = function(self, id, amount, tile)
-	if nation(id) and amount > 0 then acc.bonus += amount end
+	if nation(id) and amount > 0 then acc.bonus += amount; add_per(id, amount) end
 	return ab(self, id, amount, tile)
 end
 local cg = sim._conquest_gold
@@ -46,7 +48,7 @@ sim.try_build = function(self, id, kname, tile)
 end
 local function fmt(v) return string.format("%.1fM", v / 1e6) end
 print(string.format("%s: %d nations", mapid, sim.nation_count))
-print("min | earned: passive trade(ore) bonus(ships/trains) conquest | spent | nations: avg gold held, max gold, avg ore | ore price")
+print("min | earned: passive trade(ore) bonus(ships/trains) conquest | spent | nations: avg gold held, max gold, avg ore | ore price | top trader's share")
 for m = 1, minutes do
 	for _ = 1, 600 do
 		sim:step()
@@ -65,7 +67,10 @@ for m = 1, minutes do
 			ore += sim.o_ore[id]
 		end
 	end
-	print(string.format("%2d | %s %s %s %s | %s | %d alive: %s, %s, %.0f | %.0f", m, fmt(acc.passive), fmt(acc.trade), fmt(acc.bonus), fmt(acc.conquest), fmt(acc.spent), n, fmt(gold / math.max(n, 1)), fmt(maxg), ore / math.max(n, 1), sim.ore_price))
+	local tot, top = 0, 0
+	for _, g in per do tot += g; top = math.max(top, g) end
+	per = {}
+	print(string.format("%2d | %s %s %s %s | %s | %d alive: %s, %s, %.0f | %.0f | %.0f%%", m, fmt(acc.passive), fmt(acc.trade), fmt(acc.bonus), fmt(acc.conquest), fmt(acc.spent), n, fmt(gold / math.max(n, 1)), fmt(maxg), ore / math.max(n, 1), sim.ore_price, 100 * top / math.max(tot, 1)))
 	acc.passive, acc.trade, acc.bonus, acc.conquest, acc.spent = 0, 0, 0, 0, 0
 	if sim.winner ~= 0 then
 		print("winner", sim.o_name[sim.winner], "at minute", m)
@@ -88,3 +93,18 @@ local ks = {}
 for k, v in st do table.insert(ks, k .. "=" .. v) end
 table.sort(ks)
 print("levels standing:", table.concat(ks, " "))
+-- the three richest survivors' holdings
+local alive = {}
+for id = 1, sim.owner_total do
+	if sim.o_alive[id] == 1 and nation(id) then table.insert(alive, id) end
+end
+table.sort(alive, function(a, b) return sim.o_tiles[a] > sim.o_tiles[b] end)
+for i = 1, math.min(3, #alive) do
+	local id = alive[i]
+	local row = {}
+	for k = 0, Defs.STRUCT_KIND_COUNT - 1 do
+		local lv = sim:struct_levels(id, k)
+		if lv > 0 then table.insert(row, Defs.STRUCT_NAMES[k] .. "=" .. sim:struct_count(id, k) .. "/" .. lv) end
+	end
+	print(string.format("#%d %s gold %s ships %d: %s", i, sim.o_name[id], fmt(sim.o_gold[id]), sim.o_warships[id], table.concat(row, " ")))
+end
