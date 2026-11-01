@@ -294,9 +294,14 @@ function SimAIEconomy.install(C)
 				and sim:struct_levels(id, Defs.S_MINE) < math.min(6, 1 + cities // 2)
 				and age > 300
 		elseif kind == Defs.S_MARKET then
+			-- (a Market for two Mine levels; one more while unsold ore piles up: mountain Mines and
+			-- captured ones dig more than that sells. Empires Front 2026-11-01)
+			local mines = sim:struct_levels(id, Defs.S_MINE)
+			local markets = sim:struct_levels(id, Defs.S_MARKET)
+			local spare = (sim.o_ore[id] or 0) - sim:ore_reserve(id)
 			return sim.o_kind[id] ~= Defs.KIND_TRIBE
-				and sim:struct_levels(id, Defs.S_MINE) > 0
-				and sim:struct_levels(id, Defs.S_MARKET) < math.max(1, sim:struct_levels(id, Defs.S_MINE) // 2)
+				and mines > 0
+				and (markets < math.max(1, mines // 2) or (spare >= 300 and markets < mines))
 		elseif kind == Defs.S_FORGE then
 			-- Empires Front: a nation arms its troops as it grows (one Forge level per two cities, 4 at most)
 			return sim.o_kind[id] ~= Defs.KIND_TRIBE

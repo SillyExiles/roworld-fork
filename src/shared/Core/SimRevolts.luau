@@ -661,6 +661,8 @@ function SimRevolts.install(C: any)
 		end
 		self.o_troops[id] += back
 		self.o_troops[rid] = 0.0
+		-- (bought, not beaten: no "You eliminated" and no conquest gold when they go)
+		self.o_killer[rid] = 0
 		rebel_ev(self, rid, r)
 		self:msg(
 			id,

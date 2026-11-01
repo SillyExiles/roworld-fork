@@ -192,6 +192,17 @@ local function build(K_LIN: number, into: any?): any
 		return 0.0
 	end
 
+	--- Empires Front (2026-11-01, economy balance): taxes. A nation or player also earns LAND_INCOME
+	--- gold a second per 1% of the map it holds (tribes none), so land pays all match long and not
+	--- only ports and trains.
+	Rules.LAND_INCOME = 400.0
+	function Rules.land_income(kind: number, share: number): number
+		if kind == KIND_TRIBE or share <= 0 then
+			return 0.0
+		end
+		return Rules.LAND_INCOME * share * 100.0
+	end
+
 	--- conquerGoldAmount: conquering a nation or tribe takes all its gold, a human half of it.
 	function Rules.conquer_gold(victim_kind: number, victim_gold: number): number
 		return victim_gold * (if victim_kind == KIND_HUMAN then 0.5 else 1.0)
@@ -630,6 +641,9 @@ local function build(K_LIN: number, into: any?): any
 	--- trainGold(rel, citiesVisited): self 10k / ally 35k / other 25k, minus 5k per stop beyond the
 	--- 9th, at least 5k. Paid to the train's owner and (if different) to the station's owner, at city
 	--- and port stops only.
+	--- (Empires Front 2026-11-01, economy balance: trains and trade ships pay TRADE_SCALE of OpenFront's
+	--- amounts. Unscaled they made ~95% of all gold and a leader sat on 50M+ by the 14th minute.)
+	Rules.TRADE_SCALE = 0.6
 	function Rules.train_gold(rel: string, stops_visited: number): number
 		local base = 25000.0
 		if rel == "self" then
@@ -637,7 +651,7 @@ local function build(K_LIN: number, into: any?): any
 		elseif rel == "ally" then
 			base = 35000.0
 		end
-		return math.max(5000.0, base - 5000.0 * math.max(0, stops_visited - 9))
+		return math.max(5000.0, base - 5000.0 * math.max(0, stops_visited - 9)) * Rules.TRADE_SCALE
 	end
 
 	function Rules.sigmoid(value: number, decay_rate: number, midpoint: number): number
@@ -831,7 +845,7 @@ local function build(K_LIN: number, into: any?): any
 	--- tradeShipGold(dist): 75000 / (1 + e^(-0.03 (dist - 300))) + 50 dist, dist = full-size tiles sailed.
 	function Rules.trade_gold(path_tiles: number): number
 		local d = path_tiles * K_LIN
-		return 75000.0 / (1.0 + math.exp(-0.03 * (d - 300.0))) + 50.0 * d
+		return (75000.0 / (1.0 + math.exp(-0.03 * (d - 300.0))) + 50.0 * d) * Rules.TRADE_SCALE
 	end
 
 	--- tradeShipSaturation(ships): world-wide spawn throttle.

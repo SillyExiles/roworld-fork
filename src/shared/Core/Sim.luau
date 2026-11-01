@@ -1638,6 +1638,7 @@ function Sim._start_playing(self: any)
 				if novice then Sim.NOVICE_SKILL else self.difficulty
 			)
 			self.o_income[id] = Rules.passive_income(self.o_kind[id], self.o_tiles[id])
+				+ Rules.land_income(self.o_kind[id], self:land_share(id))
 		end
 	end
 end
@@ -1688,7 +1689,8 @@ function Sim._economy_tick(self: any)
 		end
 		o_troops[id] += grow
 		if (tick + id) % 10 == 0 then
-			o_income[id] = Rules.passive_income(kind, o_tiles[id])
+			-- (Empires Front: + taxes on the land held, Rules.land_income)
+			o_income[id] = Rules.passive_income(kind, o_tiles[id]) + Rules.land_income(kind, self:land_share(id))
 			-- (Empires Front: trade pacts raise it: SimDiplomacy)
 			local tp = self:trade_pacts(id)
 			if tp > 0 then

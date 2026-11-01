@@ -26,13 +26,13 @@ local S_MARKET = Defs.S_MARKET
 local SimEconomy = {}
 
 SimEconomy.MINE_ORE = 3.0
-SimEconomy.MARKET_ORE = 8.0
+SimEconomy.MARKET_ORE = 12.0
 SimEconomy.ORE_PRICE = 220.0
-SimEconomy.PRICE_MIN = 0.45
+SimEconomy.PRICE_MIN = 0.7
 SimEconomy.PRICE_MAX = 1.6
 --- The glut (ore sold, decayed GLUT_DECAY a second) that cuts the price to 1.4 / 2 of its base is this many
 --- times the number of nations (players and AI) in the match.
-SimEconomy.GLUT_REF = 400.0
+SimEconomy.GLUT_REF = 1000.0
 SimEconomy.GLUT_DECAY = 0.985
 --- The demand cycle: +-DEMAND_SWING over DEMAND_PERIOD_S.
 SimEconomy.DEMAND_SWING = 0.18
