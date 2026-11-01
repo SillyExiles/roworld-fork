@@ -155,9 +155,6 @@ function UIRules.limit_note(kind: string, text: string): string
 	if string.find(text, "At most", 1, true) or string.find(text, "Only one", 1, true) then
 		return ""
 	end
-	if kind == "warship" then
-		return string.format(" At most %d at sea.", R.WARSHIP_LIMIT)
-	end
 	local sk = Defs.struct_kind_from_name(kind)
 	if sk < 0 then
 		return ""
@@ -511,7 +508,6 @@ function UIRules.owned(self: any, kind: string): number
 	if UIRules.is_nuke(kind) or kind == "reinforce" then
 		return 0
 	end
-	-- Ports and factories share one count (Rules.cost_count_kinds).
 	local n = 0
 	for _, sk in Rules().cost_count_kinds(kind) do
 		n += self:struct_count(sk)
@@ -740,7 +736,7 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 		out.locked = true
 		return out
 	end
-	-- Empires Front: the per-player caps (Rules.STRUCT_LIMITS / LEVEL_LIMITS / WARSHIP_LIMIT)
+	-- Empires Front: the per-player caps (Rules.STRUCT_LIMITS / LEVEL_LIMITS)
 	local sk = Defs.struct_kind_from_name(kind)
 	if sk >= 0 then
 		local R = Rules()
@@ -750,10 +746,6 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 			out.locked = true
 			return out
 		end
-	elseif kind == "warship" and s:count_units(ctx:me(), Defs.U_WARSHIP) >= Rules().WARSHIP_LIMIT then
-		out.reason = Rules().limit_text(kind)
-		out.locked = true
-		return out
 	end
 	if (o.gold or 0) < c then
 		out.reason = "Need " .. T().fmt_num(c - o.gold) .. " more gold"

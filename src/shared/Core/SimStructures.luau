@@ -646,16 +646,11 @@ function SimStructures.install(C)
 		return true
 	end
 
-	-- Count the price of `kind` grows with: per kind sharing the price, min(levels owned, levels built).
+	-- Count the price of `kind` grows with: min(levels owned, levels built). (Empires Front
+	-- 2026-11-01: Ports and Factories no longer share one count: each prices by its own.)
 	function C:cost_count(id: number, kind: number): number
 		local b = id * STRUCT_KINDS
-		local o_slevel = self.o_slevel
-		local o_built = self.o_built
-		if kind == S_PORT or kind == S_FACTORY then
-			return math.min(o_slevel[b + S_PORT], o_built[b + S_PORT])
-				+ math.min(o_slevel[b + S_FACTORY], o_built[b + S_FACTORY])
-		end
-		return math.min(o_slevel[b + kind], o_built[b + kind])
+		return math.min(self.o_slevel[b + kind], self.o_built[b + kind])
 	end
 
 	-- Level sum of `id`'s structures of `kind` (construction counts 1).

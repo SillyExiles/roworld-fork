@@ -22,7 +22,6 @@ expect(not Rules.under_limit(Defs.S_MARKET, 3, 3, false) and Rules.under_limit(D
 expect(not Rules.under_limit(Defs.S_MARKET, 3, 6, true), "7th market level no")
 expect(Rules.under_limit(Defs.S_CITY, 99, 99, false), "cities unlimited")
 expect(string.find(Rules.limit_text("market"), "3", 1, true) ~= nil, Rules.limit_text("market"))
-expect(string.find(Rules.limit_text("warship"), "8", 1, true) ~= nil, Rules.limit_text("warship"))
 
 -- in a match
 local sim = Sim.new(WorldMap.get("rome"), { seed = 21, difficulty = 1, tribes = 60, max_humans = 0 })
@@ -70,22 +69,8 @@ build_all(Defs.S_FARM, 10)
 expect(sim:struct_count(id, Defs.S_FARM) == 6, "farms stop at 6: " .. sim:struct_count(id, Defs.S_FARM))
 local cities = build_all(Defs.S_CITY, 12)
 expect(cities >= 8, "cities still build freely: " .. cities)
--- warships afloat
-local port = -1
-for i = 1, #own do
-	local t = own[i]
-	if sim:valid_site(id, Defs.S_PORT, t) then
-		sim.o_gold[id] += 1e8
-		if sim:try_build(id, "port", t) then port = t break end
-	end
-end
-for _ = 1, 300 do sim:step() end
-if port >= 0 then
-	for _ = 1, 12 do sim.o_gold[id] += 1e8; sim:build_warship(id, -1) end
-	expect(sim.o_warships[id] == Rules.WARSHIP_LIMIT, "warships stop at 8: " .. sim.o_warships[id])
-else
-	print("  (no coast: warship check skipped)")
-end
+-- Ports and Factories price by their own count (no longer a shared one)
+expect(sim:cost_count(id, Defs.S_FACTORY) == sim:struct_levels(id, Defs.S_FACTORY), "a factory's price ignores ports")
 -- a long AI run keeps to the caps
 for _ = 1, 6000 do sim:step() end
 local worst = {}
@@ -97,7 +82,6 @@ for o = 1, sim.owner_total do
 		for k, lim in Rules.LEVEL_LIMITS do
 			if sim:struct_levels(o, k) > lim then worst[Defs.STRUCT_NAMES[k] .. " levels"] = sim:struct_levels(o, k) end
 		end
-		if sim.o_warships[o] > Rules.WARSHIP_LIMIT then worst.warships = sim.o_warships[o] end
 	end
 end
 local w = {}

@@ -277,7 +277,7 @@ local function build(K_LIN: number, into: any?): any
 	--- matches lopsided: Mines and Markets (an ore monopoly: a conqueror held 44 Mines and 26 Markets),
 	--- Farms (73 of them). STRUCT_LIMITS: structures a player may hold
 	--- (captured ones count: one over the cap is razed when taken); LEVEL_LIMITS: their levels
-	--- together (upgrades stop there too). Warships: WARSHIP_LIMIT afloat at once.
+	--- together (upgrades stop there too). Warships have no cap.
 	Rules.STRUCT_LIMITS = {
 		[Defs.S_BARRACKS] = Rules.BARRACKS_LIMIT,
 		[Defs.S_FORGE] = Rules.FORGE_LIMIT,
@@ -294,7 +294,6 @@ local function build(K_LIN: number, into: any?): any
 		[Defs.S_MARKET] = 6,
 		[Defs.S_FARM] = 12,
 	}
-	Rules.WARSHIP_LIMIT = 8
 
 	--- How many structures of `kind` one player may hold (nil: no limit).
 	function Rules.struct_limit(kind: number): number?
@@ -319,9 +318,6 @@ local function build(K_LIN: number, into: any?): any
 
 	--- The player-facing line for a reached limit on `kind_name`.
 	function Rules.limit_text(kind_name: string): string
-		if kind_name == Rules.WARSHIP_KIND_NAME then
-			return string.format("Warship limit reached: at most %d at sea per player", Rules.WARSHIP_LIMIT)
-		end
 		local kind = Defs.struct_kind_from_name(kind_name)
 		local title = Defs.STRUCT_TITLES[kind] or kind_name
 		local lim, lv = Rules.STRUCT_LIMITS[kind], Rules.LEVEL_LIMITS[kind]
@@ -476,9 +472,6 @@ local function build(K_LIN: number, into: any?): any
 
 	--- Structure kinds (Defs.S_*) whose owned counts add up to the count build_cost() expects (1-based list).
 	function Rules.cost_count_kinds(kind_name: string): { number }
-		if kind_name == "port" or kind_name == "factory" then
-			return { Defs.S_PORT, Defs.S_FACTORY }
-		end
 		local k = Defs.struct_kind_from_name(kind_name)
 		if k >= 0 then
 			return { k }
@@ -686,9 +679,6 @@ local function build(K_LIN: number, into: any?): any
 			local p = Rules.warship_port(state, id, tile)
 			out.tile = p
 			out.reason = if p >= 0 then "" else "no_port"
-			if p >= 0 and state:count_units(id, Defs.U_WARSHIP) >= Rules.WARSHIP_LIMIT then
-				out.reason = "limit"
-			end
 		else
 			local kind = Defs.struct_kind_from_name(kind_name)
 			local r = Rules.place_site(

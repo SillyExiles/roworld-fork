@@ -116,7 +116,7 @@ SimAIEconomy.RETINT_PER_MINUTE = 4
 -- Chance that a nation answers a sunk transport / captured trade ship / incoming invasion with a
 -- new warship (Easy never, Medium 15 %, Hard 50 %); with 10+ warships it re-tasks one.
 SimAIEconomy.WARSHIP_RETALIATE_P = zt({ 0.0, f32(0.15), 0.5 }) -- PackedFloat32Array
-SimAIEconomy.WARSHIP_FLEET_CAP = 8 -- (Rules.WARSHIP_LIMIT)
+SimAIEconomy.WARSHIP_FLEET_CAP = 10
 
 local E = SimAIEconomy
 local NUKE_AGE = E.NUKE_AGE
