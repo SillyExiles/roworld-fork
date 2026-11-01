@@ -313,7 +313,7 @@ function TopStatus.refresh(self)
 	if self._goal_share ~= goal then
 		self._goal_share = goal
 		self._bar.goal = goal
-		self._goal:set_text(string.format("Goal %d%%", math.floor(goal * 100 + 0.5)))
+		self._goal:set_text(string.format("GOAL %d%%", math.floor(goal * 100 + 0.5)))
 	end
 	if s == nil then
 		return
