@@ -263,7 +263,7 @@ function UnrestBanner.refresh(self)
 		self._title:set_text("UNREST")
 		self._pct:set_text(string.format("%d%%", math.floor(o.unrest or 0)))
 		self._bar:set_target(math.clamp((o.unrest or 0) / 100, 0, 1))
-		self._detail:set_text(causes(o.unrest_parts) .. " At 60% a far province may revolt.")
+		self._detail:set_text(causes(o.unrest_parts) .. " At 55% a far province may revolt.")
 	else
 		if was then
 			self:set_visible(false)

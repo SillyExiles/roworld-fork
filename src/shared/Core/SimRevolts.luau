@@ -35,8 +35,8 @@ local SimRevolts = {}
 SimRevolts.PERIOD = 50
 SimRevolts.FROM_TICKS = 3000
 SimRevolts.MIN_SHARE = 0.05
-SimRevolts.WARN_AT = 60
-SimRevolts.RISE_AT = 50
+SimRevolts.WARN_AT = 55
+SimRevolts.RISE_AT = 45
 SimRevolts.WARN_TICKS = 300
 SimRevolts.COOLDOWN = 1800
 --- After a warning that calmed down, the next one waits at least this long.
