@@ -153,7 +153,7 @@ function Tutorial.begin(self)
 	self._picked = false
 	self._base = nil
 	self._neighbour = nil
-	self._gold_given = false
+	self._gold_given = {}
 	self._sent = #self.ctx.sent_log
 	self._card:set_visible(false)
 	self._started = false
@@ -449,12 +449,34 @@ function Tutorial._process(self, delta: number)
 				if self._relief ~= nil then
 					ctx:world_call("focus_tile", { self._relief, -1.0, 0.9 })
 				end
-			elseif id == "city" and not self._gold_given then
-				self._gold_given = true
-				local sim = ctx:session_call("local_sim")
-				local cost = ctx.rules:cost("city")
-				if sim ~= nil and type(sim.o_gold) == "table" and cost > 0 and (sim.o_gold[ctx:me()] or 0) < cost then
-					sim.o_gold[ctx:me()] = cost
+			elseif step.at == "sea" then
+				-- (the boats' card: the sea nearest the player's land)
+				self._spot_at = self:_near_tile(function(t, code)
+					return code == Defs.T_OCEAN
+				end)
+			elseif step.build ~= nil then
+				-- (2026-11-01) a building to place: where it can go, and its gold
+				self._site = nil
+				if step.needs == "coast" and not ctx.borders:has_coast() then
+					self:_advance(true)
+					return
+				elseif step.needs == "hills" then
+					local me = ctx:me()
+					self._site = self:_near_tile(function(t, code)
+						return code >= Defs.T_HIGHLAND and s:tile_owner(t) == me
+					end)
+					if self._site == nil then
+						self:_advance(true) -- (no hills in the empire yet)
+						return
+					end
+				end
+				if not self._gold_given[id] then
+					self._gold_given[id] = true
+					local sim = ctx:session_call("local_sim")
+					local cost = ctx.rules:cost(step.build)
+					if sim ~= nil and type(sim.o_gold) == "table" and cost > 0 and (sim.o_gold[ctx:me()] or 0) < cost then
+						sim.o_gold[ctx:me()] = cost
+					end
 				end
 			end
 			self:_say(i, if self._neighbour ~= nil then s:owner_name(self._neighbour) else nil)
@@ -546,14 +568,34 @@ function Tutorial._process(self, delta: number)
 				point = UICtx.rect_center(r)
 				around = math.min(r.Width, r.Height) * 0.5
 			end
-		elseif id == "terrain" then
+		elseif step.info then
 			-- read, then GOT IT (or INFO_S passes): counts as done either way
 			if self._step_t > (step.max_s or Data.INFO_S or 9) then
 				self:_advance()
 				return
 			end
-			if self._relief ~= nil then
-				point = ctx:tile_screen_pos(self._relief)
+			if id == "terrain" then
+				if self._relief ~= nil then
+					point = ctx:tile_screen_pos(self._relief)
+				end
+			elseif step.button ~= nil then
+				-- (the building's slot on the command bar, or the BUILD tray that holds it)
+				local cb = ui.bar:button(step.button)
+				local b = if cb ~= nil and cb:is_visible_in_tree() then cb else ui.bar._tray_btn
+				if b ~= nil and b:is_visible_in_tree() then
+					local r = b:get_global_rect()
+					point = UICtx.rect_center(r)
+					around = math.max(r.Width, r.Height) * 0.5
+				end
+			elseif step.at == "sea" then
+				if self._spot_at ~= nil then
+					point = ctx:tile_screen_pos(self._spot_at)
+				end
+			elseif step.at == "neighbour" then
+				local ns = ctx.borders:neighbour_ids()
+				if #ns > 0 and s:get_owner(ns[1]) ~= nil then
+					point = ctx:tile_screen_pos(s:label_tile(ns[1]))
+				end
 			end
 		elseif id == "attack" then
 			if on_owner then
@@ -579,17 +621,18 @@ function Tutorial._process(self, delta: number)
 			if self._neighbour ~= nil and s:get_owner(self._neighbour) ~= nil then
 				point = ctx:tile_screen_pos(s:label_tile(self._neighbour))
 			end
-		elseif id == "city" then
+		elseif step.build ~= nil then
+			local kind = Defs.struct_kind_from_name(step.build)
 			for _, st in s.structures do
-				if st.owner == ctx:me() and st.kind == Defs.S_CITY then
+				if st.owner == ctx:me() and st.kind == kind then
 					self:_advance()
 					return
 				end
 			end
-			local cb = ui.bar:button("city")
+			local cb = ui.bar:button(step.build)
 			local b = if cb ~= nil and cb:is_visible_in_tree() then cb else ui.bar._tray_btn
 			local pc = ui.place_confirm
-			local placing = ui.interact.aim_kind == "city"
+			local placing = ui.interact.aim_kind == step.build
 			-- (while the City is in hand the game's own line stands where the card does: the card
 			-- steps aside and only the mark leads on)
 			if self._card.visible == placing then
@@ -601,8 +644,8 @@ function Tutorial._process(self, delta: number)
 				point = UICtx.rect_center(r)
 				around = math.max(r.Width, r.Height) * 0.5
 			elseif placing then
-				-- the City is in hand: the mark moves to the player's land
-				point = ctx:tile_screen_pos(s:label_tile(ctx:me()))
+				-- the building is in hand: the mark moves to the player's land (a Mine: its hills)
+				point = ctx:tile_screen_pos(self._site or s:label_tile(ctx:me()))
 			elseif b ~= nil and b:is_visible_in_tree() then
 				local r = b:get_global_rect()
 				point = UICtx.rect_center(r)
@@ -657,6 +700,43 @@ function Tutorial._find_relief(self): number?
 		end
 	end
 	return best_m or best_h
+end
+
+--- The tile nearest the player's land (its label) within RELIEF_R tiles for which `pred(tile,
+--- terrain code)` holds, or nil.
+function Tutorial._near_tile(self, pred: (number, number) -> boolean): number?
+	local s = self.ctx.state
+	local map = s and s.map
+	local me = self.ctx:me()
+	if map == nil or map.terrain == nil or me == 0 then
+		return nil
+	end
+	local c = s:label_tile(me)
+	if type(c) ~= "number" or c < 0 then
+		return nil
+	end
+	local W, H = map.W, map.H
+	local cx, cy = c % W, c // W
+	local R = Tutorial.RELIEF_R
+	local best, bd = nil, math.huge
+	for dy = -R, R do
+		local y = cy + dy
+		if y < 0 or y >= H then
+			continue
+		end
+		for dx = -R, R do
+			local x = cx + dx
+			local d = dx * dx + dy * dy
+			if x < 0 or x >= W or d >= bd then
+				continue
+			end
+			local t = y * W + x
+			if pred(t, buffer.readu8(map.terrain, t)) then
+				best, bd = t, d
+			end
+		end
+	end
+	return best
 end
 
 --- The command bar's troop count as it shows (phones' compact bar has its own), or nil.

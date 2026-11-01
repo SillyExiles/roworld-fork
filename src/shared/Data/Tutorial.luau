@@ -21,6 +21,11 @@
 -- empire, claiming land, letting the army refill, the first war, the Attack bar, the land itself (hills
 -- and mountains are natural walls: an `info` step, read and dismissed) and the first City. It pays no
 -- Stars any more: the reward is the empire, and the last card says what to do next.
+-- (2026-11-01: it teaches the whole game. After the City the player builds a Farm, a Mine on the hills,
+-- a Market, a Port and a Temple, the gold for each given when its step comes up (`build`; one that
+-- can't be built there, `needs`, is passed over), and reads a card each on the Palace, Universities
+-- and Fortresses, Forges and Barracks, boats, alliances and revolts (`info`, with `button`: the
+-- command-bar slot the mark points at, or `at`: what on the map).)
 local Tutorial = {}
 
 --- Stars for finishing it: none (2026-10-31). Kept at 0 for old callers.
@@ -159,25 +164,129 @@ Tutorial.STEPS = {
 	{
 		id = "terrain",
 		info = true,
-		touch = "Hills and mountains are natural walls: armies cross them slowly",
+		touch = "Hills and mountains slow armies down",
 		desktop = "Hills and mountains are natural walls: armies cross them slowly",
 		mark = "Mountains",
 		max_s = Tutorial.INFO_S,
 	},
 	{
 		id = "city",
+		build = "city",
 		touch = "Open BUILD, pick City, tap your land",
 		desktop = "Pick City (1) and click your land",
 		note = "Here is gold for your first City",
+	},
+	-- (2026-11-01: the rest of the game, one building or one idea a card)
+	{
+		id = "farm",
+		build = "farm",
+		touch = "Build a Farm: it feeds a bigger army",
+		desktop = "Build a Farm: it feeds a bigger army",
+	},
+	{
+		id = "mine",
+		build = "mine",
+		needs = "hills",
+		touch = "Build a Mine on the hills: it digs Ore",
+		desktop = "Build a Mine on the hills: it digs Ore",
+	},
+	{
+		id = "market",
+		build = "market",
+		touch = "Build a Market: it sells Ore for gold",
+		desktop = "Build a Market: it sells Ore for gold",
+	},
+	{
+		id = "port",
+		build = "port",
+		needs = "coast",
+		touch = "Build a Port: trade ships bring gold",
+		desktop = "Build a Port on your coast: trade ships bring gold",
+	},
+	{
+		id = "temple",
+		build = "temple",
+		touch = "Build a Temple: it calms your land",
+		desktop = "Build a Temple: it calms the land around it",
+	},
+	{
+		id = "palace",
+		info = true,
+		button = "palace",
+		touch = "Palace: more taxes. Universities: gold",
+		desktop = "One Palace raises your taxes; Universities near it bring more gold",
+		max_s = Tutorial.INFO_S,
+	},
+	{
+		id = "army",
+		info = true,
+		button = "forge",
+		touch = "Forges arm troops, Barracks train them",
+		desktop = "Forges arm your troops with Ore; Barracks make your army grow faster",
+		max_s = Tutorial.INFO_S,
+	},
+	{
+		id = "defense",
+		info = true,
+		button = "fortress",
+		touch = "Walls and Fortresses guard borders",
+		desktop = "Walls, Defense Posts and Fortresses (on hills) guard your borders",
+		max_s = Tutorial.INFO_S,
+	},
+	{
+		id = "boats",
+		info = true,
+		at = "sea",
+		touch = "Tap land over the sea to send a boat",
+		desktop = "Click land across the sea to send troops by boat",
+		mark = "Sea",
+		max_s = Tutorial.INFO_S,
+	},
+	{
+		id = "allies",
+		info = true,
+		at = "neighbour",
+		touch = "Hold a nation to ally or trade with it",
+		desktop = "Right-click a nation to ally or trade Ore with it",
+		mark = "A nation",
+		max_s = Tutorial.INFO_S,
+	},
+	{
+		id = "revolts",
+		info = true,
+		touch = "Big empires revolt: Temples calm them",
+		desktop = "Big empires can revolt: Temples, the Palace and troops keep the peace",
+		max_s = Tutorial.INFO_S,
 	},
 }
 
 --- The "Tutorial" funnel's steps (Creator Dashboard): 1 is the match starting, then one a step,
 --- then finishing. A step passed over is not logged.
 Tutorial.FUNNEL =
-	{ "Started", "Spawned", "First Tap", "Grew", "Attacked", "Used Slider", "Saw Terrain", "Built City", "Completed" }
+	{
+		"Started",
+		"Spawned",
+		"First Tap",
+		"Grew",
+		"Attacked",
+		"Used Slider",
+		"Saw Terrain",
+		"Built City",
+		"Built Farm",
+		"Built Mine",
+		"Built Market",
+		"Built Port",
+		"Built Temple",
+		"Saw Palace",
+		"Saw Army",
+		"Saw Defense",
+		"Saw Boats",
+		"Saw Allies",
+		"Saw Revolts",
+		"Completed",
+	}
 
---- The funnel step of finishing step `id` (2..7), or nil.
+--- The funnel step of finishing step `id` (2..#STEPS + 1), or nil.
 function Tutorial.funnel_step(id: string): number?
 	for i, s in Tutorial.STEPS do
 		if s.id == id then

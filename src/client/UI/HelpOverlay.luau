@@ -356,6 +356,8 @@ function HelpOverlay.new(c: any)
 	W.Control._init(self)
 	self.ctx = c
 	self.closed = Signal.new()
+	--- (2026-11-01) "Play the tutorial" was pressed (the title only)
+	self.tutorial_requested = Signal.new()
 	self.is_open = false
 	self._built_compact = -1
 	self._scroll = nil
@@ -428,6 +430,18 @@ function HelpOverlay._build(self)
 		)
 	)
 	head:add_child(tv)
+	-- (2026-11-01: the tutorial again, any time, from the title)
+	local tut_b = UITheme.button(if not compact then "PLAY THE TUTORIAL" else "TUTORIAL", "PrimaryButton", "", 40.0)
+	tut_b.name = "HelpTutorial"
+	tut_b:set_font_size(if not compact then 13 else 12)
+	tut_b:set_min_size(Vector2.new(if not compact then 170 else 96, 40))
+	tut_b.size_flags_vertical = W.SHRINK_CENTER
+	tut_b.pressed:Connect(function()
+		self:close()
+		self.tutorial_requested:Fire()
+	end)
+	self._tut_b = tut_b
+	head:add_child(tut_b)
 	local close_b = UITheme.button("", "GlassButton", "close", 44.0)
 	close_b.expand_icon = true
 	close_b.icon_alignment = W.ALIGN_CENTER
@@ -709,6 +723,9 @@ function HelpOverlay.open(self)
 	end
 	self.is_open = true
 	self:_build()
+	if self._tut_b ~= nil then
+		self._tut_b:set_visible(self.ctx:mode() == UICtx.MODE_TITLE)
+	end
 	self:_place()
 	self:set_visible(true)
 	self:set_modulate_a(1.0)
