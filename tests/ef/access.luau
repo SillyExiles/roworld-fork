@@ -58,3 +58,12 @@ for id = 1, sim2.owner_total do
 	if t ~= 0 then count[t] = (count[t] or 0) + 1 end
 end
 print("teams", table.concat(sim2.team_names, ","), "sizes", count[1], count[2], "human on", sim2.o_team[h])
+-- Signals: AI allies answer
+local Defs2 = require("../../src/shared/Core/Defs")
+sim.tick += 1000
+local before = sim.o_troops[A]
+sim._ping_at = {}
+print("ping help", sim:ping(A, tile, "help"), "troops before", math.floor(before), "after", math.floor(sim.o_troops[A]))
+sim.tick += 1000
+local ab = #sim.attacks
+print("ping target", sim:ping(A, tile, "target"), "attacks", ab, "->", #sim.attacks)

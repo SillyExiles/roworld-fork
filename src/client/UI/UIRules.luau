@@ -1262,7 +1262,8 @@ function UIRules.has_mates(self: any): boolean
 		return false
 	end
 	for id, o in s.owners do
-		if id ~= me and o.alive and o.kind == Defs.KIND_HUMAN and s:are_allies(me, id) then
+		-- (Empires Front 2026-11-01: AI allies too: they answer a Signal, Sim.ping)
+		if id ~= me and o.alive and o.kind ~= Defs.KIND_TRIBE and s:are_allies(me, id) then
 			return true
 		end
 	end

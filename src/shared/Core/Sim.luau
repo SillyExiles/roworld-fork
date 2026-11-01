@@ -1022,6 +1022,9 @@ end
 --- Ev.PING (MatchServer sends it to that player alone) and a line in the feed. At most one Signal
 --- per PING_COOLDOWN ticks per player.
 Sim.PING_COOLDOWN = 15
+--- (Empires Front) the share of its army an AI ally sends when it answers a Signal, and how many answer
+Sim.PING_AI_SHARE = 0.25
+Sim.PING_AI_MAX = 2
 function Sim.ping(self: any, id: number, tile: number, kname: string): boolean
 	if tile < 0 or tile >= self.N then
 		return false
@@ -1047,6 +1050,35 @@ function Sim.ping(self: any, id: number, tile: number, kname: string): boolean
 		if h ~= id and self.o_alive[h] == 1 and self.o_left[h] == 0 and self:allied(id, h) then
 			d[#d + 1] = { Ev.PING, h, id, tile, k }
 			self:msg(h, Defs.MSG_INFO, text)
+		end
+	end
+	-- Empires Front (2026-11-01): AI allies answer a Signal. "Attack here": an ally bordering that
+	-- nation (not its own ally) sends PING_AI_SHARE of its army at it; "Help here": an ally with troops to
+	-- spare sends PING_AI_SHARE of them to the caller.
+	local answered = 0
+	for a = 1, self.owner_total do
+		if a == id or self.o_alive[a] == 0 or self.o_ai[a] ~= 1 or self.o_kind[a] ~= Defs.KIND_NATION then
+			continue
+		end
+		if not self:allied(id, a) then
+			continue
+		end
+		local ok = false
+		if k == 1 then
+			if own > 0 and own ~= a and not self:allied(a, own) and self:borders(a, own) then
+				ok = self:intent_attack(a, tile, Sim.PING_AI_SHARE)
+			end
+		elseif self.o_troops[a] > self.o_troops[id] * 0.5 then
+			ok = self:donate(a, id, math.floor(self.o_troops[a] * Sim.PING_AI_SHARE))
+		end
+		if ok then
+			answered += 1
+			if self:is_human(id) then
+				self:msg(id, Defs.MSG_GOOD, string.format("%s answers your signal", self.o_name[a]))
+			end
+		end
+		if answered >= Sim.PING_AI_MAX then
+			break
 		end
 	end
 	return true
