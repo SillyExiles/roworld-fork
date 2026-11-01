@@ -69,6 +69,18 @@ build_all(Defs.S_FARM, 10)
 expect(sim:struct_count(id, Defs.S_FARM) == 6, "farms stop at 6: " .. sim:struct_count(id, Defs.S_FARM))
 local cities = build_all(Defs.S_CITY, 12)
 expect(cities >= 8, "cities still build freely: " .. cities)
+-- Temple, Palace, Fortress, University: no upgrades, so the caps hold
+for _, k in { Defs.S_TEMPLE, Defs.S_PALACE, Defs.S_FORTRESS, Defs.S_UNIVERSITY } do
+	expect(not Rules.is_upgradable(k), Defs.STRUCT_NAMES[k] .. " is not upgradable")
+	build_all(k, 10)
+	local n, lv = sim:struct_count(id, k), sim:struct_levels(id, k)
+	for _, st in sim:structs_of(id, k) do
+		sim.o_gold[id] += 1e8
+		sim:try_build(id, Defs.STRUCT_NAMES[k], st.tile)
+	end
+	expect(n <= Rules.struct_limit(k) and sim:struct_levels(id, k) == lv and lv == n,
+		string.format("%s: %d built, %d levels after trying to upgrade", Defs.STRUCT_NAMES[k], n, sim:struct_levels(id, k)))
+end
 -- Ports and Factories price by their own count (no longer a shared one)
 expect(sim:cost_count(id, Defs.S_FACTORY) == sim:struct_levels(id, Defs.S_FACTORY), "a factory's price ignores ports")
 -- a long AI run keeps to the caps

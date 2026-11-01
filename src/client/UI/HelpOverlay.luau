@@ -275,7 +275,7 @@ HelpOverlay.SECTIONS = {
 		icon = "temple",
 		color = "amber",
 		title = "Your empire's ecosystem",
-		text = "Farms feed a bigger army (troop cap; best on plains). Temples calm the provinces around them and bless their Farms (x1.5). One Palace: +30% land taxes, and the provinces near it never revolt; lose it and the enemy loots a quarter of your gold. Universities raise your gold income a level at a time, more near a Temple and most near the Palace. Fortresses stand on hills: a great Defense Post whose garrison keeps the peace. Build them together: Palace at the heart, Universities around it, Temples over the farmland, Fortresses on the frontier heights.",
+		text = "Farms feed a bigger army (troop cap; best on plains). Temples calm the provinces around them and bless their Farms (x1.5). One Palace: +30% land taxes, and the provinces near it never revolt; lose it and the enemy loots a quarter of your gold. Universities raise your gold income, more near a Temple and most near the Palace. Fortresses stand on hills: a great Defense Post whose garrison keeps the peace. Build them together: Palace at the heart, Universities around it, Temples over the farmland, Fortresses on the frontier heights.",
 	},
 	{
 		icon = "ping",

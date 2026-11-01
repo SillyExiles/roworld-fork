@@ -302,7 +302,7 @@ function SimAIEconomy.install(C)
 		elseif kind == Defs.S_UNIVERSITY then
 			-- Universities late, once the land grab is over (a level per three cities)
 			return sim.o_kind[id] ~= Defs.KIND_TRIBE
-				and sim:struct_levels(id, Defs.S_UNIVERSITY) < math.min(4, cities // 3)
+				and sim:struct_count(id, Defs.S_UNIVERSITY) < math.min(Rules.UNIVERSITY_LIMIT, cities // 3)
 				and age > 1500
 		elseif kind == Defs.S_MINE then
 			return sim.o_kind[id] ~= Defs.KIND_TRIBE

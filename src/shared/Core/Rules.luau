@@ -246,8 +246,9 @@ local function build(K_LIN: number, into: any?): any
 	--- palace 20 s, fortress 12 s, university 10 s.)
 	Rules.BUILD_TICKS = zt({ 20, 50, 20, 50, 300, 100, 80, 100, 150, 60, 60, 40, 60, 60, 50, 80, 200, 120, 100 })
 	--- Upgradable: city, port, factory, SAM and silo gain levels; defense posts don't (nor
-	--- the Arsenal's structures).
-	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1 })
+	--- the Arsenal's structures). (Empires Front 2026-11-01: nor the Temple, Palace, Fortress and
+	--- University: one building, one level, so their caps are real caps.)
+	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0 })
 	--- Empires Front (2026-10-31) Border Wall: when finished it raises stones on every tile of the
 	--- owner's frontier (own land next to someone else's land) within WALL_RADIUS_FULL full-size tiles
 	--- (Defs.F_WALL). Taking a walled tile costs the attacker WALL_MAG x the troops and WALL_COST x
@@ -348,7 +349,7 @@ local function build(K_LIN: number, into: any?): any
 	Rules.TEMPLE_RANGE_FULL = 60.0
 	Rules.TEMPLE_RANGE_LEVEL_FULL = 10.0
 	Rules.CALM_TEMPLE = 20.0
-	Rules.TEMPLE_EMPIRE_CALM = 3.0
+	Rules.TEMPLE_EMPIRE_CALM = 4.0
 	Rules.TEMPLE_EMPIRE_MAX = 12.0
 	function Rules.temple_range(level: number?): number
 		return (Rules.TEMPLE_RANGE_FULL + Rules.TEMPLE_RANGE_LEVEL_FULL * math.max((level or 1) - 1, 0)) / K_LIN
@@ -377,10 +378,10 @@ local function build(K_LIN: number, into: any?): any
 	--- University: +UNI_INCOME gold income per weighted level (taxes, the land's and the base's, and the
 	--- Markets' sales), x UNI_NEAR_TEMPLE within a Temple's reach or x UNI_NEAR_PALACE within the Palace's;
 	--- UNI_MAX at most.
-	Rules.UNI_INCOME = 0.05
+	Rules.UNI_INCOME = 0.10 -- (one level each since 2026-11-01: was 0.05 a level)
 	Rules.UNI_NEAR_TEMPLE = 1.25
 	Rules.UNI_NEAR_PALACE = 1.5
-	Rules.UNI_MAX = 0.6
+	Rules.UNI_MAX = 0.3
 	function Rules.uni_mult(power: number): number
 		return 1.0 + math.clamp(Rules.UNI_INCOME * power, 0, Rules.UNI_MAX)
 	end
