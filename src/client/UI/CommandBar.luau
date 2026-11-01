@@ -527,7 +527,9 @@ end
 --- and a slot per unlocked Arsenal kind. UIRoot: how wide the screen must be for the wide flow.
 function CommandBar.extra_width(self): number
 	local shop = math.max(CommandBar.SHOP_W, TrayFit.shop_width(#self._shop:locked()))
-	return 62.0 * #self:_unlocked_arsenal() + shop + 4.0
+	-- (2026-11-01: the build row holds more than ten slots now: the ecosystem's five)
+	local more = math.max(0, #UIRules().ACTIONS - 10)
+	return 62.0 * (#self:_unlocked_arsenal() + more) + shop + 4.0
 end
 
 --- Placement feedback: highlights the slot and, on touch, shows "Tap your land… · Cancel".
@@ -572,6 +574,20 @@ function CommandBar._arrange_slots(self, two_rows: boolean)
 	end
 	local unlocked = self:_unlocked_arsenal()
 	self._arsenal_sig = table.concat(unlocked, ",")
+	-- (2026-11-01: fifteen build slots; with two rows the second half of them goes to the second row)
+	local acts = UIRules().ACTIONS
+	local half = if two_rows and #acts > 10 then math.ceil(#acts / 2) else #acts
+	for i, k in ipairs(acts) do
+		local b = self.buttons[k]
+		if b ~= nil then
+			self:_detach(b)
+			if i <= half then
+				self._builds:add_child(b)
+			else
+				self._builds2:add_child(b)
+			end
+		end
+	end
 	local row = self._builds
 	if two_rows then
 		row = self._builds2
@@ -722,7 +738,7 @@ function CommandBar._reflow(self)
 		-- One row when it fits between the safe edges (the ten slots, the unlocked Arsenal kinds and
 		-- the SHOP button: the slots narrow a little first, then SHOP), else builds over nukes.
 		local avail = ctx.vp.X - ctx.insets.x - ctx.insets.z - 16.0
-		local fit = TrayFit.fit(avail, 10 + #self:_unlocked_arsenal(), #self._shop:locked())
+		local fit = TrayFit.fit(avail, #UIRules().ACTIONS + #self:_unlocked_arsenal(), #self._shop:locked())
 		for _, b in pairs(self.buttons) do
 			b:set_slot_width(fit.slot_w)
 		end
