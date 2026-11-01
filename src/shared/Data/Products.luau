@@ -11,7 +11,7 @@
 -- tools/assets/make_arsenal_products.py.
 local PRODUCTS: { [string]: any } = {
 	--- Solo / public: take over the AI nation that eliminated you (2026-09-28).
-	takeover = { id = 3715363250, robux = 25, staging = 3716610101 },
+	takeover = { id = 3715363250, robux = 16, staging = 3716610101 },
 	--- A cosmetic crate (Data/Cosmetics; 2026-09-29: 49 Robux, the first one 15).
 	crate = { id = 3715469100, robux = 49, staging = 3716610114 },
 	--- The first crate a player buys (offered only before their first crate).
@@ -102,7 +102,9 @@ end
 --- is switched off (id 0: its offer hides, nothing prompts it). To sell one again, create it in this
 --- experience's Creator Dashboard (Monetization → Developer Products) and put its id in OWN_IDS.
 local OWN_IDS: { [string]: number } = {
-	-- takeover = 0, -- (create "Take Over" here, then put its id here)
+	--- Take Over (2026-11-01: created in this experience; dynamic/regional pricing on, so each player
+	--- sees Roblox's own price for them: UI/Prices asks GetProductInfo)
+	takeover = 3726603872,
 }
 for key, p in PRODUCTS do
 	if p.empire_flag ~= nil then
