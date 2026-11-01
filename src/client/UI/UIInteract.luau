@@ -1120,6 +1120,11 @@ function UIInteract.on_radial(self: any, id: string, tile: number)
 		ctx:send({ type = "pay_rebels", target = own })
 		ctx:sfx("buy")
 		self:_float("Gold sent to the " .. s:owner_name(own), "gold", T().GOLD, pos)
+	elseif id == "recognize_rebels" then
+		-- Empires Front: let our rebels go as an allied free nation (Core/SimRevolts.recognize_rebels)
+		ctx:send({ type = "recognize_rebels", target = own })
+		ctx:sfx("confirm")
+		self:_float("Independence recognized", "alliance", T().VIOLET, pos)
 	elseif id == "focus" then
 		ctx:world_call("focus_tile", { tile })
 	elseif id == "info" then

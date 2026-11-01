@@ -52,7 +52,8 @@ Ev.PING = 36 -- to, from, tile, kind (1 attack here, 2 help here)  (a Signal: se
 
 Ev.UNREST = 37 -- id, unrest 0..100, province tile (-1), warned until tick (0: no warning), province name,
 --   then the parts troops, size, lead, far, fresh, calm (Core/SimRevolts; players' own empires only)
-Ev.REBEL = 38 -- rid, parent, born_tick, state (0 rising, 1 crushed, 2 bought back, 3 free nation, 4 gone)
+Ev.REBEL = 38 -- rid, parent, born_tick, state (0 rising, 1 crushed, 2 bought back, 3 free nation, 4 gone),
+--   then while rising what the province is worth (its price): total, land, troops, buildings
 
 --- Number of event ids (ids are 0..COUNT-1).
 Ev.COUNT = 39

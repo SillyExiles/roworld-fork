@@ -138,7 +138,12 @@ expect(r ~= nil and r.parent == id and r.state == SimRevolts.RISING, "the band i
 
 -- buy back
 local price = sm:rebel_price_of(rid)
-expect(price >= Rules.REBEL_PRICE_MIN and price <= Rules.REBEL_PRICE_MAX, "a price in range: " .. price)
+do
+	local total, land, tg, bg = sm:rebel_value(rid)
+	print(string.format("  worth %d = land %d + troops %d + buildings %d (%d tiles, %.2f%% of the map, %d troops)", total, land, tg, bg, sm.o_tiles[rid], 100 * sm.o_tiles[rid] / sm.map.contestable_count, sm.o_troops[rid]))
+	expect(price == total and price >= Rules.REBEL_PRICE_MIN, "the price is the province's worth: " .. price)
+	expect(land > 0 and tg > 0, "land and troops both count")
+end
 sm.o_gold[id] = price - 1
 expect(not sm:pay_rebels(id, rid), "too little gold: no deal")
 sm.o_gold[id] = price + 5
@@ -149,6 +154,14 @@ expect(sm.o_tiles[rid] == 0 and sm.o_tiles[id] == tiles_before + rt, "the provin
 expect(sm.o_gold[id] == 5, "paid the price")
 sm:step()
 expect(sm.o_alive[rid] == 0 and r.state == SimRevolts.PAID, "the band is gone, marked bought back")
+
+-- recognize: a free nation, allied with its old empire
+local sr, idr, ridr = fresh_revolt(7)
+expect(sr:recognize_rebels(idr, ridr), "recognized")
+local rr = sr._rv.rebels[ridr]
+expect(rr.state == SimRevolts.FREE and sr.o_kind[ridr] == Defs.KIND_NATION, "a free nation at once")
+expect(sr:allied(ridr, idr), "allied with the empire that let it go")
+expect(not sr:recognize_rebels(idr, ridr), "only once")
 
 -- crush in time
 local sc, idc, ridc = fresh_revolt(6)
@@ -203,6 +216,10 @@ local gs = GameState.new()
 local sm2, id2, rid2 = fresh_revolt(10)
 gs:load_snapshot(sm2:snapshot())
 expect(gs.owners[rid2] and gs.owners[rid2].rebel_of == id2, "snapshot: the mirror knows the rebels' empire")
+expect(gs.owners[rid2].rebel_price == sm2:rebel_price_of(rid2) and gs.owners[rid2].rebel_land > 0, "snapshot: the mirror knows their price")
+local b2 = Protocol.encode_intent({ type = "recognize_rebels", target = 7 })
+local back2 = b2 and Protocol.decode_intent(b2)
+expect(back2 ~= nil and back2.type == "recognize_rebels" and back2.target == 7, "recognize_rebels intent round trip")
 gs:_set_unrest({ Ev.UNREST, id2, 73, 1234, 999, "Testland", 30, 10, 5, 8, 20, 0 }, 1)
 expect(gs.owners[id2].unrest == 73 and gs.owners[id2].unrest_prov == "Testland" and gs.owners[id2].unrest_at == 999, "Ev.UNREST fills the owner")
 

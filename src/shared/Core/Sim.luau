@@ -1028,6 +1028,8 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		self:ping(id, tile, _str(it, "kind"))
 	elseif kind == "pay_rebels" then
 		self:pay_rebels(id, _int(it, "target", 0))
+	elseif kind == "recognize_rebels" then
+		self:recognize_rebels(id, _int(it, "target", 0))
 	end
 end
 

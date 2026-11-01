@@ -1408,12 +1408,20 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 			local gold = if mo ~= nil then tonumber(mo.gold) or 0 else 0
 			table.insert(items, {
 				id = "pay_rebels",
-				label = "Pay Rebels",
+				label = "Buy Back",
 				icon = "gold",
 				ok = gold >= price,
 				reason = if gold >= price then "" else "Need " .. T().fmt_cost(price) .. " gold",
 				danger = false,
 				cost = price,
+			})
+			table.insert(items, {
+				id = "recognize_rebels",
+				label = "Recognize",
+				icon = "alliance",
+				ok = true,
+				reason = "",
+				danger = false,
 			})
 		end
 		if s:are_allies(me, own) then
@@ -1523,16 +1531,14 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 	return items
 end
 
---- Empires Front: what buying rebels `rid` back costs `me` (Rules.rebel_price, the Sim's own formula);
---- -1 when `rid` are not `me`'s rising rebels.
+--- Empires Front: what buying rebels `rid` back costs `me` (the province's worth, Rules.province_value,
+--- as the Sim last sent it: Ev.REBEL); -1 when `rid` are not `me`'s rising rebels.
 function UIRules.rebel_price(s: any, me: number, rid: number): number
 	local r = if s ~= nil then s:get_owner(rid) else nil
 	if r == nil or me == 0 or r.rebel_of ~= me or r.rebel_state ~= 0 or not r.alive then
 		return -1
 	end
-	local mo = s:get_owner(me)
-	local cap = if mo ~= nil then tonumber(mo.max_troops) or 0 else 0
-	return Rules().rebel_price(tonumber(r.troops) or 0, cap)
+	return tonumber(r.rebel_price) or 0
 end
 
 return UIRules

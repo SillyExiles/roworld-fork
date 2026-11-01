@@ -17,7 +17,8 @@
 -- map's nations (the nearest within reach whose name no living owner wears), else by the side of the
 -- empire they lie on ("Northern Rome").
 -- Rebels: crushed by their empire within CRUSH_TICKS pays Rules.rebel_crush_gold; bought back with
--- gold (the "pay_rebels" intent, Rules.rebel_price) returns the province and half the rebels; alive
+-- gold (the "pay_rebels" intent at the province's worth: Rules.province_value, its land, troops and
+-- buildings) returns the province and half the rebels; recognized ("recognize_rebels") or alive
 -- after FREE_TICKS they become the free nation "Free <province>" (an AI nation at FREE_SKILL) that
 -- allies with the strongest empire at war with their old one.
 -- Players see their own unrest (Ev.UNREST, snapshot `unrest`); everyone sees the rebels (Ev.REBEL,
@@ -29,6 +30,7 @@ local NumberFormat = require("./NumberFormat")
 local Coop = require("../Net/Coop")
 
 local readi32 = buffer.readi32
+local readu8 = buffer.readu8
 
 local SimRevolts = {}
 
@@ -491,33 +493,75 @@ function SimRevolts.install(C: any)
 		self.o_spawn_tile[rid] = best
 		self:ev({ Ev.SPAWNED, rid, best })
 		local s = rv(self)
+		-- the province's mean terrain value (Rules.TERRAIN_VALUE): its worth per tile from now on
+		local tv, nt = 0.0, 0
+		local terr = self.terr
+		for i = 1, taken do
+			tv += Rules.TERRAIN_VALUE[readu8(terr, take[i])] or 1.0
+			nt += 1
+		end
 		local rec = {
 			parent = id,
 			born = self.tick,
 			prov = pname,
-			price0 = Rules.rebel_price(defect + levy, self.o_cap[id] or 0.0),
+			terrain = if nt > 0 then tv / nt else 1.0,
+			price0 = 0,
 			state = SimRevolts.RISING,
 		}
 		s.rebels[rid] = rec
-		self:ev({ Ev.REBEL, rid, id, rec.born, rec.state })
+		rec.price0 = self:rebel_value(rid)
+		self:_rebel_send(rid, rec)
 		self:msg(
 			id,
 			Defs.MSG_BAD,
 			string.format(
-				"Revolt! %s rises: %d tiles and %s troops break away as the %s. Crush them within %d min for a reward, or buy them back",
+				"Revolt! %s rises: %d tiles and %s troops break away as the %s. Buy the province back, or recognize it as an independent nation",
 				pname,
 				taken,
 				NumberFormat.render_troops(defect + levy),
-				name,
-				SimRevolts.CRUSH_TICKS // (Rules.TICK_RATE * 60)
+				name
 			)
 		)
 		self:msg_others(id, Defs.MSG_INFO, string.format("Revolt in %s: the %s take up arms", self.o_name[id], name))
 		return true
 	end
 
+	--- What rebels `rid` hold is worth (Rules.province_value): (total, land, troops, buildings).
+	function C.rebel_value(self: any, rid: number): (number, number, number, number)
+		local s = self._rv
+		local r = if s ~= nil then s.rebels[rid] else nil
+		local share = self.o_tiles[rid] / math.max(self.map.contestable_count, 1)
+		local sg = 0.0
+		for _, st in self.struct_list do
+			if st.owner == rid and not st.dead then
+				local c = Rules.build_cost(Defs.STRUCT_NAMES[st.kind] or "", 0)
+				if c > 0 then
+					sg += c * math.max(st.level or 1, 1)
+				end
+			end
+		end
+		return Rules.province_value(share, if r ~= nil then r.terrain or 1.0 else 1.0, self.o_troops[rid], sg)
+	end
+
+	--- Ev.REBEL {rid, parent, born, state, price, land, troops, buildings} (the worth while they rise).
+	function C._rebel_row(self: any, rid: number, r: any): { number }
+		local total, land, tg, bg = 0, 0, 0, 0
+		if r.state == SimRevolts.RISING and self.o_alive[rid] == 1 then
+			total, land, tg, bg = self:rebel_value(rid)
+		end
+		return { rid, r.parent, r.born, r.state, total, land, tg, bg }
+	end
+
+	function C._rebel_send(self: any, rid: number, r: any)
+		local row = self:_rebel_row(rid, r)
+		r.sent = row[5]
+		local e = { Ev.REBEL }
+		table.move(row, 1, #row, 2, e)
+		self:ev(e)
+	end
+
 	local function rebel_ev(self: any, rid: number, r: any)
-		self:ev({ Ev.REBEL, rid, r.parent, r.born, r.state })
+		self:_rebel_send(rid, r)
 	end
 
 	--- The strongest empire (most land) at war with `parent` right now: attacking it, not its ally,
@@ -542,8 +586,9 @@ function SimRevolts.install(C: any)
 		return best
 	end
 
-	--- Rebels alive FREE_TICKS become the free nation of their province.
-	function C._rebels_free(self: any, rid: number, r: any)
+	--- Rebels alive FREE_TICKS become the free nation of their province (allied with their old empire's
+	--- enemy); `recognized`: their empire let them go (Sim's "recognize_rebels"), and they are its allies.
+	function C._rebels_free(self: any, rid: number, r: any, recognized: boolean?)
 		local name = "Free " .. tostring(r.prov)
 		local base = name
 		local n = 1
@@ -571,6 +616,12 @@ function SimRevolts.install(C: any)
 		r.state = SimRevolts.FREE
 		rebel_ev(self, rid, r)
 		local parent = r.parent
+		if recognized then
+			self:form_alliance(rid, parent)
+			self:msg(parent, Defs.MSG_GOOD, string.format("You recognized %s as an independent nation: it is your ally", name))
+			self:msg_others(parent, Defs.MSG_INFO, string.format("%s recognized the independence of %s", self.o_name[parent], name))
+			return
+		end
 		self:msg(
 			parent,
 			Defs.MSG_BAD,
@@ -600,6 +651,12 @@ function SimRevolts.install(C: any)
 				rebel_ev(self, rid, r)
 			elseif tick - r.born >= SimRevolts.FREE_TICKS then
 				self:_rebels_free(rid, r)
+			else
+				-- (their worth moves with their land and troops: the price on the player's screen follows)
+				local total = self:rebel_value(rid)
+				if total ~= r.sent then
+					rebel_ev(self, rid, r)
+				end
 			end
 		end
 	end
@@ -633,7 +690,7 @@ function SimRevolts.install(C: any)
 		if r == nil or r.state ~= SimRevolts.RISING or self.o_alive[rid] == 0 then
 			return -1
 		end
-		return Rules.rebel_price(self.o_troops[rid], self.o_cap[r.parent] or 0.0)
+		return (self:rebel_value(rid))
 	end
 
 	--- The "pay_rebels" intent: `id` buys its rebels `rid` back (their land returns with half of them).
@@ -686,7 +743,18 @@ function SimRevolts.install(C: any)
 		return true
 	end
 
-	--- Snapshot rows: {rid, parent, born, state} per rebel band, and the players' unrest rows.
+	--- The "recognize_rebels" intent: `id` lets its rebels `rid` go: a free nation, its ally.
+	function C.recognize_rebels(self: any, id: number, rid: number): boolean
+		local s = self._rv
+		local r = if s ~= nil then s.rebels[rid] else nil
+		if r == nil or r.parent ~= id or r.state ~= SimRevolts.RISING or self.o_alive[rid] == 0 then
+			return false
+		end
+		self:_rebels_free(rid, r, true)
+		return true
+	end
+
+	--- Snapshot rows: Ev.REBEL's body per rebel band, and the players' unrest rows.
 	function C.rebel_rows(self: any): { { number } }
 		local out = {}
 		local s = self._rv
@@ -694,7 +762,7 @@ function SimRevolts.install(C: any)
 			return out
 		end
 		for rid, r in s.rebels do
-			table.insert(out, { rid, r.parent, r.born, r.state })
+			table.insert(out, self:_rebel_row(rid, r))
 		end
 		table.sort(out, function(a, b)
 			return a[1] < b[1]

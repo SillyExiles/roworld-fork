@@ -142,6 +142,7 @@ Protocol.INTENT_TYPES = {
 	"trade", -- {target, kind = "sell" | "buy"}: an ore deal with a trade-pact partner
 	"ping", -- {tile, kind = "target" | "help"}: a Signal on the map for the team and allies (Sim.ping)
 	"pay_rebels", -- {target}: buy one's rebels back with gold (Core/SimRevolts.pay_rebels)
+	"recognize_rebels", -- {target}: let one's rebels go as an allied free nation (Core/SimRevolts)
 }
 local INTENT_INDEX: { [string]: number } = {}
 for i, name in Protocol.INTENT_TYPES do

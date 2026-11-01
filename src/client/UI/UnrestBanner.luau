@@ -3,7 +3,8 @@
 --   · a meter "UNREST 42%" with what drives it, once it reaches SHOW_AT;
 --   · a warned province: "UNREST IN THESSALY", the seconds until it revolts, what calms it, and VIEW;
 --   · rebels risen against the player: "REVOLT: THESSALY REBELS", the time left to crush them for a
---     reward, VIEW and PAY (buy them back: Rules.rebel_price).
+--     reward... (2026-11-01: now only what the province is worth and two choices: BUY BACK at that
+--     price, Rules.province_value, or RECOGNIZE it as an independent nation, an ally).
 -- An alarm sounds when a warning comes up and when a province rises.
 --   UnrestBanner.new(ctx) · apply_layout(y, right_x?) · refresh() (4 a second by itself)
 
@@ -95,11 +96,23 @@ function UnrestBanner.new(c: any)
 		end
 	end)
 	btns:add_child(self._pay)
+	self._recog = T.button("RECOGNIZE", "GlassButton", "alliance", 32.0)
+	self._recog:set_font_size(12)
+	self._recog:add_theme_constant_override("icon_max_width", 14)
+	self._recog.size_flags_horizontal = W.EXPAND_FILL
+	self._recog.pressed:Connect(function()
+		if self._rebel > 0 then
+			self.ctx:send({ type = "recognize_rebels", target = self._rebel })
+			self.ctx:sfx("confirm")
+		end
+	end)
+	btns:add_child(self._recog)
 	self._btns = btns
 	v:add_child(btns)
 	self.gui.Name = "UnrestBanner"
 	self._view.gui.Name = "UnrestView"
 	self._pay.gui.Name = "UnrestPay"
+	self._recog.gui.Name = "UnrestRecognize"
 	self:set_visible(false)
 	self:set_process(true)
 	return self
@@ -184,7 +197,8 @@ function UnrestBanner._style(self, mode: string)
 	self._icon:set_icon(if mode == "revolt" then "attack" else "troops")
 	self._bar:set_visible(mode ~= "revolt")
 	self._pay:set_visible(mode == "revolt")
-	self._view:set_visible(mode ~= "meter")
+	self._recog:set_visible(mode == "revolt")
+	self._view:set_visible(mode == "warn")
 	self._btns:set_visible(mode ~= "meter")
 end
 
@@ -215,26 +229,18 @@ function UnrestBanner.refresh(self)
 		end
 		self._title:set_text("REVOLT: " .. string.upper(tostring(reb.name)))
 		self._pct:set_text("")
-		local left = (reb.rebel_born + 1200 - tick) / rate
-		local free_left = (reb.rebel_born + 1800 - tick) / rate
-		local Rules = UITheme.core("Rules")
+		-- what the province is worth (the Sim's valuation, Ev.REBEL): its price to buy it back
 		local price = UIRules.rebel_price(s, me, reb.id)
-		local reward = if price >= 0 then Rules.rebel_crush_gold(Rules.rebel_price(tonumber(reb.troops) or 0, tonumber(o.max_troops) or 0)) else 0
-		local line
-		if left > 0 then
-			line = string.format(
-				"Crush them in %s for about +%s gold, or buy them back. In %s they break free as a nation.",
-				T.fmt_time(math.ceil(left)),
-				T.fmt_cost(reward),
-				T.fmt_time(math.ceil(math.max(free_left, 0)))
-			)
-		else
-			line = string.format("Too late for a reward. In %s they break free as a nation: crush them or buy them back.", T.fmt_time(math.ceil(math.max(free_left, 0))))
-		end
-		self._detail:set_text(line)
+		self._detail:set_text(string.format(
+			"Province worth %s: land %s · troops %s · buildings %s. Buy it back, or recognize it as an independent nation (your ally).",
+			T.fmt_cost(math.max(price, 0)),
+			T.fmt_cost(tonumber(reb.rebel_land) or 0),
+			T.fmt_cost(tonumber(reb.rebel_troops_value) or 0),
+			T.fmt_cost(tonumber(reb.rebel_buildings) or 0)
+		))
 		local gold = tonumber(o.gold) or 0
-		self._pay:set_text(if price >= 0 then "PAY " .. T.fmt_cost(price) else "PAY")
-		self._pay:set_disabled(price < 0 or gold < price)
+		self._pay:set_text(if price > 0 then "BUY BACK " .. T.fmt_cost(price) else "BUY BACK")
+		self._pay:set_disabled(price <= 0 or gold < price)
 		local key = tostring(reb.id)
 		if key ~= self._rebel_key then
 			self._rebel_key = key

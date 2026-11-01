@@ -115,6 +115,11 @@ local function new_owner_info(id: number)
 		rebel_of = 0,
 		rebel_born = 0,
 		rebel_state = 0,
+		-- while rising: what buying them back costs (Rules.province_value) and its parts
+		rebel_price = 0,
+		rebel_land = 0,
+		rebel_troops_value = 0,
+		rebel_buildings = 0,
 		-- sums of the owned tiles' x and y (territory centroid = (cx, cy) / tiles); cz unused (0)
 		cx = 0.0,
 		cy = 0.0,
@@ -1462,6 +1467,10 @@ function GameState._set_rebel(self: any, row: { any }, o: number)
 	own.rebel_of = tonumber(row[o + 2]) or 0
 	own.rebel_born = tonumber(row[o + 3]) or 0
 	own.rebel_state = tonumber(row[o + 4]) or 0
+	own.rebel_price = tonumber(row[o + 5]) or 0
+	own.rebel_land = tonumber(row[o + 6]) or 0
+	own.rebel_troops_value = tonumber(row[o + 7]) or 0
+	own.rebel_buildings = tonumber(row[o + 8]) or 0
 	self.rebels_changed:Fire(own.id, own.rebel_state)
 end
 

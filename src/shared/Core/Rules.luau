@@ -1060,17 +1060,26 @@ local function build(K_LIN: number, into: any?): any
 	Rules.REINFORCE_FRACTION = 0.20
 	Rules.REINFORCE_COOLDOWN_TICKS = 300
 
-	--- Empires Front (2026-11-01): rebels (Core/SimRevolts). Buying a rebel province back costs about
-	--- what its troops would cost as Reinforcements (a fifth of the cap for REINFORCE_COST), at
-	--- REBEL_PRICE_RATE of that, rounded to 1,000 between REBEL_PRICE_MIN and REBEL_PRICE_MAX.
-	Rules.REBEL_PRICE_RATE = 0.6
-	Rules.REBEL_PRICE_MIN = 50000.0
-	Rules.REBEL_PRICE_MAX = 3000000.0
-	function Rules.rebel_price(rebel_troops: number, parent_cap: number): number
-		local cap = math.max(parent_cap, 1.0)
-		local v = Rules.REINFORCE_COST * (math.max(rebel_troops, 0.0) / (Rules.REINFORCE_FRACTION * cap)) * Rules.REBEL_PRICE_RATE
-		v = math.clamp(v, Rules.REBEL_PRICE_MIN, Rules.REBEL_PRICE_MAX)
+	--- Empires Front (2026-11-01): what a rebel province is worth (Core/SimRevolts: the price of buying
+	--- it back). Land: LAND_VALUE gold per 1% of the map, times the land's terrain (TERRAIN_VALUE: the
+	--- mountains' ore, the plains' farms; tundra and ice are worth little). Troops: TROOP_VALUE gold a
+	--- troop (what Reinforcements cost, about). Buildings: STRUCT_VALUE of what their levels cost to
+	--- build. Rounded to 1,000, at least REBEL_PRICE_MIN.
+	Rules.LAND_VALUE = 600000.0
+	Rules.TERRAIN_VALUE = { [Defs.T_PLAINS] = 1.0, [Defs.T_HIGHLAND] = 1.15, [Defs.T_MOUNTAIN] = 1.3, [Defs.T_TUNDRA] = 0.6, [Defs.T_ICECAP] = 0.3 }
+	Rules.TROOP_VALUE = 0.5
+	Rules.STRUCT_VALUE = 0.5
+	Rules.REBEL_PRICE_MIN = 25000.0
+	local function k1000(v: number): number
 		return math.floor(v / 1000 + 0.5) * 1000
+	end
+	--- (total, land, troops, buildings) gold: `share` of the map held, its mean terrain value, the
+	--- troops on it and the build cost of the structure levels on it.
+	function Rules.province_value(share: number, terrain: number, troops: number, structs_gold: number): (number, number, number, number)
+		local land = k1000(Rules.LAND_VALUE * math.max(share, 0) * 100.0 * math.max(terrain, 0))
+		local tg = k1000(math.max(troops, 0) * Rules.TROOP_VALUE)
+		local bg = k1000(math.max(structs_gold, 0) * Rules.STRUCT_VALUE)
+		return math.max(Rules.REBEL_PRICE_MIN, land + tg + bg), land, tg, bg
 	end
 	--- Crushing a revolt in time (SimRevolts.CRUSH_TICKS) pays this share of the price the rebels
 	--- asked when they rose, between REBEL_CRUSH_MIN and REBEL_CRUSH_MAX.
