@@ -94,6 +94,9 @@ function UnrestBanner.new(c: any)
 	btns:add_child(self._pay)
 	self._btns = btns
 	v:add_child(btns)
+	self.gui.Name = "UnrestBanner"
+	self._view.gui.Name = "UnrestView"
+	self._pay.gui.Name = "UnrestPay"
 	self:set_visible(false)
 	self:set_process(true)
 	return self

@@ -14,7 +14,8 @@
 -- since its last revolt) the province is warned: WARN_TICKS later, still at RISE_AT or more, it rises
 -- (the province's land and TROOPS of the army break away as "<province> Rebels", a tribe in a darker
 -- shade of the empire's colour); under it, the unrest calms down. Provinces are named after the
--- map's nations (the nearest one whose name no living owner wears).
+-- map's nations (the nearest within reach whose name no living owner wears), else by the side of the
+-- empire they lie on ("Northern Rome").
 -- Rebels: crushed by their empire within CRUSH_TICKS pays Rules.rebel_crush_gold; bought back with
 -- gold (the "pay_rebels" intent, Rules.rebel_price) returns the province and half the rebels; alive
 -- after FREE_TICKS they become the free nation "Free <province>" (an AI nation at FREE_SKILL) that
@@ -141,8 +142,11 @@ function SimRevolts.install(C: any)
 		return s.provs
 	end
 
-	--- The province at tile `t` of empire `id`: the nearest map nation whose name no living owner
-	--- wears (else the empire's own name).
+	local DIRS = { "Eastern", "Southeastern", "Southern", "Southwestern", "Western", "Northwestern", "Northern", "Northeastern" }
+
+	--- The province at tile `t` of empire `id`: the nearest map nation within the empire's reach whose
+	--- name no living owner wears (a nation it swallowed, or one never in play); else the side of the
+	--- empire it lies on ("Northern Rome").
 	function C._province_name(self: any, id: number, t: number): string
 		local s = rv(self)
 		local worn = {}
@@ -152,7 +156,8 @@ function SimRevolts.install(C: any)
 			end
 		end
 		local range_d2 = self.range_d2
-		local best, bd = nil, math.huge
+		local reach = 2.5 * math.sqrt(math.max(self.o_tiles[id], 1) / math.pi) + 20
+		local best, bd = nil, reach * reach
 		for _, p in provinces(self, s) do
 			if worn[p.name] then
 				continue
@@ -162,7 +167,23 @@ function SimRevolts.install(C: any)
 				best, bd = p.name, d
 			end
 		end
-		return best or self.o_name[id]
+		if best ~= nil then
+			return best
+		end
+		local cap = self.o_spawn_tile[id]
+		if cap < 0 then
+			return "Outer " .. self.o_name[id]
+		end
+		local W = self.W
+		local dx = t % W - cap % W
+		local dy = t // W - cap // W
+		if math.abs(dx) > W / 2 then
+			dx -= if dx > 0 then W else -W
+		end
+		-- (rows grow southwards: north is -y)
+		local a = math.atan2(dy, dx)
+		local k = math.floor((a / (2 * math.pi)) * 8 + 0.5) % 8
+		return DIRS[k + 1] .. " " .. self.o_name[id]
 	end
 
 	--- The border tile of `id` farthest from its capital (the centroid without one), with a little

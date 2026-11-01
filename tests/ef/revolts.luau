@@ -100,6 +100,18 @@ local function fresh_revolt(seed)
 end
 
 local sm, id, rid = fresh_revolt(5)
+do
+	local nm = sm:_province_name(id, sm:_far_province(id))
+	print("  province name:", nm, "(empire " .. sm.o_name[id] .. ")")
+	expect(nm ~= sm.o_name[id], "a province is not named like its empire")
+	local alive_named = false
+	for o = 1, sm.owner_total do
+		if sm.o_alive[o] == 1 and sm.o_name[o] == nm then
+			alive_named = true
+		end
+	end
+	expect(not alive_named, "nor like any living owner")
+end
 expect(rid > 0, "a revolt makes a rebel band")
 expect(sm.o_name[rid] == "Testland Rebels", "named after the province: " .. tostring(sm.o_name[rid]))
 expect(sm.o_color[rid] == SimRevolts.rebel_color(sm.o_color[id]), "a darker shade of the empire's colour")
