@@ -41,7 +41,15 @@ local EXTRA_KINDS = {
 	-- (2026-10-31) the Border Wall on the Defense Post's plate, the Barracks on the City's
 	[Defs.S_WALL] = { plate = 3, glyph = "wall" },
 	[Defs.S_BARRACKS] = { plate = 0, glyph = "barracks" },
+	-- (2026-11-01) the ecosystem, each on a plate of its own (none the Mine's squircle): the Temple a
+	-- dome, the Palace a hexagon, the Fortress a diamond, the University a bullet, the Farm a field
+	[Defs.S_TEMPLE] = { plate = 4, glyph = "temple" },
+	[Defs.S_PALACE] = { plate = 8, glyph = "palace" },
+	[Defs.S_FORTRESS] = { plate = 6, glyph = "fortress" },
+	[Defs.S_UNIVERSITY] = { plate = 5, glyph = "university" },
 }
+-- (the Farm moves from the Port's disc to the field)
+EXTRA_KINDS[Defs.S_FARM] = { plate = 7, glyph = "farm" }
 local Sprites = require(Airfront:WaitForChild("Assets"):WaitForChild("MapSprites")) :: any
 --- Sprites.shapes_one is used once it is known to have loaded (an image still in moderation would leave
 --- every plate invisible).
@@ -73,6 +81,14 @@ StructureLayer.ICON_FILL = table.clone(Sprites.icon_fill)
 for _ = 1, 6 do
 	table.insert(StructureLayer.ICON_FILL, 0.72)
 end
+-- (2026-11-01) the Temple, Palace, Fortress and University: their plate's own size, a pixel glyph
+for _, k in { Defs.S_TEMPLE, Defs.S_PALACE, Defs.S_FORTRESS, Defs.S_UNIVERSITY } do
+	local col = EXTRA_KINDS[k].plate
+	StructureLayer.SHAPE_SCALE[k + 1] = Sprites.shape_scale[col + 1] or 1.1
+	StructureLayer.ICON_FILL[k + 1] = 0.7
+end
+-- (the Farm on the field plate)
+StructureLayer.SHAPE_SCALE[Defs.S_FARM + 1] = Sprites.shape_scale[EXTRA_KINDS[Defs.S_FARM].plate + 1] or 1.1
 StructureLayer.FILL_V = 0.65
 StructureLayer.BORDER_V = 0.1
 StructureLayer.BORDER_DARKEN = 0.125
@@ -212,6 +228,7 @@ end
 function StructureLayer.bind(self: any, state: any)
 	self:unbind()
 	self._state = state
+	PixelIcons.set_map(state.map_id)
 	self._dirty = true
 end
 
@@ -339,6 +356,8 @@ end
 
 function StructureLayer._style(self: any, p: Plate, s: any, building: boolean)
 	local st = self._state
+	-- (the Temple and the Palace are drawn for the map in play)
+	PixelIcons.set_map(st.map_id)
 	local k = s.kind
 	-- one image for the plate once it has loaded (see the header)
 	local one = one_ready

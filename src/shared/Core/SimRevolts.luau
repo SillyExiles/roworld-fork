@@ -258,9 +258,64 @@ function SimRevolts.install(C: any)
 				road = true
 			end
 		end
-		return math.min(towns, 2) * SimRevolts.CALM_TOWN
+		local calm = math.min(towns, 2) * SimRevolts.CALM_TOWN
 			+ (if post then SimRevolts.CALM_POST else 0)
 			+ (if road then SimRevolts.CALM_ROAD else 0)
+		-- (2026-11-01) the ecosystem: a Palace in reach keeps the province loyal (it never rises); a
+		-- Temple in reach and a Fortress's garrison calm it
+		local R = self.R
+		local pt = if self.o_palace ~= nil then self.o_palace[id] else -1
+		if pt ~= nil and pt >= 0 then
+			local pr = R.palace_range()
+			if range_d2(pt, epi) <= pr * pr then
+				return 100
+			end
+		end
+		if self:struct_count(id, Defs.S_TEMPLE) > 0 then
+			for _, st in self:structs_of(id, Defs.S_TEMPLE) do
+				local r = R.temple_range(st.level)
+				if st.active and range_d2(st.tile, epi) <= r * r then
+					calm += Rules.CALM_TEMPLE
+					break
+				end
+			end
+		end
+		if self:struct_count(id, Defs.S_FORTRESS) > 0 then
+			local fr = R.fortress_range() * 1.5
+			for _, st in self:structs_of(id, Defs.S_FORTRESS) do
+				if st.active and range_d2(st.tile, epi) <= fr * fr then
+					calm += Rules.CALM_FORTRESS
+					break
+				end
+			end
+		end
+		return calm
+	end
+
+	--- (2026-11-01) The calm the whole empire owes its Temples (every level) and its Palace.
+	function C._empire_calm(self: any, id: number): number
+		local c = 0.0
+		if self.o_temple_levels ~= nil then
+			c += math.min((self.o_temple_levels[id] or 0) * Rules.TEMPLE_EMPIRE_CALM, Rules.TEMPLE_EMPIRE_MAX)
+		end
+		if self.o_palace ~= nil and (self.o_palace[id] or -1) >= 0 then
+			c += Rules.PALACE_EMPIRE_CALM
+		end
+		return c
+	end
+
+	--- (2026-11-01) SimStructures: `old`'s Palace was taken by `nw` (it is razed). The conqueror loots
+	--- Rules.PALACE_LOOT of the gold; the empire is shaken as if half its land were freshly conquered.
+	function C._palace_lost(self: any, old: number, nw: number)
+		local loot = math.floor(math.max(self.o_gold[old], 0) * Rules.PALACE_LOOT)
+		if loot > 0 then
+			self.o_gold[old] -= loot
+			self.o_gold[nw] += loot
+		end
+		local s = rv(self)
+		s.fresh[old] = (s.fresh[old] or 0) + self.o_tiles[old] * 0.5
+		self:msg(old, Defs.MSG_BAD, string.format("%s took your Palace and looted %s gold: your provinces stir", self.o_name[nw], NumberFormat.render_number(loot)))
+		self:msg(nw, Defs.MSG_GOOD, string.format("You took the Palace of %s: %s gold looted", self.o_name[old], NumberFormat.render_number(loot)))
 	end
 
 	-- =========================================================================================
@@ -305,6 +360,7 @@ function SimRevolts.install(C: any)
 			end
 			calm = self:_province_calm(id, t)
 		end
+		calm += self:_empire_calm(id)
 		local total = math.clamp(base + p_far - calm, 0, 100)
 		local r = math.floor
 		return total,

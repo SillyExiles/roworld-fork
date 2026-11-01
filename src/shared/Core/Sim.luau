@@ -1639,10 +1639,21 @@ function Sim._start_playing(self: any)
 				0,
 				if novice then Sim.NOVICE_SKILL else self.difficulty
 			)
-			self.o_income[id] = Rules.passive_income(self.o_kind[id], self.o_tiles[id])
-				+ Rules.land_income(self.o_kind[id], self:land_share(id))
+			self.o_income[id] = self:_income_of(id)
 		end
 	end
+end
+
+--- (Empires Front) Passive gold a second: the base, the land's taxes (+ Rules.PALACE_TAX with a Palace),
+--- all x the Universities' (SimEconomy._ecosystem).
+function Sim._income_of(self: any, id: number): number
+	local kind = self.o_kind[id]
+	local land = Rules.land_income(kind, self:land_share(id))
+	if self.o_palace ~= nil and self.o_palace[id] >= 0 then
+		land *= 1.0 + Rules.PALACE_TAX
+	end
+	local mult = if self.o_uni_mult ~= nil then self.o_uni_mult[id] or 1.0 else 1.0
+	return (Rules.passive_income(kind, self.o_tiles[id]) + land) * mult
 end
 
 function Sim._economy_tick(self: any)
@@ -1679,6 +1690,8 @@ function Sim._economy_tick(self: any)
 		end
 		-- maxTroops: + cityTroopIncrease per level of each finished city.
 		local cap = max_troops(tkind, o_tiles[id], o_alevel[id * STRUCT_KINDS + Defs.S_CITY], tdiff)
+		-- (Empires Front: Farms feed a bigger army, SimEconomy._ecosystem)
+		cap *= self.o_farm_mult[id] or 1.0
 		o_cap[id] = cap
 		-- Per-tick player update: + troopIncreaseRate troops (whole troops: truncated) and
 		-- + goldAdditionRate gold every tick, never during the spawn phase.
@@ -1692,7 +1705,7 @@ function Sim._economy_tick(self: any)
 		o_troops[id] += grow
 		if (tick + id) % 10 == 0 then
 			-- (Empires Front: + taxes on the land held, Rules.land_income)
-			o_income[id] = Rules.passive_income(kind, o_tiles[id]) + Rules.land_income(kind, self:land_share(id))
+			o_income[id] = self:_income_of(id)
 			-- (Empires Front: trade pacts raise it: SimDiplomacy)
 			local tp = self:trade_pacts(id)
 			if tp > 0 then

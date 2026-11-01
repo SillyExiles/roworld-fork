@@ -60,7 +60,15 @@ Defs.S_MARKET = 12
 -- _raise_wall, F_WALL) and the Barracks (troops regrow faster: Rules.barracks_mult)
 Defs.S_WALL = 13
 Defs.S_BARRACKS = 14
-Defs.STRUCT_KIND_COUNT = 15
+-- Empires Front (2026-11-01): the empire's ecosystem (Core/SimEconomy, SimRevolts, SimAttacks): the Temple
+-- (calms revolts, blesses Farms), the Palace (one: taxes, a region that never revolts), the Fortress
+-- (a great Defense Post on high ground) and the University (gold income). The Farm (10) is back:
+-- it raises the troop cap.
+Defs.S_TEMPLE = 15
+Defs.S_PALACE = 16
+Defs.S_FORTRESS = 17
+Defs.S_UNIVERSITY = 18
+Defs.STRUCT_KIND_COUNT = 19
 Defs.STRUCT_NAMES = {
 	[0] = "city",
 	"port",
@@ -77,6 +85,10 @@ Defs.STRUCT_NAMES = {
 	"market",
 	"wall",
 	"barracks",
+	"temple",
+	"palace",
+	"fortress",
+	"university",
 }
 --- Empires Front: structure kinds kept in the code but not built (2026-10-31: no SAMs, silos, Arsenal, farms)
 Defs.DISABLED_STRUCT = {
@@ -85,7 +97,6 @@ Defs.DISABLED_STRUCT = {
 	[Defs.S_ARTILLERY] = true,
 	[Defs.S_AIRFIELD] = true,
 	[Defs.S_RAILGUN] = true,
-	[Defs.S_FARM] = true,
 }
 --- Empires Front (2026-10-31): the structures the road network (the Way Stations' carts) links. Every
 --- one of them within a Way Station's reach becomes a station on the roads (SimStructures._activate).
@@ -99,6 +110,11 @@ Defs.ROAD_KIND = {
 	[Defs.S_MARKET] = true,
 	[Defs.S_WALL] = true,
 	[Defs.S_BARRACKS] = true,
+	[Defs.S_FARM] = true,
+	[Defs.S_TEMPLE] = true,
+	[Defs.S_PALACE] = true,
+	[Defs.S_FORTRESS] = true,
+	[Defs.S_UNIVERSITY] = true,
 }
 --- The stations a cart trades at (pays trainGold; carts head for them). The others on the roads (posts,
 --- forges, walls, barracks) only pass carts through and join networks together.
@@ -124,6 +140,10 @@ Defs.STRUCT_TITLES = {
 	"Market",
 	"Border Wall",
 	"Barracks",
+	"Temple",
+	"Palace",
+	"Fortress",
+	"University",
 }
 
 -- Unit kinds

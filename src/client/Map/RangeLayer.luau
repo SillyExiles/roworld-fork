@@ -51,6 +51,11 @@ local ROAD_BUILD = {
 	market = Defs.S_MARKET,
 	forge = Defs.S_FORGE,
 	barracks = Defs.S_BARRACKS,
+	farm = Defs.S_FARM,
+	temple = Defs.S_TEMPLE,
+	palace = Defs.S_PALACE,
+	fortress = Defs.S_FORTRESS,
+	university = Defs.S_UNIVERSITY,
 }
 
 local HOSTILE_TINT = Color3.new(1.0, 0.2, 0.16)

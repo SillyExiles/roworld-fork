@@ -21,7 +21,7 @@ local Rng = require("./Rng")
 local Coop = require("../Net/Coop")
 
 local MAXO = Defs.MAX_OWNERS
-local STRUCT_KINDS = 16
+local STRUCT_KINDS = 24 -- (per-owner stride: Defs.S_* kinds and Rules.BUILT_WARSHIP)
 local F_FALLOUT = Defs.F_FALLOUT
 local F_WALL = Defs.F_WALL
 

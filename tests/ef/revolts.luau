@@ -92,7 +92,7 @@ local calm = Sim.new(map, { seed = 11, difficulty = 2, tribes = 60, max_humans =
 for _ = 1, 4000 do
 	calm:step()
 end
-expect(calm._rv == nil, "revolts = false: no unrest, no revolts")
+expect(calm._rv == nil or (next(calm._rv.unrest) == nil and next(calm._rv.rebels) == nil), "revolts = false: no unrest, no revolts")
 
 -- 3) a revolt by hand on a big empire, then the three ways out
 local function biggest(sm)

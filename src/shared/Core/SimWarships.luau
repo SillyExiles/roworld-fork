@@ -23,7 +23,7 @@ local readi32 = buffer.readi32
 
 local Unit = SimStructures.Unit
 
-local STRUCT_KINDS = 16
+local STRUCT_KINDS = 24 -- (per-owner stride: Defs.S_* kinds and Rules.BUILT_WARSHIP)
 --- Ship grid cell size (tiles).
 local GCELL = 32
 

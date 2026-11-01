@@ -310,6 +310,32 @@ PixelIcons.GLYPHS = {
 
 local cache: { [string]: any } = {}
 
+-- (Empires Front 2026-11-01) the ecosystem's buildings (UI/PixelBuildings, tools/make_pixel_buildings.py):
+-- a Temple and a Palace drawn for each map (temple_<map>, palace_<map>), the Fortress and the University.
+for name, rows in require("./PixelBuildings") :: any do
+	PixelIcons.GLYPHS[name] = rows
+end
+--- Icons drawn per map: "temple" shows temple_<the map in play> (temple_rome when the map has none).
+PixelIcons.PER_MAP = { temple = true, palace = true }
+PixelIcons.map_id = "rome"
+
+--- The map in play (StructureLayer sets it from the match's GameState): its Temple and Palace show.
+function PixelIcons.set_map(id: string?)
+	if type(id) == "string" and id ~= "" then
+		-- ("world@80": a public match plays the map a bit smaller; same art)
+		PixelIcons.map_id = string.match(id, "^([^@]+)") or id
+	end
+end
+
+--- The glyph `name` stands for on this map.
+function PixelIcons.resolve(name: string): string
+	if PixelIcons.PER_MAP[name] then
+		local own = name .. "_" .. PixelIcons.map_id
+		return if PixelIcons.GLYPHS[own] ~= nil then own else name .. "_rome"
+	end
+	return name
+end
+
 --- Antialiased 48 x 48 masks (UI/IconData, tools/make_icons.py) and the icon names they stand for.
 local IconData = require("./IconData") :: any
 PixelIcons.ALIASES = {
@@ -341,7 +367,8 @@ PixelIcons.ALIASES = {
 }
 
 function PixelIcons.has(name: string?): boolean
-	return name ~= nil and (PixelIcons.ALIASES[name] ~= nil or PixelIcons.GLYPHS[name] ~= nil)
+	return name ~= nil
+		and (PixelIcons.ALIASES[name] ~= nil or PixelIcons.GLYPHS[name] ~= nil or PixelIcons.PER_MAP[name] == true)
 end
 
 local function make(size: number, fill: (buffer) -> ()): any
@@ -359,6 +386,7 @@ end
 
 --- The glyph's Content (nil if it can't be made: EditableImage memory budget).
 function PixelIcons.content(name: string): any
+	name = PixelIcons.resolve(name)
 	local c = cache[name]
 	if c ~= nil then
 		return if c == false then nil else c
@@ -405,7 +433,7 @@ function PixelIcons.apply(label: any, name: string): boolean
 	label.ImageRectSize = Vector2.zero
 	label.ImageContent = c
 	pcall(function()
-		label.ResampleMode = if PixelIcons.ALIASES[name] ~= nil then Enum.ResamplerMode.Default else Enum.ResamplerMode.Pixelated
+		label.ResampleMode = if PixelIcons.ALIASES[PixelIcons.resolve(name)] ~= nil then Enum.ResamplerMode.Default else Enum.ResamplerMode.Pixelated
 	end)
 	return true
 end

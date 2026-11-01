@@ -233,11 +233,12 @@ local function build(K_LIN: number, into: any?): any
 	--- defense post 5 s, SAM 30 s, silo 10 s. A structure under construction blocks placement and
 	--- counts for prices but does nothing and can't be upgraded.
 	--- (Arsenal: artillery 8 s, airfield 10 s, railgun 15 s.)
-	--- (Empires Front: farm 6 s, mine 4 s, market 6 s, forge 6 s, border wall 6 s, barracks 5 s.)
-	Rules.BUILD_TICKS = zt({ 20, 50, 20, 50, 300, 100, 80, 100, 150, 60, 40, 60, 60, 60, 50 })
+	--- (Empires Front: farm 6 s, mine 4 s, market 6 s, forge 6 s, border wall 6 s, barracks 5 s; temple 8 s,
+	--- palace 20 s, fortress 12 s, university 10 s.)
+	Rules.BUILD_TICKS = zt({ 20, 50, 20, 50, 300, 100, 80, 100, 150, 60, 60, 40, 60, 60, 50, 80, 200, 120, 100 })
 	--- Upgradable: city, port, factory, SAM and silo gain levels; defense posts don't (nor
 	--- the Arsenal's structures).
-	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1 })
+	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1 })
 	--- Empires Front (2026-10-31) Border Wall: when finished it raises stones on every tile of the
 	--- owner's frontier (own land next to someone else's land) within WALL_RADIUS_FULL full-size tiles
 	--- (Defs.F_WALL). Taking a walled tile costs the attacker WALL_MAG x the troops and WALL_COST x
@@ -257,14 +258,83 @@ local function build(K_LIN: number, into: any?): any
 	--- (2026-11-01) at most FORGE_LIMIT Forges per player (their four tiers are levels: upgrade one)
 	Rules.FORGE_LIMIT = 2
 
+	--- (2026-11-01) the empire's ecosystem: at most 3 Temples, 1 Palace, 2 Fortresses, 2 Universities
+	Rules.TEMPLE_LIMIT = 3
+	Rules.PALACE_LIMIT = 1
+	Rules.FORTRESS_LIMIT = 2
+	Rules.UNIVERSITY_LIMIT = 2
+
 	--- How many structures of `kind` one player may hold (nil: no limit).
 	function Rules.struct_limit(kind: number): number?
 		if kind == Defs.S_BARRACKS then
 			return Rules.BARRACKS_LIMIT
 		elseif kind == Defs.S_FORGE then
 			return Rules.FORGE_LIMIT
+		elseif kind == Defs.S_TEMPLE then
+			return Rules.TEMPLE_LIMIT
+		elseif kind == Defs.S_PALACE then
+			return Rules.PALACE_LIMIT
+		elseif kind == Defs.S_FORTRESS then
+			return Rules.FORTRESS_LIMIT
+		elseif kind == Defs.S_UNIVERSITY then
+			return Rules.UNIVERSITY_LIMIT
 		end
 		return nil
+	end
+
+	-- ---------------------------------------------------------------------------------------------
+	-- Empires Front (2026-11-01): the ecosystem's numbers (Farms, Temples, the Palace, Fortresses,
+	-- Universities). Reaches in full-size tiles (OUR tiles: / K_LIN).
+	-- ---------------------------------------------------------------------------------------------
+	--- Farm: the troop cap grows FARM_CAP per farm power (a level, times its land: FARM_TERRAIN, and x
+	--- FARM_BLESSED within a Temple's reach), FARM_POWER_MAX powers at most.
+	Rules.FARM_CAP = 0.03
+	Rules.FARM_POWER_MAX = 15.0
+	Rules.FARM_BLESSED = 1.5
+	Rules.FARM_TERRAIN = { [Defs.T_PLAINS] = 1.25, [Defs.T_HIGHLAND] = 1.0, [Defs.T_MOUNTAIN] = 0.5, [Defs.T_TUNDRA] = 0.6, [Defs.T_ICECAP] = 0.3 }
+	function Rules.farm_mult(power: number): number
+		return 1.0 + Rules.FARM_CAP * math.clamp(power, 0, Rules.FARM_POWER_MAX)
+	end
+	--- Temple: its reach (grows a little each level), the calm it brings to a province in reach, and the
+	--- calm every Temple level brings the whole empire (TEMPLE_EMPIRE_MAX at most).
+	Rules.TEMPLE_RANGE_FULL = 60.0
+	Rules.TEMPLE_RANGE_LEVEL_FULL = 10.0
+	Rules.CALM_TEMPLE = 20.0
+	Rules.TEMPLE_EMPIRE_CALM = 3.0
+	Rules.TEMPLE_EMPIRE_MAX = 12.0
+	function Rules.temple_range(level: number?): number
+		return (Rules.TEMPLE_RANGE_FULL + Rules.TEMPLE_RANGE_LEVEL_FULL * math.max((level or 1) - 1, 0)) / K_LIN
+	end
+	--- Palace: +PALACE_TAX on the land's taxes; no province within its reach revolts; the whole empire
+	--- PALACE_EMPIRE_CALM calmer. Lost (it is razed when taken): the conqueror loots PALACE_LOOT of
+	--- the owner's gold and the empire is shaken (Core/SimRevolts).
+	Rules.PALACE_TAX = 0.3
+	Rules.PALACE_RANGE_FULL = 90.0
+	Rules.PALACE_EMPIRE_CALM = 8.0
+	Rules.PALACE_LOOT = 0.25
+	function Rules.palace_range(): number
+		return Rules.PALACE_RANGE_FULL / K_LIN
+	end
+	--- Fortress: a great Defense Post on high ground (hills or mountains): FORTRESS_RANGE_FULL reach,
+	--- attackers lose FORTRESS_MAG x the troops and take FORTRESS_COST x the time; its garrison calms
+	--- the province around it (CALM_FORTRESS). Razed when taken.
+	Rules.FORTRESS_RANGE_FULL = 48.0
+	Rules.FORTRESS_MAG = 7.5
+	Rules.FORTRESS_COST = 4.5
+	Rules.CALM_FORTRESS = 15.0
+	function Rules.fortress_range(): number
+		return Rules.FORTRESS_RANGE_FULL / K_LIN
+	end
+	Rules.FORTRESS_RADIUS = math.ceil(Rules.FORTRESS_RANGE_FULL / K_LIN)
+	--- University: +UNI_INCOME gold income per weighted level (taxes, the land's and the base's, and the
+	--- Markets' sales), x UNI_NEAR_TEMPLE within a Temple's reach or x UNI_NEAR_PALACE within the Palace's;
+	--- UNI_MAX at most.
+	Rules.UNI_INCOME = 0.05
+	Rules.UNI_NEAR_TEMPLE = 1.25
+	Rules.UNI_NEAR_PALACE = 1.5
+	Rules.UNI_MAX = 0.6
+	function Rules.uni_mult(power: number): number
+		return 1.0 + math.clamp(Rules.UNI_INCOME * power, 0, Rules.UNI_MAX)
 	end
 
 	--- Border Wall reach in OUR tiles (euclidean, map.range_d2).
@@ -283,8 +353,8 @@ local function build(K_LIN: number, into: any?): any
 	Rules.PORT_SPAWN_MANHATTAN = 20.0 / K_LIN
 	--- Per-owner "constructed" counters (units ever built): index Defs.S_* for structures,
 	--- BUILT_WARSHIP for warships.
-	Rules.BUILT_WARSHIP = 15
-	Rules.BUILT_SLOTS = 16
+	Rules.BUILT_WARSHIP = 23
+	Rules.BUILT_SLOTS = 24
 	--- samRange(level) = 150 - 480 / (level + 5) full-size tiles (level 1 = 70).
 	Rules.SAM_MAX_RANGE_FULL = 150.0
 	--- Integer SAM range at level 1 (our tiles), for callers that want a constant.
@@ -335,6 +405,14 @@ local function build(K_LIN: number, into: any?): any
 			return math.min(400000, 100000 * (n + 1))
 		elseif kind_name == "barracks" then
 			return math.min(1600000, 200000 * 2 ^ math.min(n, 3))
+		elseif kind_name == "temple" then
+			return math.min(2000000, 250000 * 2 ^ math.min(n, 3))
+		elseif kind_name == "palace" then
+			return 1000000
+		elseif kind_name == "fortress" then
+			return math.min(1400000, 350000 * (n + 1))
+		elseif kind_name == "university" then
+			return math.min(3200000, 400000 * 2 ^ math.min(n, 3))
 		end
 		return -1
 	end
@@ -458,12 +536,14 @@ local function build(K_LIN: number, into: any?): any
 		local pick = -1
 		local pd = 0.0
 		local mine = kind == Defs.S_MINE
+		-- (2026-11-01: a Fortress stands on high ground too)
+		local heights = kind == Defs.S_FORTRESS
 		for _, t in flood do
 			if port and (buffer.readu8(coastal, t) == 0 or geo_manhattan(tile, t) > Rules.PORT_SPAWN_MANHATTAN) then
 				continue
 			end
 			-- Empires Front: a mine digs into hills or mountains
-			if mine and buffer.readu8(map.terrain, t) < Defs.T_HIGHLAND then
+			if (mine or heights) and buffer.readu8(map.terrain, t) < Defs.T_HIGHLAND then
 				continue
 			end
 			local blocked = false
@@ -483,7 +563,7 @@ local function build(K_LIN: number, into: any?): any
 			end
 		end
 		if pick < 0 then
-			out.reason = if port then "no_coast" elseif mine then "no_hills" else "no_room"
+			out.reason = if port then "no_coast" elseif mine then "no_hills" elseif heights then "no_heights" else "no_room"
 			return out
 		end
 		out.tile = pick

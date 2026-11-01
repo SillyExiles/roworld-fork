@@ -269,7 +269,13 @@ HelpOverlay.SECTIONS = {
 		icon = "wall",
 		color = "orange",
 		title = "Walls, barracks & revolts",
-		text = "A Border Wall raises stones along your frontier near it: taking a walled tile costs {wall_mag}× the troops and {wall_cost}× the time (a wall and a Defense Post don't stack), and the stones fall with the tile. A wall or a Defense Post that is overrun is destroyed; mines, markets, barracks and cities are captured instead (at most 4 Barracks each). Each Barracks level makes your army grow {bar_pct}% faster. Revolts: a big empire with too few troops, provinces far from the capital or many new conquests grows restless, and one day a far province may rise without warning. Strong armies, Cities, Markets, Defense Posts and roads keep the provinces calm. Rebels can be crushed within 2 min for a gold reward, or bought back (Pay Rebels); left alone for 3 min they become a free nation. The land leader is the most restless.",
+		text = "A Border Wall raises stones along your frontier near it: taking a walled tile costs {wall_mag}× the troops and {wall_cost}× the time (a wall and a Defense Post don't stack), and the stones fall with the tile. A wall or a Defense Post that is overrun is destroyed; mines, markets, barracks and cities are captured instead (at most 4 Barracks each). Each Barracks level makes your army grow {bar_pct}% faster. Revolts: a big empire with too few troops, provinces far from the capital or many new conquests grows restless, and one day a far province may rise without warning. Strong armies, Cities, Markets, Defense Posts and roads keep the provinces calm. When a province rises you can buy it back at its worth (its land, troops and buildings) or recognize it as an independent nation, your ally; left alone for 3 min it breaks free and sides with your enemies. The land leader is the most restless.",
+	},
+	{
+		icon = "temple",
+		color = "amber",
+		title = "Your empire's ecosystem",
+		text = "Farms feed a bigger army (troop cap; best on plains). Temples calm the provinces around them and bless their Farms (x1.5). One Palace: +30% land taxes, and the provinces near it never revolt; lose it and the enemy loots a quarter of your gold. Universities raise your gold income a level at a time, more near a Temple and most near the Palace. Fortresses stand on hills: a great Defense Post whose garrison keeps the peace. Build them together: Palace at the heart, Universities around it, Temples over the farmland, Fortresses on the frontier heights.",
 	},
 	{
 		icon = "ping",

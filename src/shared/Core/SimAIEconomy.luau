@@ -18,7 +18,7 @@ local readi32 = buffer.readi32
 
 local f32 = Defs.f32
 
-local STRUCT_KINDS = 16
+local STRUCT_KINDS = 24 -- (per-owner stride: Defs.S_* kinds and Rules.BUILT_WARSHIP)
 local S_CITY = Defs.S_CITY
 local S_PORT = Defs.S_PORT
 local S_FACTORY = Defs.S_FACTORY
@@ -86,7 +86,9 @@ SimAIEconomy.UPGRADE_DENSITY_FULL_TILES = 1500.0
 -- Build order after defense posts; a city when none of these is due or possible.
 -- (Empires Front: no farms, SAMs or silos)
 -- (2026-10-31: and the Barracks; Border Walls go up against a threat, like defense posts)
-SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FORGE, Defs.S_BARRACKS }
+-- (2026-11-01: and the ecosystem: Farms, a Palace, Temples, Universities; Fortresses go up against a
+-- threat, like defense posts)
+SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FARM, Defs.S_PALACE, Defs.S_TEMPLE, Defs.S_FORGE, Defs.S_BARRACKS, Defs.S_UNIVERSITY }
 -- Border Walls a nation raises against a threatening neighbour: at most this many.
 SimAIEconomy.WALL_CAP = 3
 -- Crowded map: more nations than one per this many full-size land tiles.
@@ -280,15 +282,28 @@ function SimAIEconomy.install(C)
 				and age > NUKE_AGE[d] - 900
 				and self.rank[id] <= E.SILO_TOP_RANK
 		elseif kind == Defs.S_FARM then
-			-- Empires Front: feed the army (SimEconomy): a farm whenever the food would run short
-			if sim.o_kind[id] == Defs.KIND_TRIBE then
-				return false
-			end
-			-- (farms still being built count too, at a typical yield)
-			local per = 0.0005
-			local want = math.max(sim.o_troops[id], sim.o_cap[id] * 0.95) * per
-			local expect = sim.o_cap[id] * per * 0.8 + sim:struct_levels(id, Defs.S_FARM) * 45 * 0.7
-			return expect < want * 1.1
+			-- Empires Front (2026-11-01): Farms raise the troop cap: about one level a city (8 at most)
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_levels(id, Defs.S_FARM) < math.min(8, cities)
+				and age > 300
+		elseif kind == Defs.S_TEMPLE then
+			-- a Temple once the empire spreads (one per three cities, Rules.TEMPLE_LIMIT at most), sooner
+			-- when its provinces stir (Core/SimRevolts)
+			local u = if sim._rv ~= nil then sim._rv.unrest[id] or 0 else 0
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_count(id, Defs.S_TEMPLE) < math.min(Rules.TEMPLE_LIMIT, math.max(cities // 3, if u >= 35 then 1 else 0))
+				and age > 600
+		elseif kind == Defs.S_PALACE then
+			-- the Palace once the empire counts (four cities)
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_count(id, Defs.S_PALACE) < Rules.PALACE_LIMIT
+				and cities >= 4
+				and age > 900
+		elseif kind == Defs.S_UNIVERSITY then
+			-- Universities late, once the land grab is over (a level per three cities)
+			return sim.o_kind[id] ~= Defs.KIND_TRIBE
+				and sim:struct_levels(id, Defs.S_UNIVERSITY) < math.min(4, cities // 3)
+				and age > 1500
 		elseif kind == Defs.S_MINE then
 			return sim.o_kind[id] ~= Defs.KIND_TRIBE
 				and sim:struct_levels(id, Defs.S_MINE) < math.min(6, 1 + cities // 2)
@@ -394,6 +409,21 @@ function SimAIEconomy.install(C)
 			end
 			return
 		end
+		-- (2026-11-01: then a Fortress on the high ground of that front, two at most)
+		if
+			cities > 2
+			and threat > 0
+			and sim.o_kind[id] ~= Defs.KIND_TRIBE
+			and sim:struct_count(id, Defs.S_FORTRESS) < Rules.FORTRESS_LIMIT
+			and sim.tick - self.last_defense[id] >= E.DEFENSE_GAP
+			and sim.rng:randf() < 0.2
+		then
+			if self:_spawn_structure(sim, id, Defs.S_FORTRESS, cities, threat) then
+				self.last_build[id] = sim.tick
+				self.last_defense[id] = sim.tick
+				return
+			end
+		end
 		-- The very first structure is a port; without a coast a factory, on a crowded map only.
 		if self.crowded_first[id] == 0 then
 			local coastal = sim.o_coast[id] > 0
@@ -487,6 +517,25 @@ function SimAIEconomy.install(C)
 			return self:_factory_site(sim, id)
 		elseif kind == S_DEFENSE or kind == Defs.S_WALL then
 			return self:_defense_site(sim, id, threat)
+		elseif kind == Defs.S_FORTRESS then
+			-- (on the front's high ground: the defense site, else any hill near it)
+			local t = self:_defense_site(sim, id, threat)
+			if t >= 0 and buffer.readu8(sim.terr, t) >= Defs.T_HIGHLAND then
+				return t
+			end
+			if t >= 0 then
+				return sim:find_site(id, kind, t, math.ceil(20 * sim.R.LEGACY_LIN), 24)
+			end
+			return -1
+		elseif kind == Defs.S_PALACE then
+			-- (at the capital)
+			local cap = sim.o_spawn_tile[id]
+			if cap >= 0 then
+				local s = sim:find_site(id, kind, cap, math.ceil(12 * sim.R.LEGACY_LIN), 24)
+				if s >= 0 then
+					return s
+				end
+			end
 		elseif kind == S_SAM then
 			local cities = sim:structs_of(id, S_CITY)
 			if #cities > 0 then

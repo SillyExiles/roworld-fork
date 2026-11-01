@@ -17,6 +17,7 @@ local Defs = require("./Defs")
 local SimState = require("./SimState")
 
 local readu8 = buffer.readu8
+local Rules = require("./Rules")
 local filled = SimState.filled
 local MAXO = Defs.MAX_OWNERS
 
@@ -76,6 +77,12 @@ function SimEconomy.install(C)
 		self._trade_acc = filled(MAXO, 0)
 		--- the troop growth the economy allows (1: all; no food any more)
 		self.o_fed = filled(MAXO, 1.0)
+		--- (2026-11-01) the ecosystem, worked out once a second (_ecosystem): the troop cap Farms give
+		--- (x), the income Universities give (x), the Palace's tile (-1: none) and Temple levels
+		self.o_farm_mult = filled(MAXO, 1.0)
+		self.o_uni_mult = filled(MAXO, 1.0)
+		self.o_palace = filled(MAXO, -1)
+		self.o_temple_levels = filled(MAXO, 0)
 		--- the match's ore market
 		self.ore_glut = 0.0
 		self.ore_price = E.ORE_PRICE
@@ -113,8 +120,81 @@ function SimEconomy.install(C)
 		end
 	end
 
+	--- (Empires Front 2026-11-01) Once a second: the ecosystem's sums per owner from the finished
+	--- structures. A Farm's power is its level x its land (Rules.FARM_TERRAIN), x FARM_BLESSED within
+	--- reach of one of its owner's Temples; a University's its level x UNI_NEAR_PALACE within the
+	--- Palace's reach, else x UNI_NEAR_TEMPLE within a Temple's.
+	function C:_ecosystem()
+		local temples = {} :: { [number]: { any } }
+		local farms = {} :: { any }
+		local unis = {} :: { any }
+		local palace = {} :: { [number]: number }
+		local tlev = {} :: { [number]: number }
+		for _, s in self.struct_list do
+			if s.dead or not s.active then
+				continue
+			end
+			local k = s.kind
+			if k == Defs.S_TEMPLE then
+				local l = temples[s.owner]
+				if l == nil then
+					l = {}
+					temples[s.owner] = l
+				end
+				table.insert(l, s)
+				tlev[s.owner] = (tlev[s.owner] or 0) + s.level
+			elseif k == Defs.S_FARM then
+				table.insert(farms, s)
+			elseif k == Defs.S_UNIVERSITY then
+				table.insert(unis, s)
+			elseif k == Defs.S_PALACE then
+				palace[s.owner] = s.tile
+			end
+		end
+		local range_d2 = self.range_d2
+		local R = self.R
+		local function near_temple(owner: number, t: number): boolean
+			for _, tp in temples[owner] or {} do
+				local r = R.temple_range(tp.level)
+				if range_d2(tp.tile, t) <= r * r then
+					return true
+				end
+			end
+			return false
+		end
+		local fp = {} :: { [number]: number }
+		local terr = self.terr
+		for _, s in farms do
+			local p = s.level * (Rules.FARM_TERRAIN[readu8(terr, s.tile)] or 1.0)
+			if near_temple(s.owner, s.tile) then
+				p *= Rules.FARM_BLESSED
+			end
+			fp[s.owner] = (fp[s.owner] or 0) + p
+		end
+		local up = {} :: { [number]: number }
+		local pr = R.palace_range()
+		for _, s in unis do
+			local m = 1.0
+			local pt = palace[s.owner]
+			if pt ~= nil and range_d2(pt, s.tile) <= pr * pr then
+				m = Rules.UNI_NEAR_PALACE
+			elseif near_temple(s.owner, s.tile) then
+				m = Rules.UNI_NEAR_TEMPLE
+			end
+			up[s.owner] = (up[s.owner] or 0) + s.level * m
+		end
+		local o_farm_mult, o_uni_mult, o_palace, o_temple_levels = self.o_farm_mult, self.o_uni_mult, self.o_palace, self.o_temple_levels
+		for id = 1, self.owner_total do
+			o_farm_mult[id] = Rules.farm_mult(fp[id] or 0)
+			o_uni_mult[id] = Rules.uni_mult(up[id] or 0)
+			o_palace[id] = palace[id] or -1
+			o_temple_levels[id] = tlev[id] or 0
+		end
+	end
+
 	--- Once a second: mining, the Markets' sales and the ore price.
 	function C:_resource_tick()
+		self:_ecosystem()
 		local mine = {} :: { [number]: number }
 		local market = {} :: { [number]: number }
 		for _, s in self.struct_list do
@@ -158,7 +238,8 @@ function SimEconomy.install(C)
 				if sell > 0 then
 					o_ore[id] -= sell
 					sold += sell
-					self:_trade_gold(id, sell * price * self:ore_bonus(id))
+					-- (a University's scholars raise the Markets' takings too)
+					self:_trade_gold(id, sell * price * self:ore_bonus(id) * (self.o_uni_mult[id] or 1.0))
 				end
 			end
 			self.o_trade_gold[id] = self._trade_acc[id]

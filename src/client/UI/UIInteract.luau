@@ -1672,6 +1672,7 @@ if UICtx.IS_ROBLOX then
 		[K.Equals] = 12,
 		[K.LeftBracket] = 13,
 		[K.RightBracket] = 14,
+		[K.BackSlash] = 15,
 		[K.Seven] = 7,
 		[K.KeypadSeven] = 7,
 		[K.Eight] = 8,

@@ -35,11 +35,12 @@ UIRules.__index = UIRules
 
 -- (Empires Front: no SAMs, silos, bombs or Arsenal; no farms: 2026-10-31)
 -- (Empires Front 2026-10-31: the Border Wall and the Barracks)
-UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks" }
+-- (2026-11-01: the empire's ecosystem: Farm, Temple, Palace, Fortress, University)
+UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "fortress", "university" }
 UIRules.NUKE_KINDS = {}
 --- Hotkeys 1..9, 0 in this order.
-UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks" }
-UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" }
+UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "fortress", "university" }
+UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]", "\\" }
 --- The Arsenal's kinds (Data/Arsenal: unlocked with Stars or Robux), in the order of its tray:
 --- structures, munitions launched like a nuke (the last two from their own structure: strikes), and
 --- the Reinforcements call. A locked one is offered in the Arsenal instead of doing anything.
@@ -58,6 +59,10 @@ UIRules.TITLES = {
 	market = "Market",
 	wall = "Border Wall",
 	barracks = "Barracks",
+	temple = "Temple",
+	palace = "Palace",
+	fortress = "Fortress",
+	university = "University",
 	sam = "SAM Launcher",
 	silo = "Missile Silo",
 	warship = "Warship",
@@ -84,6 +89,10 @@ UIRules.SHORT = {
 	market = "Market",
 	wall = "Wall",
 	barracks = "Barracks",
+	temple = "Temple",
+	palace = "Palace",
+	fortress = "Fortress",
+	university = "University",
 	sam = "SAM",
 	silo = "Silo",
 	warship = "Warship",
@@ -105,7 +114,11 @@ UIRules.BLURBS = {
 	factory = "Road hub: every building within its reach joins the roads. Carts pay gold at every city, port, mine and market they pass.",
 	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time.",
 	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}. At most 2 Forges per player: build near one to upgrade it.",
-	farm = "Grows {farm_food} Food a second for each level (less on hills or dry land). Your army eats: without Food it stops growing and deserts.",
+	farm = "Feeds a bigger army: your troop cap +{farm_pct}% a level ({farm_plain}% on plains, less on hills or cold land). Near a Temple: x{farm_bless} (a blessed harvest).",
+	temple = "Calms the provinces within {temple_r} tiles and blesses the Farms there (x{farm_bless}). Every level calms your whole empire a little. Universities near one study x{uni_temple}. At most {temple_lim}: build near one to upgrade it.",
+	palace = "Your seat of power: land taxes +{pal_tax}%, and no province within {pal_r} tiles ever revolts. Universities near it study x{uni_palace}. Only one. If it is taken, the enemy loots {pal_loot}% of your gold and your provinces stir.",
+	fortress = "A great Defense Post on hills or mountains: land within {fort_r} tiles costs attackers {fort_mag}x the troops and {fort_cost}x the time. Its garrison keeps the province calm. At most {fort_lim}; razed if taken.",
+	university = "Scholars: +{uni_pct}% gold income a level (taxes and Market sales), x{uni_temple} near a Temple, x{uni_palace} near the Palace (up to +{uni_max}%). At most {uni_lim}: build near one to upgrade it.",
 	mine = "Digs {mine_ore} Ore a second for each level. Only on hills or mountains (more in mountains). On the roads (a Factory in reach): +50% Ore.",
 	market = "Sells up to {mkt_ore} spare Ore a second for each level at the match's Ore price (it keeps what your next Forge level needs). Each trade pact raises what it gets by 20%. On the roads: sells 50% more.",
 	wall = "Raises stone walls along your frontier within {wall_r} tiles: taking a walled tile costs {wall_mag}x the troops and {wall_cost}x the time. The stones follow the frontier and fall with the tile.",
@@ -163,6 +176,24 @@ function UIRules.blurb(kind: string): string
 		wall_cost = tostring(Defs.round(R.WALL_COST)),
 		bar_pct = tostring(math.floor(R.BARRACKS_GROWTH * 100 + 0.5)),
 		bar_max = tostring(R.BARRACKS_MAX_LEVELS),
+		-- (2026-11-01) the ecosystem
+		farm_pct = tostring(math.floor(R.FARM_CAP * 100 + 0.5)),
+		farm_plain = string.format("%.1f", R.FARM_CAP * 100 * (R.FARM_TERRAIN[Defs.T_PLAINS] or 1)),
+		farm_bless = tostring(R.FARM_BLESSED),
+		temple_r = tostring(Defs.round(R.temple_range(1))),
+		temple_lim = tostring(R.TEMPLE_LIMIT),
+		pal_tax = tostring(math.floor(R.PALACE_TAX * 100 + 0.5)),
+		pal_r = tostring(Defs.round(R.palace_range())),
+		pal_loot = tostring(math.floor(R.PALACE_LOOT * 100 + 0.5)),
+		fort_r = tostring(Defs.round(R.fortress_range())),
+		fort_mag = tostring(R.FORTRESS_MAG),
+		fort_cost = tostring(R.FORTRESS_COST),
+		fort_lim = tostring(R.FORTRESS_LIMIT),
+		uni_pct = tostring(math.floor(R.UNI_INCOME * 100 + 0.5)),
+		uni_temple = tostring(R.UNI_NEAR_TEMPLE),
+		uni_palace = tostring(R.UNI_NEAR_PALACE),
+		uni_max = tostring(math.floor(R.UNI_MAX * 100 + 0.5)),
+		uni_lim = tostring(R.UNIVERSITY_LIMIT),
 	})
 end
 
@@ -811,6 +842,7 @@ UIRules.PLACE_REASONS = {
 	not_own = "Build on your own land",
 	no_room = "No room here: structures need space",
 	no_hills = "Mines must be dug in hills or mountains",
+	no_heights = "A Fortress must stand on hills or mountains",
 	no_coast = "Ports must be on your coast",
 	no_port = "Warships need a finished port on this water",
 	gold = "Not enough gold",

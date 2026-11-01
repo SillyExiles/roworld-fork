@@ -43,6 +43,10 @@ Eras.list = {
 		name = "Roman Empire",
 		period = "117 AD · Antiquity",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Palace", "Palatium" },
+			{ "Fortress", "Arx" },
+			{ "University", "Academy", "Academies" },
 			{ "Farm", "Latifundium", "Latifundia" },
 			{ "Mine", "Iron Mine" },
 			{ "Market", "Forum" },
@@ -124,6 +128,11 @@ Eras.list = {
 		name = "Persian Empire",
 		period = "500 BC · Antiquity",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Fire Temple" },
+			{ "Palace", "Apadana" },
+			{ "Fortress", "Dez" },
+			{ "University", "Academy", "Academies" },
 			{ "Farm", "Qanat Farm" },
 			{ "Mine", "Copper Mine" },
 			{ "Market", "Bazaar" },
@@ -205,6 +214,11 @@ Eras.list = {
 		name = "Ming China",
 		period = "1450 · Early gunpowder",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Pagoda" },
+			{ "Palace", "Imperial Palace" },
+			{ "Fortress", "Pass Fort" },
+			{ "University", "Academy", "Academies" },
 			{ "Farm", "Rice Paddy" },
 			{ "Mine", "Iron Mine" },
 			{ "Market", "Market Town" },
@@ -285,6 +299,11 @@ Eras.list = {
 		name = "Inca Empire",
 		period = "1500 · Tawantinsuyu",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Sun Temple" },
+			{ "Palace", "Royal Kancha" },
+			{ "Fortress", "Pukara" },
+			{ "University", "Yachay Wasi" },
 			{ "Farm", "Terrace Farm" },
 			{ "Mine", "Gold Mine" },
 			{ "Market", "Trade Fair" },
@@ -361,6 +380,11 @@ Eras.list = {
 		name = "Aztec Empire",
 		period = "1500 · The Triple Alliance",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Teocalli" },
+			{ "Palace", "Tecpan" },
+			{ "Fortress", "Stronghold" },
+			{ "University", "Calmecac" },
 			{ "Farm", "Chinampa" },
 			{ "Mine", "Obsidian Mine" },
 			{ "Market", "Tianguis Market" },
@@ -437,6 +461,11 @@ Eras.list = {
 		name = "African Empires",
 		period = "1400 · Kingdoms of Gold",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Mosque" },
+			{ "Palace", "Royal Palace" },
+			{ "Fortress", "Tata" },
+			{ "University", "Madrasa" },
 			{ "Farm", "Millet Field" },
 			{ "Mine", "Gold Mine" },
 			{ "Market", "Market Town" },
@@ -513,6 +542,11 @@ Eras.list = {
 		name = "Mongol Empire",
 		period = "1279 · The Great Khans",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Monastery", "Monasteries" },
+			{ "Palace", "Great Ger" },
+			{ "Fortress", "Stronghold" },
+			{ "University", "Scriptorium" },
 			{ "Mine", "Iron Mine" },
 			{ "Market", "Silk Road Bazaar" },
 			{ "Ore", "Iron" },
@@ -551,6 +585,11 @@ Eras.list = {
 		name = "Ottoman Empire",
 		period = "1566 · The Magnificent Century",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Mosque" },
+			{ "Palace", "Saray" },
+			{ "Fortress", "Hisar" },
+			{ "University", "Madrasa" },
 			{ "Mine", "Silver Mine" },
 			{ "Market", "Grand Bazaar" },
 			{ "Ore", "Silver" },
@@ -589,6 +628,10 @@ Eras.list = {
 		name = "Ancient Greece",
 		period = "431 BC · The Classical Age",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Palace", "Acropolis" },
+			{ "Fortress", "Citadel" },
+			{ "University", "Lyceum" },
 			{ "Mine", "Silver Mine" },
 			{ "Market", "Agora" },
 			{ "Ore", "Silver" },
@@ -624,6 +667,11 @@ Eras.list = {
 		name = "Sengoku Japan",
 		period = "1560 · The Warring States",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Shrine" },
+			{ "Palace", "Castle" },
+			{ "Fortress", "Yamashiro" },
+			{ "University", "Academy", "Academies" },
 			{ "Mine", "Silver Mine" },
 			{ "Market", "Rakuichi Market" },
 			{ "Ore", "Silver" },
@@ -659,6 +707,9 @@ Eras.list = {
 		name = "British Empire",
 		period = "1897 · Victorian",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Cathedral" },
+			{ "Fortress", "Castle" },
 			{ "Farm", "Plantation" },
 			{ "Mine", "Coal Mine" },
 			{ "Market", "Stock Exchange" },
@@ -738,6 +789,11 @@ Eras.list = {
 		name = "Russian Empire",
 		period = "1914 · The Great War",
 		words = {
+			-- (2026-11-01) the ecosystem's buildings
+			{ "Temple", "Cathedral" },
+			{ "Palace", "Kremlin" },
+			{ "Fortress", "Ostrog" },
+			{ "University", "Academy", "Academies" },
 			{ "Farm", "Estate" },
 			{ "Mine", "Coal Mine" },
 			{ "Market", "Exchange" },
@@ -824,11 +880,19 @@ do
 		end
 	end
 	if ru ~= nil then
+		-- (Russia's words, but a Palace stays a Palace and a Fortress is a Citadel in the Age of Nations)
+		local words = {}
+		for _, w in ru.words do
+			if w[1] ~= "Palace" and w[1] ~= "Fortress" and w[1] ~= "University" then
+				table.insert(words, w)
+			end
+		end
+		table.insert(words, 1, { "Fortress", "Citadel" })
 		table.insert(Eras.list, {
 			id = "nations",
 			name = "Age of Nations",
 			period = "1914 · Free for all",
-			words = ru.words,
+			words = words,
 			rules = ru.rules,
 			forge = ru.forge,
 		})

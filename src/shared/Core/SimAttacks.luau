@@ -913,9 +913,16 @@ function SimAttacks.install(C: any)
 			if not neutral and bit32.band(tflags, F_WALL) ~= 0 then
 				mag *= Rules.WALL_MAG
 				tc *= Rules.WALL_COST
-			elseif not neutral and readu8(def_cover, t) > 0 and self:_defense_post_covers(t, tg) then
-				mag *= Rules.DEFENSE_POST_MAG
-				tc *= Rules.DEFENSE_POST_COST
+			elseif not neutral and readu8(def_cover, t) > 0 then
+				-- (2026-11-01: a Fortress guards like a stronger, wider defense post)
+				local cover = self:_cover_strength(t, tg)
+				if cover == 2 then
+					mag *= Rules.FORTRESS_MAG
+					tc *= Rules.FORTRESS_COST
+				elseif cover == 1 then
+					mag *= Rules.DEFENSE_POST_MAG
+					tc *= Rules.DEFENSE_POST_COST
+				end
 			end
 			if bit32.band(tflags, F_FALLOUT) ~= 0 then
 				mag *= fo_mod
@@ -1339,6 +1346,11 @@ function SimAttacks.install(C: any)
 	--- Overridden by SimStructures: true when a defense post of `id` covers tile `t`.
 	function C._defense_post_covers(_self: any, _t: number, _id: number): boolean
 		return false
+	end
+
+	--- Overridden by SimStructures: 2 a Fortress of `id` guards `t`, 1 a defense post, 0 none.
+	function C._cover_strength(_self: any, _t: number, _id: number): number
+		return 0
 	end
 
 	-- =========================================================================================

@@ -30,7 +30,7 @@ local writei32 = buffer.writei32
 local a_an = SimState.a_an
 
 local MAXO = Defs.MAX_OWNERS
-local STRUCT_KINDS = 16
+local STRUCT_KINDS = 24 -- (per-owner stride: Defs.S_* kinds and Rules.BUILT_WARSHIP)
 
 local S_CITY = Defs.S_CITY
 local S_PORT = Defs.S_PORT
@@ -461,6 +461,10 @@ function SimStructures.install(C)
 		if kind == S_PORT and readu8(self.map.coastal, t) == 0 then
 			return false
 		end
+		-- (Empires Front: Mines and Fortresses on hills or mountains only, as place_site)
+		if (kind == Defs.S_MINE or kind == Defs.S_FORTRESS) and readu8(self.terr, t) < Defs.T_HIGHLAND then
+			return false
+		end
 		local range_d2 = self.range_d2
 		local md = self.R.STRUCT_MIN_DIST
 		local md2 = md * md
@@ -631,6 +635,8 @@ function SimStructures.install(C)
 				self:msg(id, Defs.MSG_INFO, "Ports must be built on your coast")
 			elseif reason == "no_hills" then
 				self:msg(id, Defs.MSG_INFO, "Mines must be dug in your hills or mountains")
+			elseif reason == "no_heights" then
+				self:msg(id, Defs.MSG_INFO, "A Fortress must stand on your hills or mountains")
 			elseif reason == "not_own" then
 				self:msg(id, Defs.MSG_INFO, "You can only build on your own land")
 			else
@@ -765,6 +771,8 @@ function SimStructures.install(C)
 			table.insert(self.factory_list, s)
 		elseif k == S_DEFENSE then
 			self:_cover(s.tile, 1)
+		elseif k == Defs.S_FORTRESS then
+			self:_cover(s.tile, 1, self.R.fortress_range())
 		elseif k == S_ARTILLERY then
 			self:_battery_ready(s)
 		elseif k == S_WALL then
@@ -839,6 +847,8 @@ function SimStructures.install(C)
 				end
 			elseif k == S_DEFENSE then
 				self:_cover(s.tile, -1)
+			elseif k == Defs.S_FORTRESS then
+				self:_cover(s.tile, -1, self.R.fortress_range())
 			elseif k == S_WALL then
 				self._walls = math.max(0, (self._walls or 0) - 1)
 			end
@@ -874,10 +884,16 @@ function SimStructures.install(C)
 			or nw == 0
 			or k == S_DEFENSE
 			or k == S_WALL
+			or k == Defs.S_FORTRESS
+			or k == Defs.S_PALACE
 			or k == S_ARTILLERY
 			or k == Defs.S_AIRFIELD
 			or k == Defs.S_RAILGUN
 		then
+			-- (a Palace taken: its empire is shaken and the conqueror loots: Core/SimRevolts)
+			if k == Defs.S_PALACE and s.active and old > 0 and nw > 0 then
+				self:_palace_lost(old, nw)
+			end
 			self:destroy_struct(s)
 			if old > 0 and nw > 0 then
 				self:msg(
@@ -956,9 +972,9 @@ function SimStructures.install(C)
 	end
 
 	-- Marks the tiles a defense post at `t` covers (geo metric, like _defense_post_covers).
-	function C:_cover(t: number, delta: number)
+	function C:_cover(t: number, delta: number, radius: number?)
 		local def_cover = self.def_cover
-		for _, c in self:disk_tiles(t, self.R.defense_range(), false) do
+		for _, c in self:disk_tiles(t, radius or self.R.defense_range(), false) do
 			writeu8(def_cover, c, math.clamp(readu8(def_cover, c) + delta, 0, 255))
 		end
 	end
@@ -974,6 +990,20 @@ function SimStructures.install(C)
 			end
 		end
 		return false
+	end
+
+	-- (Empires Front 2026-11-01) How `id`'s defences guard tile `t`: 2 a Fortress in reach, 1 a defense
+	-- post, 0 none (SimAttacks: the stronger one counts).
+	function C:_cover_strength(t: number, id: number): number
+		local R = self.R
+		local range_d2 = self.range_d2
+		local rf = R.fortress_range()
+		for _, s in self:structs_in_box(t, self.geo_span(t, rf), R.FORTRESS_RADIUS, Defs.S_FORTRESS) do
+			if s.owner == id and s.active and range_d2(s.tile, t) <= rf * rf then
+				return 2
+			end
+		end
+		return if self:_defense_post_covers(t, id) then 1 else 0
 	end
 
 	-- Structures of `id` of `kind` in sid order (linear scan; fine for AI decisions).
