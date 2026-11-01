@@ -95,4 +95,22 @@ if Staging.here() then
 	end
 end
 
+--- Empires Front (2026-11-01): the ids above (Take Over, crates, the Arsenal's unlocks, the starter
+--- pack, the old flag shop) came with the RoWorld fork and belong to RoWorld's own experience.
+--- Prompted here, Roblox still sells them: the Robux go to RoWorld and the receipt never reaches this
+--- game's ProcessReceipt, so the player pays for nothing. Every product that is not this game's own
+--- is switched off (id 0: its offer hides, nothing prompts it). To sell one again, create it in this
+--- experience's Creator Dashboard (Monetization → Developer Products) and put its id in OWN_IDS.
+local OWN_IDS: { [string]: number } = {
+	-- takeover = 0, -- (create "Take Over" here, then put its id here)
+}
+for key, p in PRODUCTS do
+	if p.empire_flag ~= nil then
+		continue -- (the Empire Shop's Robux flags: this game's own products)
+	end
+	local own = OWN_IDS[key]
+	p.id = if type(own) == "number" then own else 0
+	p.staging = 0
+end
+
 return PRODUCTS
