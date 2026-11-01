@@ -456,11 +456,21 @@ function Tutorial._process(self, delta: number)
 				if self._relief ~= nil then
 					ctx:world_call("focus_tile", { self._relief, -1.0, 0.9 })
 				end
-			elseif step.at == "sea" then
-				-- (the boats' card: the sea nearest the player's land)
-				self._spot_at = self:_near_tile(function(t, code)
-					return code == Defs.T_OCEAN
-				end)
+			elseif step.at ~= nil then
+				-- (the boats' card: the sea nearest the player's land; the allies': a neighbour)
+				if step.at == "sea" then
+					self._spot_at = self:_near_tile(function(t, code)
+						return code == Defs.T_OCEAN
+					end)
+				else
+					local ns = ctx.borders:neighbour_ids()
+					self._spot_at = if #ns > 0 then s:label_tile(ns[1]) else nil
+				end
+				if self._spot_at ~= nil and self._spot_at >= 0 then
+					ctx:world_call("focus_tile", { self._spot_at, -1.0, 0.9 })
+				else
+					self._spot_at = nil
+				end
 			elseif step.build ~= nil then
 				-- (2026-11-01) a building to place: where it can go, and its gold
 				self._site = nil
@@ -594,16 +604,11 @@ function Tutorial._process(self, delta: number)
 					point = UICtx.rect_center(r)
 					around = math.max(r.Width, r.Height) * 0.5
 				end
-			elseif step.at == "sea" then
-				if self._spot_at ~= nil then
-					point = ctx:tile_screen_pos(self._spot_at)
-				end
-			elseif step.at == "neighbour" then
-				local ns = ctx.borders:neighbour_ids()
-				if #ns > 0 and s:get_owner(ns[1]) ~= nil then
-					point = ctx:tile_screen_pos(s:label_tile(ns[1]))
-				end
+			elseif self._spot_at ~= nil then
+				point = ctx:tile_screen_pos(self._spot_at)
 			end
+			-- (nothing to tap on a card to read)
+			word = step.mark or "Look here"
 		elseif id == "attack" then
 			if on_owner then
 				self:_advance()

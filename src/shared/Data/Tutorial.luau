@@ -221,8 +221,8 @@ Tutorial.STEPS = {
 		id = "army",
 		info = true,
 		button = "forge",
-		touch = "Forges arm troops, Barracks train them",
-		desktop = "Forges arm your troops with Ore; Barracks make your army grow faster",
+		touch = "Arm troops at Forges, train at Barracks",
+		desktop = "Forges arm your troops with Ore; your army grows faster with Barracks",
 		max_s = Tutorial.INFO_S,
 	},
 	{
