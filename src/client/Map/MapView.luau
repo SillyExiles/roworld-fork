@@ -413,6 +413,28 @@ function MapView.bind_state(self: any, state: any)
 			call(self.layers.fx, "ping", from, tile, kind)
 		end)
 	end
+	-- Empires Front: the player's warned province pulses on the map until it revolts or calms down
+	if state.unrest_changed ~= nil then
+		self:_connect(state.unrest_changed, function(id)
+			if id ~= state.local_owner then
+				return
+			end
+			local o = state:get_owner(id)
+			local at = if o ~= nil then tonumber(o.unrest_at) or 0 else 0
+			local tile = if o ~= nil then tonumber(o.unrest_tile) or -1 else -1
+			local key = if at > 0 and tile >= 0 then string.format("%d:%d", tile, at) else ""
+			if key == self._unrest_key then
+				return
+			end
+			self._unrest_key = key
+			if key == "" then
+				call(self.layers.fx, "unrest", nil)
+			else
+				local left = (at - state.tick) / Defs.TICK_RATE
+				call(self.layers.fx, "unrest", tile, left, "Unrest: " .. tostring(o.unrest_prov))
+			end
+		end)
+	end
 	-- only the local player's income shows
 	self:_connect(state.bonus, function(owner, tile, gold)
 		if owner ~= 0 and owner == state.local_owner then

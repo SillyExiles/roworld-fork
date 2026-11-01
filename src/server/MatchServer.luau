@@ -111,6 +111,7 @@ MatchServer.BUILD_BUDGET_S = 0.012
 local EV_MSG = 19
 local EV_BONUS = 34
 local EV_PING = 36
+local EV_UNREST = 37 -- (Core/Ev.UNREST)
 local PHASE_PLAYING = 1
 local PHASE_OVER = 2
 
@@ -139,6 +140,10 @@ local function is_private(e: any): number?
 	end
 	-- a Signal: only the teammate or ally it is addressed to sees it (Sim.ping)
 	if e[1] == EV_PING then
+		return e[2]
+	end
+	-- (Empires Front) a player's unrest is theirs alone (Core/SimRevolts)
+	if e[1] == EV_UNREST then
 		return e[2]
 	end
 	return nil

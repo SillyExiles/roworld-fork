@@ -378,6 +378,8 @@ function UIRoot.start_tutorial(self)
 			-- (Empires Front: a short first match, Data/Tutorial)
 			nation_limit = TutorialData.NATIONS,
 			win_share = TutorialData.WIN_SHARE,
+			-- (no revolts in the first match: Core/SimRevolts)
+			revolts = false,
 		},
 	})
 end
@@ -440,6 +442,7 @@ function UIRoot.hud_controls(self): { GuiObject }
 		self.bar._place_chip,
 		self.spawn.panel,
 		self.alert.panel,
+		self.unrest.panel,
 		self.coach._card,
 		self.target_card._panel,
 		self.tooltip._panel,
@@ -800,6 +803,7 @@ function UIRoot._build(self)
 	local EventFeed = kit("EventFeed")
 	local AttacksPanel = kit("AttacksPanel")
 	local AlertBanner = kit("AlertBanner")
+	local UnrestBanner = kit("UnrestBanner")
 	local BusyChip = kit("BusyChip")
 
 	local hud = self:_layer("HUD")
@@ -880,6 +884,14 @@ function UIRoot._build(self)
 	alert.name = "NukeAlert"
 	self.alert = alert
 	hud:add_child(alert)
+	-- Empires Front: unrest, warned provinces and rebels (Core/SimRevolts), under the alert
+	local unrest = UnrestBanner.new(ctx)
+	unrest.name = "Unrest"
+	self.unrest = unrest
+	unrest.on_layout = function()
+		self:_layout_alert()
+	end
+	hud:add_child(unrest)
 	self.spectate_pill = self:_build_spectate_pill()
 	hud:add_child(self.spectate_pill)
 	root:add_child(hud)
@@ -956,6 +968,7 @@ function UIRoot._build(self)
 			bar.tray,
 			bar._place_chip,
 			alert.panel,
+			unrest.panel,
 			spawn.panel,
 		}) do
 			if c ~= nil and c:is_visible_in_tree() then
@@ -2427,6 +2440,14 @@ function UIRoot._layout_alert(self)
 	if ctx.compact then
 		-- Phones: the alert temporarily takes over the status pill's slot (top-right).
 		self.alert:apply_layout(self.top.panel.offset_top, 8.0 + ctx.insets.z)
+		-- (the unrest panel under the status pill, or under the alert while it shows)
+		if self.unrest ~= nil and self.unrest.visible then
+			local uy = if self.alert.visible
+				then self.alert.panel:get_global_rect().Max.Y + 6.0
+				elseif self.top.visible then self.top:bottom_edge() + 6.0
+				else 12.0 + ctx.insets.y
+			self.unrest:apply_layout(uy, 8.0 + ctx.insets.z)
+		end
 		return
 	end
 	local y = 12.0 + ctx.insets.y
@@ -2436,6 +2457,10 @@ function UIRoot._layout_alert(self)
 		y = self.spawn:bottom_edge() + 10.0
 	end
 	self.alert:apply_layout(y)
+	if self.unrest ~= nil and self.unrest.visible then
+		local uy = if self.alert.visible then self.alert.panel:get_global_rect().Max.Y + 8.0 else y
+		self.unrest:apply_layout(uy)
+	end
 end
 
 -- =============================================================================================
@@ -2592,7 +2617,7 @@ function UIRoot._poll_layout(self)
 		)
 		-- (a hidden alert is placed when it comes up, UIAdvisor -> relayout_alert: here its two fixed-width
 		-- labels were drawn again glyph by glyph twice a second, 2026-10-27)
-		if self.alert.visible then
+		if self.alert.visible or (self.unrest ~= nil and self.unrest.visible) then
 			self:_layout_alert()
 		end
 		self.probe:update_world_safe_area()

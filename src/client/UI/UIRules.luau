@@ -1401,6 +1401,21 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 
 	if playing and own ~= 0 and own ~= me then
 		local target_info = s:get_owner(own)
+		-- Empires Front: our own rebels can be bought back (Core/SimRevolts.pay_rebels)
+		local price = UIRules.rebel_price(s, me, own)
+		if price >= 0 then
+			local mo = s:get_owner(me)
+			local gold = if mo ~= nil then tonumber(mo.gold) or 0 else 0
+			table.insert(items, {
+				id = "pay_rebels",
+				label = "Pay Rebels",
+				icon = "gold",
+				ok = gold >= price,
+				reason = if gold >= price then "" else "Need " .. T().fmt_cost(price) .. " gold",
+				danger = false,
+				cost = price,
+			})
+		end
 		if s:are_allies(me, own) then
 			local plan = self:donate_plan(own)
 			table.insert(items, {
@@ -1506,6 +1521,18 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 		table.insert(items, { id = "info", label = "Info", icon = "info", ok = true, reason = "", danger = false })
 	end
 	return items
+end
+
+--- Empires Front: what buying rebels `rid` back costs `me` (Rules.rebel_price, the Sim's own formula);
+--- -1 when `rid` are not `me`'s rising rebels.
+function UIRules.rebel_price(s: any, me: number, rid: number): number
+	local r = if s ~= nil then s:get_owner(rid) else nil
+	if r == nil or me == 0 or r.rebel_of ~= me or r.rebel_state ~= 0 or not r.alive then
+		return -1
+	end
+	local mo = s:get_owner(me)
+	local cap = if mo ~= nil then tonumber(mo.max_troops) or 0 else 0
+	return Rules().rebel_price(tonumber(r.troops) or 0, cap)
 end
 
 return UIRules

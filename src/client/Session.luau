@@ -435,6 +435,8 @@ function Session.start_solo(self: any, p_difficulty: number, map_id: string?, op
 	-- (the first match: fewer nations and a lower bar to win, Data/Tutorial; every other match the usual)
 	local nation_limit = if type(opts) == "table" and type(opts.nation_limit) == "number" then opts.nation_limit else nil
 	local win_share = if type(opts) == "table" and type(opts.win_share) == "number" then opts.win_share else nil
+	-- (the first match has no revolts: Core/SimRevolts)
+	local revolts = if type(opts) == "table" and opts.revolts == false then false else nil
 	self:_start_local(MODE_SOLO, {
 		seed = self:_rand_seed(),
 		difficulty = self.difficulty,
@@ -446,6 +448,7 @@ function Session.start_solo(self: any, p_difficulty: number, map_id: string?, op
 		teams = teams,
 		nation_limit = nation_limit,
 		win_share = win_share,
+		revolts = revolts,
 	}, self:local_display_name())
 end
 

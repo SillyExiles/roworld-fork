@@ -75,6 +75,8 @@ local SIGNALS = {
 	"phase_changed", -- (phase, ticks_left)
 	"game_over", -- (winner, reason)
 	"pinged", -- (from, tile, kind) Empires Front Ev.PING: a teammate's or ally's Signal (1 attack here, 2 help here)
+	"unrest_changed", -- (id) Empires Front Ev.UNREST: a player's unrest, its province and warning (OwnerInfo.unrest*)
+	"rebels_changed", -- (rid, state) Empires Front Ev.REBEL: rebels rose, were crushed / bought back, went free
 }
 GameState.SIGNAL_NAMES = SIGNALS
 
@@ -102,6 +104,17 @@ local function new_owner_info(id: number)
 		trade_gold = 0, -- gold its trade made last second
 		traitor_until = 0, -- tick
 		killer = 0,
+		-- Empires Front unrest (Core/SimRevolts; players' own): 0..100, the far province (-1), the tick a
+		-- warned province revolts (0: none), its name, and the parts {troops, size, lead, far, fresh, calm}
+		unrest = 0,
+		unrest_tile = -1,
+		unrest_at = 0,
+		unrest_prov = "",
+		unrest_parts = nil :: { number }?,
+		-- rebels: the empire they rose against (0: not rebels), when, and their state (SimRevolts.RISING..)
+		rebel_of = 0,
+		rebel_born = 0,
+		rebel_state = 0,
 		-- sums of the owned tiles' x and y (territory centroid = (cx, cy) / tiles); cz unused (0)
 		cx = 0.0,
 		cy = 0.0,
@@ -974,6 +987,12 @@ function GameState.load_snapshot(self: GameState, snap: { [string]: any })
 	for _, row in snap.requests or {} do
 		self.requests[row[1] * 1024 + row[2]] = row[3] or self.tick
 	end
+	for _, row in snap.unrest or {} do
+		self:_set_unrest(row, 0)
+	end
+	for _, row in snap.rebels or {} do
+		self:_set_rebel(row, 0)
+	end
 	self.loaded = true
 	self.snapshot_loaded:Fire()
 end
@@ -1411,6 +1430,47 @@ HANDLERS[Ev.TRAITOR] = function(self, e)
 		o.traitor_until = e[3]
 	end
 	self.traitor_marked:Fire(e[2], e[3])
+end
+
+--- Empires Front: an empire's unrest row (Ev.UNREST body from `o`; snapshot rows from 0).
+function GameState._set_unrest(self: any, row: { any }, o: number)
+	local own = self.owners[row[o + 1]]
+	if own == nil then
+		return
+	end
+	own.unrest = tonumber(row[o + 2]) or 0
+	own.unrest_tile = tonumber(row[o + 3]) or -1
+	own.unrest_at = tonumber(row[o + 4]) or 0
+	own.unrest_prov = tostring(row[o + 5] or "")
+	own.unrest_parts = {
+		tonumber(row[o + 6]) or 0,
+		tonumber(row[o + 7]) or 0,
+		tonumber(row[o + 8]) or 0,
+		tonumber(row[o + 9]) or 0,
+		tonumber(row[o + 10]) or 0,
+		tonumber(row[o + 11]) or 0,
+	}
+	self.unrest_changed:Fire(own.id)
+end
+
+--- Empires Front: a rebel band's row {rid, parent, born, state} (Ev.REBEL from `o`; snapshot from 0).
+function GameState._set_rebel(self: any, row: { any }, o: number)
+	local own = self.owners[row[o + 1]]
+	if own == nil then
+		return
+	end
+	own.rebel_of = tonumber(row[o + 2]) or 0
+	own.rebel_born = tonumber(row[o + 3]) or 0
+	own.rebel_state = tonumber(row[o + 4]) or 0
+	self.rebels_changed:Fire(own.id, own.rebel_state)
+end
+
+HANDLERS[Ev.UNREST] = function(self, e)
+	self:_set_unrest(e, 1)
+end
+
+HANDLERS[Ev.REBEL] = function(self, e)
+	self:_set_rebel(e, 1)
 end
 
 --- Empires Front: a Signal sent to this player (Sim.ping: only its teammates and allies get one).

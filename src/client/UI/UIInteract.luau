@@ -1115,6 +1115,11 @@ function UIInteract.on_radial(self: any, id: string, tile: number)
 		end
 	elseif string.sub(id, 1, 5) == "ping:" then
 		self:send_ping(tile, string.sub(id, 6), pos)
+	elseif id == "pay_rebels" then
+		-- Empires Front: buy our rebels back (Core/SimRevolts.pay_rebels)
+		ctx:send({ type = "pay_rebels", target = own })
+		ctx:sfx("buy")
+		self:_float("Gold sent to the " .. s:owner_name(own), "gold", T().GOLD, pos)
 	elseif id == "focus" then
 		ctx:world_call("focus_tile", { tile })
 	elseif id == "info" then

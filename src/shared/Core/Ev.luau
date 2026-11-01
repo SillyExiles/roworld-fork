@@ -50,7 +50,11 @@ Ev.PACT = 35 -- a, b, kind (1 trade, 2 defence), state (0 proposed by a to b, 1 
 Ev.PING = 36 -- to, from, tile, kind (1 attack here, 2 help here)  (a Signal: sent to `to` alone, one
 --   event per teammate or ally of `from` and one for `from` itself: Sim.ping)
 
+Ev.UNREST = 37 -- id, unrest 0..100, province tile (-1), warned until tick (0: no warning), province name,
+--   then the parts troops, size, lead, far, fresh, calm (Core/SimRevolts; players' own empires only)
+Ev.REBEL = 38 -- rid, parent, born_tick, state (0 rising, 1 crushed, 2 bought back, 3 free nation, 4 gone)
+
 --- Number of event ids (ids are 0..COUNT-1).
-Ev.COUNT = 37
+Ev.COUNT = 39
 
 return Ev

@@ -140,7 +140,10 @@ FxLayer.PING_PX = 26
 FxLayer.PING_RING_PX = 54
 FxLayer.PING_PULSE_S = 1.0
 FxLayer.PING_MAX = 12
-FxLayer.PING_COLORS = { Color3.fromRGB(255, 84, 72), Color3.fromRGB(255, 198, 64) }
+FxLayer.PING_COLORS = { Color3.fromRGB(255, 84, 72), Color3.fromRGB(255, 198, 64), Color3.fromRGB(255, 120, 40) }
+--- (Empires Front 2026-11-01) A warned province (Core/SimRevolts): kind 3, the unrest colour, up until
+--- the revolt is due (FxLayer.unrest); its marker's sender id.
+FxLayer.UNREST_FROM = -100
 
 type Fx = { u: number, v: number, r0: number, r1: number, t0: number, dur: number, col: Color3, flash: boolean }
 type Pop = { u: number, v: number, t0: number, text: string, col: Color3 }
@@ -576,6 +579,31 @@ function FxLayer.ping(self: any, from: number, tile: number, kind: number)
 	})
 end
 
+--- (Empires Front) A warned province at `tile`: a pulsing marker named `text` for `seconds` (one at a
+--- time; nil `tile` or -1 takes it down).
+function FxLayer.unrest(self: any, tile: number?, seconds: number?, text: string?)
+	local st = self._state
+	local list = self._pings
+	for i = #list, 1, -1 do
+		if list[i].from == FxLayer.UNREST_FROM then
+			table.remove(list, i)
+		end
+	end
+	if st == nil or tile == nil or tile < 0 or (seconds or 0) <= 0 then
+		return
+	end
+	local W = st.map.W or Defs.W
+	table.insert(list, {
+		u = tile % W + 0.5,
+		v = tile // W + 0.5,
+		t0 = FrameClock.now(),
+		kind = 3,
+		name = tostring(text or "Unrest"),
+		from = FxLayer.UNREST_FROM,
+		dur = math.max(seconds :: number, FxLayer.PING_FADE_S),
+	})
+end
+
 local function ping_gui(self: any, n: number): any
 	local g = self._ping_gui[n]
 	if g ~= nil then
@@ -663,7 +691,8 @@ local function pings_step(self: any, cam: any, now: number)
 	for i = 1, #list do
 		local p = list[i]
 		local el = now - p.t0
-		if el >= FxLayer.PING_S then
+		local life = p.dur or FxLayer.PING_S
+		if el >= life then
 			continue
 		end
 		keep += 1
@@ -681,7 +710,7 @@ local function pings_step(self: any, cam: any, now: number)
 		local col = FxLayer.PING_COLORS[p.kind] or FxLayer.PING_COLORS[1]
 		if g.kind ~= p.kind then
 			g.kind = p.kind
-			pcall(PixelIcons.apply, g.icon, if p.kind == 2 then "ping_help" else "ping_target")
+			pcall(PixelIcons.apply, g.icon, if p.kind == 2 then "ping_help" elseif p.kind == 3 then "ping" else "ping_target")
 			g.icon.ImageColor3 = col
 			g.ring_stroke.Color = col
 			g.plate_stroke.Color = col
@@ -692,7 +721,7 @@ local function pings_step(self: any, cam: any, now: number)
 		end
 		g.root.Position = UDim2.fromOffset(x, y)
 		-- fades over the last PING_FADE_S; the ring pulses out from the plate and fades as it grows
-		local fade = math.clamp((FxLayer.PING_S - el) / FxLayer.PING_FADE_S, 0, 1)
+		local fade = math.clamp((life - el) / FxLayer.PING_FADE_S, 0, 1)
 		local ph = (el % FxLayer.PING_PULSE_S) / FxLayer.PING_PULSE_S
 		local d = FxLayer.PING_PX + (FxLayer.PING_RING_PX - FxLayer.PING_PX) * ph
 		g.ring.Size = UDim2.fromOffset(d, d)

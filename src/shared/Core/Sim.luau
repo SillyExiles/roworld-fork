@@ -37,6 +37,7 @@ local SimArsenal = require("./SimArsenal")
 local Era = require("./Era")
 local SimEconomy = require("./SimEconomy")
 local SimDiplomacy = require("./SimDiplomacy")
+local SimRevolts = require("./SimRevolts")
 local SimAI = require("./SimAI")
 local Teams = require("./Teams")
 local WorldMap = require("./WorldMap")
@@ -60,6 +61,7 @@ SimNukes.install(Sim)
 SimArsenal.install(Sim)
 SimEconomy.install(Sim)
 SimDiplomacy.install(Sim)
+SimRevolts.install(Sim)
 
 Sim.TICK_RATE = TICK_RATE
 --- Owners whose start lies within these many tiles (of the original 1024-wide grid; scaled by the
@@ -124,6 +126,8 @@ function Sim.new(p_map: any, config: { [string]: any }?): any
 	--- (what the HUD shows) follows it there; Sim.new sets it back for every other match.
 	self.win_share = if type(cfg.win_share) == "number" then math.clamp(cfg.win_share, 0.3, 1.0) else Sim.DEFAULT_WIN_SHARE
 	Rules.WIN_SHARE = self.win_share
+	--- (Empires Front) unrest and revolts (Core/SimRevolts); off with `revolts = false` (the first match)
+	self.revolts = cfg.revolts ~= false
 	--- Wall-clock microseconds of the last step() (diagnostics).
 	self.last_step_usec = 0
 	--- When true, step() accumulates per-subsystem microseconds into `prof` (see PROF_NAMES).
@@ -556,6 +560,9 @@ function Sim.snapshot(self: any): { [string]: any }
 		attacks = self:attack_rows(),
 		allies = allies,
 		requests = reqs,
+		-- (Empires Front) the players' unrest and the rebel bands (Core/SimRevolts)
+		unrest = self:unrest_rows(),
+		rebels = self:rebel_rows(),
 	}
 end
 
@@ -1019,6 +1026,8 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		self:send_resource(id, _int(it, "target", 0), _str(it, "kind"), _int(it, "troops", 0))
 	elseif kind == "ping" then
 		self:ping(id, tile, _str(it, "kind"))
+	elseif kind == "pay_rebels" then
+		self:pay_rebels(id, _int(it, "target", 0))
 	end
 end
 
@@ -1728,6 +1737,8 @@ function Sim._process_eliminations(self: any)
 end
 
 function Sim._eliminate(self: any, id: number, killer: number)
+	-- (Empires Front: rebels crushed in time pay their empire, Core/SimRevolts)
+	self:_rebels_out(id, killer)
 	-- Decide who hears about it before alliances are dissolved: humans involved, allied or
 	-- bordering, or when a top-5 owner did the conquering. Tribes are never world news.
 	local audience = {}

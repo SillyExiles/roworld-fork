@@ -1046,6 +1046,28 @@ local function build(K_LIN: number, into: any?): any
 	Rules.REINFORCE_FRACTION = 0.20
 	Rules.REINFORCE_COOLDOWN_TICKS = 300
 
+	--- Empires Front (2026-11-01): rebels (Core/SimRevolts). Buying a rebel province back costs about
+	--- what its troops would cost as Reinforcements (a fifth of the cap for REINFORCE_COST), at
+	--- REBEL_PRICE_RATE of that, rounded to 1,000 between REBEL_PRICE_MIN and REBEL_PRICE_MAX.
+	Rules.REBEL_PRICE_RATE = 0.6
+	Rules.REBEL_PRICE_MIN = 50000.0
+	Rules.REBEL_PRICE_MAX = 3000000.0
+	function Rules.rebel_price(rebel_troops: number, parent_cap: number): number
+		local cap = math.max(parent_cap, 1.0)
+		local v = Rules.REINFORCE_COST * (math.max(rebel_troops, 0.0) / (Rules.REINFORCE_FRACTION * cap)) * Rules.REBEL_PRICE_RATE
+		v = math.clamp(v, Rules.REBEL_PRICE_MIN, Rules.REBEL_PRICE_MAX)
+		return math.floor(v / 1000 + 0.5) * 1000
+	end
+	--- Crushing a revolt in time (SimRevolts.CRUSH_TICKS) pays this share of the price the rebels
+	--- asked when they rose, between REBEL_CRUSH_MIN and REBEL_CRUSH_MAX.
+	Rules.REBEL_CRUSH_RATE = 0.75
+	Rules.REBEL_CRUSH_MIN = 50000.0
+	Rules.REBEL_CRUSH_MAX = 1500000.0
+	function Rules.rebel_crush_gold(price: number): number
+		local v = math.clamp(price * Rules.REBEL_CRUSH_RATE, Rules.REBEL_CRUSH_MIN, Rules.REBEL_CRUSH_MAX)
+		return math.floor(v / 1000 + 0.5) * 1000
+	end
+
 	function Rules.artillery_range(): number
 		return 45.0 / K_LIN
 	end

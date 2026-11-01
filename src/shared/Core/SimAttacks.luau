@@ -46,11 +46,7 @@
 --   * call to arms: every AID_PERIOD ticks, the teammates of a nation under attack send it troops
 --     (_team_aid_tick): each gives AID_SHARE of what it holds above AID_KEEP of its own cap, the lot
 --     no more than AID_COVER of the troops attacking and the room under the defender's cap.
--- Empires Front, revolts (2026-10-31): an empire stretched thin (at least REVOLT_MIN_SHARE of the land,
--- troops under REVOLT_LOW_TROOPS of its cap) may see its far provinces rise (_revolts_tick, every
--- REVOLT_PERIOD ticks once play has run REVOLT_FROM_TICKS): the border tile farthest from its heart
--- and the empire's land in a disk around it (about REVOLT_SHARE of its tiles) break away as a rebel
--- tribe, with REVOLT_TROOPS of the empire's troops as defectors and a levy of their own.
+-- Empires Front: unrest and revolts live in Core/SimRevolts (attacks_tick calls _unrest_tick).
 local Defs = require("./Defs")
 local Ev = require("./Ev")
 local Rules = require("./Rules")
@@ -86,22 +82,6 @@ SimAttacks.AID_KEEP = 0.35
 SimAttacks.AID_COVER = 0.35
 --- Messages about the aid, once per pair in this many ticks.
 SimAttacks.AID_MSG_TICKS = 300
-
---- Revolts: ticks between two checks (10 s), none in the first REVOLT_FROM_TICKS of play (5 min).
-SimAttacks.REVOLT_PERIOD = 100
-SimAttacks.REVOLT_FROM_TICKS = 3000
---- Only an empire holding this share of the land, with troops under this share of its cap.
-SimAttacks.REVOLT_MIN_SHARE = 0.06
-SimAttacks.REVOLT_LOW_TROOPS = 0.25
---- Chance per check for an empire that qualifies (scaled up to it by land: full at 15%).
-SimAttacks.REVOLT_CHANCE = 0.12
---- One revolt per empire in this many ticks at most (3 min); this many per match at most.
-SimAttacks.REVOLT_COOLDOWN = 1800
-SimAttacks.REVOLT_MAX = 40
---- The rebels take about this share of the empire's tiles and of its troops.
-SimAttacks.REVOLT_SHARE = 0.08
-SimAttacks.REVOLT_TROOPS = 0.25
-SimAttacks.REVOLT_COLOR = Defs.html_rgba("#8a5a44")
 
 --- A new Attack record (GDScript class SimAttacks.Attack).
 function SimAttacks.new_attack(): any
@@ -747,9 +727,8 @@ function SimAttacks.install(C: any)
 		if self.team_mode and tick % SimAttacks.AID_PERIOD == 0 then
 			self:_team_aid_tick()
 		end
-		if tick % SimAttacks.REVOLT_PERIOD == 0 and self.no_revolts ~= true then
-			self:_revolts_tick()
-		end
+		-- (Empires Front: unrest, warnings and revolts, Core/SimRevolts)
+		self:_unrest_tick()
 		-- Compact dead attacks.
 		local w = 0
 		local n = #attacks
@@ -1354,152 +1333,8 @@ function SimAttacks.install(C: any)
 		end
 	end
 
-	--- Revolts: which stretched-thin empires see a province rise this check (see the header).
-	function C._revolts_tick(self: any)
-		local since = self.playing_since or -1
-		if since < 0 or self.tick - since < SimAttacks.REVOLT_FROM_TICKS then
-			return
-		end
-		if (self._revolt_n or 0) >= SimAttacks.REVOLT_MAX then
-			return
-		end
-		local last = self._revolt_at
-		if last == nil then
-			last = {}
-			self._revolt_at = last
-		end
-		local o_alive = self.o_alive
-		local o_spawned = self.o_spawned
-		local o_kind = self.o_kind
-		local o_troops = self.o_troops
-		local o_cap = self.o_cap
-		local rng = self.rng
-		-- (owner_total grows as rebels appear: the bound is read once)
-		local total = self.owner_total
-		for id = 1, total do
-			if o_alive[id] == 0 or o_spawned[id] == 0 or o_kind[id] == Defs.KIND_TRIBE then
-				continue
-			end
-			local share = self:land_share(id)
-			if share < SimAttacks.REVOLT_MIN_SHARE then
-				continue
-			end
-			if o_troops[id] >= SimAttacks.REVOLT_LOW_TROOPS * (o_cap[id] or 0.0) then
-				continue
-			end
-			if self.tick - (last[id] or -1000000) < SimAttacks.REVOLT_COOLDOWN then
-				continue
-			end
-			local chance = SimAttacks.REVOLT_CHANCE * math.min(1.0, share / 0.15)
-			if rng:randf() >= chance then
-				continue
-			end
-			last[id] = self.tick
-			if self:_revolt(id) then
-				self._revolt_n = (self._revolt_n or 0) + 1
-				if self._revolt_n >= SimAttacks.REVOLT_MAX then
-					return
-				end
-			end
-		end
-	end
-
-	--- A province of `id` rises: returns true when rebels took land.
-	function C._revolt(self: any, id: number): boolean
-		local tiles = self.o_tiles[id]
-		if tiles < 40 then
-			return false
-		end
-		local owner = self.owner
-		local W = self.W
-		-- the heart of the empire: its centroid
-		local cx = self.o_cx[id] / tiles
-		local cy = self.o_cy[id] / tiles
-		-- the far province: the border tile farthest from the heart (a little noise so two revolts of
-		-- one empire do not always rise at the same end)
-		local salt = self.tick * 0.618 + id * 1.37
-		local best, bd = -1, -1.0
-		local t = self.bhead[id]
-		local seen = 0
-		while t ~= -1 do
-			local x = t % W
-			local y = t // W
-			local dx, dy = x - cx, y - cy
-			local h = math.sin(t * 12.9898 + salt) * 43758.5453
-			h -= math.floor(h)
-			local d = (dx * dx + dy * dy) * (0.75 + 0.5 * h)
-			if d > bd then
-				best, bd = t, d
-			end
-			seen += 1
-			if seen % 4096 == 0 then
-				Coop.check()
-			end
-			t = readi32(self.bnext, t * 4)
-		end
-		if best < 0 then
-			return false
-		end
-		-- the rebels' disk: about REVOLT_SHARE of the empire's tiles
-		local want = math.max(12, math.floor(tiles * SimAttacks.REVOLT_SHARE))
-		local r = math.clamp(math.sqrt(want / math.pi) * 1.25, 3.0, 80.0)
-		local take: { number } = {}
-		for _, c in self:disk_tiles(best, r, true) do
-			if readi32(owner, c * 4) == id then
-				take[#take + 1] = c
-			end
-		end
-		if #take < 8 then
-			return false
-		end
-		-- nearest the epicentre first, no more than `want` tiles
-		local range_d2 = self.range_d2
-		table.sort(take, function(a, b)
-			local da, db = range_d2(a, best), range_d2(b, best)
-			if da ~= db then
-				return da < db
-			end
-			return a < b
-		end)
-		local n_rebels = (self._revolt_names or {})[id] or 0
-		if self._revolt_names == nil then
-			self._revolt_names = {}
-		end
-		self._revolt_names[id] = n_rebels + 1
-		local name = self.o_name[id] .. " Rebels"
-		if n_rebels > 0 then
-			name ..= " " .. tostring(n_rebels + 1)
-		end
-		local rid = self:add_owner(name, SimAttacks.REVOLT_COLOR, Defs.KIND_TRIBE)
-		if rid <= 0 then
-			return false
-		end
-		local taken = 0
-		for i = 1, math.min(#take, want) do
-			set_owner(self, take[i], rid)
-			taken += 1
-		end
-		-- defectors from the empire's army, and a levy raised in the province
-		local defect = math.floor(self.o_troops[id] * SimAttacks.REVOLT_TROOPS)
-		self.o_troops[id] -= defect
-		local levy = math.floor(0.5 * self.R.max_troops(Defs.KIND_TRIBE, taken, 0, self.difficulty))
-		self.o_troops[rid] = defect + levy
-		self.o_spawned[rid] = 1
-		self.o_spawn_tile[rid] = best
-		self:ev({ Ev.SPAWNED, rid, best })
-		self:msg(
-			id,
-			Defs.MSG_BAD,
-			string.format(
-				"Revolt! Your far provinces rise: %d tiles and %s troops break away as the %s",
-				taken,
-				NumberFormat.render_troops(defect + levy),
-				name
-			)
-		)
-		self:msg_others(id, Defs.MSG_INFO, string.format("Revolt in %s: the %s take up arms", self.o_name[id], name))
-		return true
-	end
+	--- Overridden by SimRevolts (Empires Front: unrest and revolts).
+	function C._unrest_tick(_self: any) end
 
 	--- Overridden by SimStructures: true when a defense post of `id` covers tile `t`.
 	function C._defense_post_covers(_self: any, _t: number, _id: number): boolean
