@@ -117,6 +117,8 @@ Protocol.OP = {
 	-- server/Purchases.starter_seen; the INVENTORY that follows carries `starter`)
 	GENERAL = 42, -- server → client: ({ on: boolean, given: { crate: boolean?, stars: number?, skin: string? }? })
 	-- RoWorld General (Data/Subscription; server/General): subscribed or not, and what it just gave
+	FAVORITED = 43, -- client → server: Roblox's favorite prompt said yes: the support card's Stars (once;
+	-- server/Purchases.favorite_bonus; the INVENTORY that follows carries `fav_paid`)
 }
 
 Protocol.INTENT_TYPES = {

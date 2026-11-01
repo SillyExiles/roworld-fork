@@ -144,6 +144,8 @@ function ServerMain.start()
 	local setting_budget: { [Player]: number } = {}
 	local analytics_budget: { [Player]: number } = {}
 	local credit_budget: { [Player]: number } = {}
+	--- (Empires Front) a FAVORITED heard this session (the store keeps it once per account anyway)
+	local favorite_asked: { [Player]: boolean } = {}
 	--- server/FreshServers on a live hub (nil elsewhere), and when each player last asked to hop
 	local fresh: any = nil
 	local hop_at: { [Player]: number } = {}
@@ -890,6 +892,23 @@ function ServerMain.start()
 					report_once("Rewards.solo_result", err)
 				end
 			end)
+		elseif op == OP.FAVORITED then
+			-- (Empires Front) the title's support card: the player favorited the game (once per account)
+			if favorite_asked[player] then
+				return
+			end
+			favorite_asked[player] = true
+			task.spawn(function()
+				if Purchases.favorite_bonus(player) then
+					send(
+						player,
+						OP.NOTICE,
+						string.format("+%d Stars! Thanks for supporting Empires Front", Purchases.FAVORITE_STARS),
+						0
+					)
+					pcall(Analytics.report, player, "favorited")
+				end
+			end)
 		elseif op == OP.STARTER_SEEN then
 			-- the starter pack's offer is on the player's screen: its 48 hours start (once)
 			local c_used = credit_budget[player] or 0
@@ -1490,6 +1509,7 @@ function ServerMain.start()
 		setting_budget[player] = nil
 		analytics_budget[player] = nil
 		credit_budget[player] = nil
+		favorite_asked[player] = nil
 		crates_allowed[player] = nil
 		policy_known[player] = nil
 		General.release(player)

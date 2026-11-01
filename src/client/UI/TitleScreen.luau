@@ -19,6 +19,7 @@ local StarterButton = require("./StarterButton")
 local GeneralButton = require("./GeneralButton")
 local ShopButton = require("./ShopButton")
 local PartyPanel = require("./PartyPanel")
+local SupportCard = require("./SupportCard")
 local Signal = UITheme.core("Signal")
 
 local TitleScreen = W.class(W.Control)
@@ -456,6 +457,9 @@ function TitleScreen.new(c: any)
 		self.party_action:Fire(action, uid)
 	end
 	self:add_child(self._party)
+	-- (Empires Front) under the party: favorite the game for Stars (once)
+	self._support = SupportCard.new(c)
+	self:add_child(self._support)
 	--- in a party, and whether this player leads it (only the leader picks a public match)
 	self._in_party = false
 	self._party_leader = true
@@ -982,6 +986,7 @@ function TitleScreen.apply_layout(self)
 	self._credits:set_offsets(0, -(cb + ctx.insets.w + 14.0), 0, -(cb + ctx.insets.w))
 	self:_place_crate_button(compact, head_top)
 	self._party:apply_layout()
+	self._support:apply_layout(self._party)
 end
 
 --- The crate button, top right: level with the wordmark's top on desktop; on phones up in the
@@ -1705,6 +1710,7 @@ function TitleScreen._process(self, delta: number)
 		if self._party.visible ~= party_on then
 			self._party:set_visible(party_on)
 		end
+		self._support:refresh(not self.ctx:mp_waiting())
 	end
 	self._mp_dot:set_modulate_a(0.55 + 0.45 * (0.5 + 0.5 * math.sin(self._dot_t * 4.0)))
 	self:_countdown_ticks()

@@ -740,6 +740,15 @@ function Session.again_public(self: any, mode: string): boolean
 	return true
 end
 
+--- (Empires Front) Roblox's favorite prompt said yes: the support card's Stars (once per account;
+--- server/Purchases.favorite_bonus).
+function Session.claim_favorite(self: any)
+	local net = self.env.net
+	if net ~= nil and net.connected and type(net.send) == "function" then
+		net.send(OP.FAVORITED)
+	end
+end
+
 --- Quick Play: leave the line.
 function Session.leave_line(self: any)
 	if self:multiplayer_available() then
@@ -1506,6 +1515,8 @@ function Session._on_net(self: any, op: number, ...: any)
 				loaded = true,
 				starter = Session._starter_of(inv.starter),
 				banner = inv.banner == true,
+				-- (Empires Front) the favorite-the-game Stars were paid (UI/SupportCard hides)
+				fav_paid = inv.fav_paid == true,
 			}
 			local was = self._unlocks_seen
 			local fresh = {}

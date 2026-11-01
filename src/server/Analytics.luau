@@ -529,6 +529,9 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 		if open then
 			end_match(player, e, "Left", minutes(a))
 		end
+	elseif kind == "favorited" then
+		-- (Empires Front) the title's support card paid its Stars
+		custom(player, "Favorited Game", 1, nil)
 	elseif kind == "play_again" then
 		-- (Empires Front) the results' PLAY AGAIN (a: "solo" | "multi"): straight into another match
 		custom(player, "Play Again", 1, nil, if a == "solo" then "Solo" else "Multiplayer")

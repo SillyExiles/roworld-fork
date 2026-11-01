@@ -86,6 +86,8 @@ type Record = {
 	unlocks: { [string]: boolean },
 	--- the tutorial's Stars were paid (Data/Tutorial.STARS, once per player)
 	tutorial_paid: boolean?,
+	--- (Empires Front) the Stars for favoriting the game were paid (Purchases.FAVORITE_STARS, once)
+	fav_paid: boolean?,
 	--- ever paid Robux (a record from before this field: it has receipts)
 	paid: boolean,
 	--- the starter pack's offer, once it has been on their screen
@@ -168,6 +170,7 @@ local function clean(v: any, user_id: number?): Record
 	rec.stars = count(v.stars)
 	rec.stars_earned = count(v.stars_earned)
 	rec.tutorial_paid = if v.tutorial_paid == true then true else nil
+	rec.fav_paid = if v.fav_paid == true then true else nil
 	local gday = tonumber(v.general_day)
 	rec.general_day = if gday ~= nil and gday == gday then math.floor(gday) else nil
 	if type(v.unlocks) == "table" then
@@ -266,6 +269,7 @@ local function remember(player: any, rec: Record)
 		unlocks = rec.unlocks,
 		paid = rec.paid,
 		starter = rec.starter,
+		fav_paid = rec.fav_paid == true,
 	}
 end
 
@@ -347,6 +351,8 @@ function Purchases.inventory(player: any): any
 		unlocks = unlocks,
 		starter = Purchases.starter_state(player),
 		banner = banner[player] == true,
+		-- (Empires Front) the title's "favorite the game" card is gone once its Stars are paid
+		fav_paid = i ~= nil and i.fav_paid == true,
 	}
 end
 
@@ -798,6 +804,40 @@ function Purchases.tutorial_bonus(player: any, amount: number): boolean
 	return paid
 end
 
+--- (Empires Front) Stars for favoriting the game: the title's support card (UI/SupportCard).
+Purchases.FAVORITE_STARS = 1000
+
+--- (Empires Front) Pays Purchases.FAVORITE_STARS once per player, after Roblox's favorite prompt said
+--- yes (the client tells us: Roblox gives a server no way to check a favorite, so once per account is
+--- the whole guard). Yields. True when they were paid now.
+function Purchases.favorite_bonus(player: any): boolean
+	local add = Purchases.FAVORITE_STARS
+	local stored: Record? = nil
+	local paid = false
+	local ok, err = pcall(function()
+		deps.datastore:UpdateAsync(key(player.UserId), function(old: any): any
+			local rec = clean(old, player.UserId)
+			stored = rec
+			if rec.fav_paid then
+				paid = false
+				return nil
+			end
+			paid = true
+			rec.fav_paid = true
+			rec.stars = math.min(rec.stars + add, Purchases.MAX_STARS)
+			rec.stars_earned = math.min(rec.stars_earned + add, Purchases.MAX_STARS)
+			return rec
+		end)
+	end)
+	if not ok or stored == nil then
+		log("could not pay the favorite Stars to " .. tostring(player.UserId) .. ": " .. tostring(err))
+		return false
+	end
+	remember(player, stored :: Record)
+	notify(player)
+	return paid
+end
+
 --- RoWorld General (Data/Subscription; 2026-10-27; server/General calls it while Roblox says the
 --- player is subscribed): UTC day `day`'s crate credit, or, where crates aren't allowed (`crates`
 --- false), Subscription.DAILY_STARS Stars, once a day; and the month's General skin `skin`, kept for
@@ -858,6 +898,7 @@ function Purchases.reset_new_player(player: any, keep_owned: boolean?): boolean
 		deps.datastore:UpdateAsync(key(player.UserId), function(old: any): any
 			local rec = clean(old, player.UserId)
 			rec.tutorial_paid = nil
+			rec.fav_paid = nil
 			rec.crates_bought = 0
 			rec.starter = nil
 			if not keep_owned then
