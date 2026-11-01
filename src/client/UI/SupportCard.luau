@@ -19,6 +19,8 @@ SupportCard.WIDTH = 250.0
 SupportCard.STARS = 1000
 --- The gap under the party panel.
 SupportCard.GAP = 10.0
+--- Seconds a favorite prompt may take before the button comes back (it never answered).
+SupportCard.ASK_S = 20.0
 
 function SupportCard.new(c: any)
 	local self = setmetatable({}, SupportCard.__mt)
@@ -107,6 +109,7 @@ function SupportCard._favorite(self)
 	end
 	self.ctx:sfx("click")
 	self._asking = true
+	self._ask_at = os.clock()
 	self:_set_busy(true)
 	local ok = pcall(function()
 		AvatarEditorService:PromptSetFavorite(game.PlaceId, Enum.AvatarItemType.Asset, true)
@@ -122,6 +125,11 @@ function SupportCard.refresh(self, on_title: boolean)
 	local s = self.ctx.session
 	local inv = if s ~= nil then s.inventory else nil
 	local on = on_title and type(inv) == "table" and inv.loaded == true and inv.fav_paid ~= true
+	-- (a prompt that never answered: the button comes back)
+	if self._asking and os.clock() - (self._ask_at or 0) > SupportCard.ASK_S then
+		self._asking = false
+		self:_set_busy(false)
+	end
 	if self.visible ~= on then
 		self:set_visible(on)
 	end
