@@ -33,6 +33,10 @@ local readi32 = buffer.readi32
 local SimRevolts = {}
 
 SimRevolts.PERIOD = 50
+--- (2026-11-01) Revolts come as a surprise: the player sees no unrest, no warning and no "calmed
+--- down" (no Ev.UNREST, no snapshot rows, no messages). The causes and the calm of buildings still
+--- work underneath; only the rising itself is told (with crush / pay / free as before).
+SimRevolts.SECRET = true
 SimRevolts.FROM_TICKS = 3000
 SimRevolts.MIN_SHARE = 0.05
 SimRevolts.WARN_AT = 55
@@ -328,7 +332,7 @@ function SimRevolts.install(C: any)
 	end
 
 	local function send_unrest(self: any, s: any, id: number)
-		if not shown(self, id) then
+		if SimRevolts.SECRET or not shown(self, id) then
 			return
 		end
 		local row = self:_unrest_row(id)
@@ -391,7 +395,9 @@ function SimRevolts.install(C: any)
 						end
 					else
 						s.last[id] = self.tick - SimRevolts.COOLDOWN + SimRevolts.CALM_COOLDOWN
-						self:msg(id, Defs.MSG_GOOD, string.format("The unrest in %s has calmed down", w.name))
+						if not SimRevolts.SECRET then
+							self:msg(id, Defs.MSG_GOOD, string.format("The unrest in %s has calmed down", w.name))
+						end
 					end
 				end
 			elseif
@@ -403,15 +409,17 @@ function SimRevolts.install(C: any)
 			then
 				local name = self:_province_name(id, epi)
 				s.warn[id] = { tile = epi, at = self.tick + SimRevolts.WARN_TICKS, name = name }
-				self:msg(
-					id,
-					Defs.MSG_ALERT,
-					string.format(
-						"Unrest in %s! It revolts in %d s: raise your troops, or calm it with a City, Market, Defense Post or a road",
-						name,
-						SimRevolts.WARN_TICKS // rate
+				if not SimRevolts.SECRET then
+					self:msg(
+						id,
+						Defs.MSG_ALERT,
+						string.format(
+							"Unrest in %s! It revolts in %d s: raise your troops, or calm it with a City, Market, Defense Post or a road",
+							name,
+							SimRevolts.WARN_TICKS // rate
+						)
 					)
-				)
+				end
 			end
 			send_unrest(self, s, id)
 			if id % 16 == 0 then
@@ -697,7 +705,7 @@ function SimRevolts.install(C: any)
 	function C.unrest_rows(self: any): { { any } }
 		local out = {}
 		local s = self._rv
-		if s == nil then
+		if s == nil or SimRevolts.SECRET then
 			return out
 		end
 		for id = 1, self.owner_total do

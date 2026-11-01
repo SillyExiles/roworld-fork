@@ -17,6 +17,9 @@ local UnrestBanner = W.class(W.Control)
 
 --- The meter shows from this unrest on (0..100).
 UnrestBanner.SHOW_AT = 30
+--- (2026-11-01) Revolts are a surprise (Core/SimRevolts.SECRET): no meter, no warning; only a
+--- province that rose shows (crush / VIEW / PAY).
+UnrestBanner.SHOW_UNREST = false
 UnrestBanner.WIDTH = 330.0
 
 local AMBER_TINT = UITheme.rgba(0.2, 0.12, 0.03, 0.88)
@@ -238,7 +241,7 @@ function UnrestBanner.refresh(self)
 			ctx:sfx("betrayal")
 			W.pop_in(self.panel, 0.0, 1.12, 0.35)
 		end
-	elseif warn_left > 0 then
+	elseif UnrestBanner.SHOW_UNREST and warn_left > 0 then
 		self:_style("warn")
 		self._rebel = 0
 		self._focus_tile = tonumber(o.unrest_tile) or -1
@@ -256,7 +259,7 @@ function UnrestBanner.refresh(self)
 			ctx:sfx("alarm")
 			W.pop_in(self.panel, 0.0, 1.12, 0.35)
 		end
-	elseif (o.unrest or 0) >= UnrestBanner.SHOW_AT then
+	elseif UnrestBanner.SHOW_UNREST and (o.unrest or 0) >= UnrestBanner.SHOW_AT then
 		self:_style("meter")
 		self._rebel = 0
 		self._focus_tile = tonumber(o.unrest_tile) or -1

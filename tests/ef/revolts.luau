@@ -26,11 +26,8 @@ local warned, calmed, rose, free = 0, 0, 0, 0
 local warned_ids = {}
 local orig_msg = sim.msg
 sim.msg = function(self, to, cat, text)
-	if string.find(text, "^Unrest in") then
-		warned += 1
-		warned_ids[to] = (warned_ids[to] or 0) + 1
-	elseif string.find(text, "calmed down") then
-		calmed += 1
+	if string.find(text, "^Unrest in") or string.find(text, "calmed down") then
+		calmed += 1 -- (secret: none of these may be sent)
 	end
 	orig_msg(self, to, cat, text)
 end
@@ -48,9 +45,26 @@ sim._revolt = function(self, id, t, prov)
 end
 local ticks = tonumber((...)) or 9000
 local evs = {}
+local seen_warn = {}
+local unrest_events = 0
 for _ = 1, ticks do
 	local d = sim:step()
+	-- (the warnings are secret now: SimRevolts.SECRET; read them from the state)
+	local rv = sim._rv
+	if rv ~= nil then
+		for wid, w in rv.warn do
+			local key = wid .. ":" .. w.at
+			if not seen_warn[key] then
+				seen_warn[key] = true
+				warned += 1
+				warned_ids[wid] = (warned_ids[wid] or 0) + 1
+			end
+		end
+	end
 	for _, e in d.ev or {} do
+		if e[1] == Ev.UNREST then
+			unrest_events += 1
+		end
 		if e[1] == Ev.REBEL then
 			table.insert(evs, e)
 			if e[5] == SimRevolts.FREE then
@@ -59,8 +73,11 @@ for _ = 1, ticks do
 		end
 	end
 end
-print(string.format("AI match %d ticks: %d warnings, %d calmed, %d revolts, %d free nations", ticks, warned, calmed, rose, free))
-expect(unwarned == 0, "no revolt without a warning first")
+print(string.format("AI match %d ticks: %d hidden warnings, %d revolts, %d free nations", ticks, warned, rose, free))
+expect(calmed == 0, "secret: no warning or calm-down messages")
+expect(unwarned == 0, "no revolt without a (hidden) warning first")
+expect(unrest_events == 0, "secret: no unrest is sent to players")
+local secret_msgs = 0
 expect(rose <= warned, "revolts never outnumber warnings")
 local s = sim._rv
 expect(s ~= nil and next(s.unrest) ~= nil, "unrest is computed")
