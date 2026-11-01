@@ -286,6 +286,9 @@ end
 --- LobbyRules.JOIN_CLOSE_S = 6 s; the card's whole seconds round up).
 TitleScreen.JOIN_CLOSE_S = 5
 TitleScreen.DIFFS = { [0] = "Relaxed", "Standard", "Brutal" }
+--- Empires Front (2026-11-01): the solo match's mode (setting "solo_teams"): every nation for itself, or
+--- 2 / 4 teams drawn at random among you and the nations.
+TitleScreen.MODES = { { 0, "Solo" }, { 2, "2 Teams" }, { 4, "4 Teams" } }
 TitleScreen.DIFF_BLURB = {
 	[0] = "Gentle AI: slower growth and a long early peace.",
 	"A fair fight: nations respect a short early peace.",
@@ -568,6 +571,29 @@ function TitleScreen._build_dock(self)
 		end)
 		table.insert(self._chips, chip)
 		dr:add_child(chip)
+	end
+	-- the mode row: free for all or random teams (UIRoot.solo_opts reads the setting)
+	local mr = UITheme.hbox(8)
+	self._mode_row = mr
+	local mcap = UITheme.caption("Mode")
+	mcap.size_flags_vertical = W.SHRINK_CENTER
+	mcap:set_min_size(Vector2.new(84, 0))
+	mr:add_child(mcap)
+	self._mode_chips = {}
+	local cur_mode = math.floor(tonumber(ctx:setting("solo_teams", 0)) or 0)
+	for _, md in TitleScreen.MODES do
+		local chip = UITheme.button(md[2], "ChipButton", "", 34.0)
+		chip.toggle_mode = true
+		chip.size_flags_horizontal = W.EXPAND_FILL
+		chip:set_pressed_no_signal(md[1] == cur_mode)
+		chip.pressed:Connect(function()
+			for _, e in self._mode_chips do
+				e[2]:set_pressed_no_signal(e[1] == md[1])
+			end
+			ctx:set_setting("solo_teams", md[1])
+		end)
+		table.insert(self._mode_chips, { md[1], chip })
+		mr:add_child(chip)
 	end
 	self._diff_desc = UITheme.label("", 12, 500, UITheme.TEXT_2)
 	self._diff_desc:set_alignment(W.ALIGN_CENTER)
@@ -1189,6 +1215,8 @@ function TitleScreen._build_solo_menu(self)
 	self._diff_row.size_flags_horizontal = W.FILL
 	v:add_child(self._diff_row)
 	v:add_child(self._diff_desc)
+	self._mode_row.size_flags_horizontal = W.FILL
+	v:add_child(self._mode_row)
 	local start = T.button("START", "PrimaryButton", "play", 58.0)
 	start:add_theme_constant_override("icon_max_width", 18)
 	start:set_font_size(19)

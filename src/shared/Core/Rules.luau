@@ -243,11 +243,15 @@ local function build(K_LIN: number, into: any?): any
 	--- Empires Front (2026-10-31): at most BARRACKS_LIMIT Barracks per player in a match (captured
 	--- ones count; upgrading one you hold is always allowed).
 	Rules.BARRACKS_LIMIT = 4
+	--- (2026-11-01) at most FORGE_LIMIT Forges per player (their four tiers are levels: upgrade one)
+	Rules.FORGE_LIMIT = 2
 
 	--- How many structures of `kind` one player may hold (nil: no limit).
 	function Rules.struct_limit(kind: number): number?
 		if kind == Defs.S_BARRACKS then
 			return Rules.BARRACKS_LIMIT
+		elseif kind == Defs.S_FORGE then
+			return Rules.FORGE_LIMIT
 		end
 		return nil
 	end

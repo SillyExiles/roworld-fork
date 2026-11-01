@@ -447,7 +447,7 @@ local function _seed_from_border(self: any, a: any): number
 	local via = a.via
 	if via ~= nil and via >= 0 then
 		local o = readi32(self.owner, via * 4)
-		if o ~= 0 and o ~= a.attacker and self:same_team(a.attacker, o) and self:allied(a.attacker, o) then
+		if o ~= 0 and o ~= a.attacker and self:_passage_ok(a.attacker, o) then
 			_add_neighbors(self, a, via)
 		else
 			a.via = -1
@@ -1153,6 +1153,18 @@ function SimAttacks.install(C: any)
 		return o > 0 and o ~= id and self:same_team(id, o) and self:allied(id, o) and self.o_alive[o] == 1
 	end
 
+	--- Empires Front: may `id`'s troops march through `o`'s land? A teammate (team games), or an ally
+	--- that granted `id` Military Access (SimDiplomacy pact "access", asked for and accepted).
+	function C._passage_ok(self: any, id: number, o: number): boolean
+		if o <= 0 or o == id or self.o_alive[o] == 0 then
+			return false
+		end
+		if self:_is_mate(id, o) then
+			return true
+		end
+		return self:allied(id, o) and type(self.has_pact) == "function" and self:has_pact(id, o, 3)
+	end
+
 	--- True when a teammate of `id` owns a 4-neighbour of `t`.
 	function C._touches_mate(self: any, t: number, id: number): boolean
 		local owner = self.owner
@@ -1161,25 +1173,25 @@ function SimAttacks.install(C: any)
 		local o
 		if x > 0 then
 			o = readi32(owner, (t - 1) * 4)
-			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+			if o ~= 0 and o ~= id and self:_passage_ok(id, o) then
 				return true
 			end
 		end
 		if x < W - 1 then
 			o = readi32(owner, (t + 1) * 4)
-			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+			if o ~= 0 and o ~= id and self:_passage_ok(id, o) then
 				return true
 			end
 		end
 		if t >= W then
 			o = readi32(owner, (t - W) * 4)
-			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+			if o ~= 0 and o ~= id and self:_passage_ok(id, o) then
 				return true
 			end
 		end
 		if t < self.N - W then
 			o = readi32(owner, (t + W) * 4)
-			if o ~= 0 and o ~= id and self:_is_mate(id, o) then
+			if o ~= 0 and o ~= id and self:_passage_ok(id, o) then
 				return true
 			end
 		end
@@ -1190,9 +1202,7 @@ function SimAttacks.install(C: any)
 	--- nearest tile `toward`: a teammate's border tile with a land neighbour of `target`, and that
 	--- teammate (-1, 0 when no teammate borders it).
 	function C.passage_tile(self: any, id: number, target: number, toward: number): (number, number)
-		if not self.team_mode or self.o_team[id] == 0 then
-			return -1, 0
-		end
+		-- (Empires Front: also through an ally that granted Military Access, team game or not)
 		local owner = self.owner
 		local land = self.land
 		local bnext = self.bnext
@@ -1202,7 +1212,7 @@ function SimAttacks.install(C: any)
 		local best, best_mate, best_d = -1, 0, math.huge
 		local seen = 0
 		for m = 1, self.owner_total do
-			if not self:_is_mate(id, m) then
+			if not self:_passage_ok(id, m) then
 				continue
 			end
 			local b = self.bhead[m]

@@ -118,8 +118,14 @@ function SimNaval.install(C)
 		self.boat_tokens[id] -= 1
 		local water_body = readu16(map.coast_body, t * 2)
 		local src = self:nearest_own_coast(id, water_body, t)
+		local via_port = 0
 		if src < 0 then
-			self:msg(id, Defs.MSG_INFO, "You have no coast on that sea")
+			-- Empires Front (2026-11-01): no coast of our own on that sea, but an ally that granted
+			-- Military Access (or a teammate) has a finished port there: the transport sails from it
+			src, via_port = self:_partner_port(id, water_body, t)
+		end
+		if src < 0 then
+			self:msg(id, Defs.MSG_INFO, "You have no coast on that sea (an ally's port works with Military Access)")
 			return false
 		end
 		local nav = self.nav
@@ -150,6 +156,9 @@ function SimNaval.install(C)
 		u.end_tick = tick + ((#path - 1) * u.tpt + 99) // 100
 		self.o_boats[id] += 1
 		self:add_unit(u)
+		if via_port > 0 and self:is_human(id) then
+			self:msg(id, Defs.MSG_INFO, "Your transport sails from " .. self.o_name[via_port] .. "'s port")
+		end
 		if tg ~= 0 then
 			self:msg(tg, Defs.MSG_ALERT, string.format("%s sent a transport toward your coast", self.o_name[id]))
 			self:_on_transport_launched(u, tg)
@@ -159,6 +168,27 @@ function SimNaval.install(C)
 
 	-- Hook for the AI (a nation may answer an incoming transport).
 	function C:_on_transport_launched(_u, _target_owner: number) end
+
+	--- Empires Front: the finished port on `water_body` nearest `near` of a nation whose land `id` may use
+	--- (SimAttacks._passage_ok: Military Access, or a teammate). Its tile and owner, or -1, 0.
+	function C:_partner_port(id: number, water_body: number, near: number): (number, number)
+		local cb = self.map.coast_body
+		local dist2 = self.dist2
+		local best, best_owner, bd = -1, 0, math.huge
+		for _, s in self.port_list do
+			if s.dead or not s.active or s.owner == id or not self:_passage_ok(id, s.owner) then
+				continue
+			end
+			if readu16(cb, s.tile * 2) ~= water_body then
+				continue
+			end
+			local d = dist2(s.tile, near)
+			if d < bd then
+				best, best_owner, bd = s.tile, s.owner, d
+			end
+		end
+		return best, best_owner
+	end
 
 	-- Owned coastal tile on `water_body` closest to `near` (-1 if none).
 	function C:nearest_own_coast(id: number, water_body: number, near: number): number

@@ -68,6 +68,12 @@ LobbyRules.MAP_SCALE_PCT = 80
 LobbyRules.LOBBY_OPEN_S = 90
 LobbyRules.LOBBY_INTERVAL_S = 45
 LobbyRules.MIN_LEAD_S = 45
+--- Empires Front (2026-11-01): while few players are joining (under QUIET_RATE seats a second, about
+--- 3 a minute) a new lobby starts QUIET_LEAD_S out and the next QUIET_INTERVAL_S after it, so a player
+--- waits ~20 s, not a minute; with many joining the usual 45-90 s let the lobbies fill.
+LobbyRules.QUIET_RATE = 0.05
+LobbyRules.QUIET_LEAD_S = 20
+LobbyRules.QUIET_INTERVAL_S = 25
 --- World's lobbies keep this far from the free-for-alls' starts (missing_starts `avoid`): the two kinds
 --- kept the same schedule (each LOBBY_INTERVAL_S after its last), so their lobbies started on the same
 --- second and PUBLIC MATCH, which takes World's seats when World's lobby is the sooner (takes_from),
@@ -412,7 +418,12 @@ function LobbyRules.missing_starts(
 		interval = math.clamp(size / demand.rate, LobbyRules.MIN_INTERVAL_S, LobbyRules.LOBBY_INTERVAL_S)
 	end
 	local out = {}
-	local next_start = math.max(now + LobbyRules.MIN_LEAD_S, latest + interval)
+	local lead = LobbyRules.MIN_LEAD_S
+	if demand == nil or demand.rate < LobbyRules.QUIET_RATE then
+		lead = LobbyRules.QUIET_LEAD_S
+		interval = math.min(interval, LobbyRules.QUIET_INTERVAL_S)
+	end
+	local next_start = math.max(now + lead, latest + interval)
 	if avoid ~= nil and interval >= LobbyRules.LOBBY_INTERVAL_S then
 		for _, a in avoid do
 			if math.abs(next_start - a) < LobbyRules.WORLD_STAGGER_S then
@@ -673,10 +684,7 @@ function LobbyRules.team_weights(maps: { any }): { { id: string, weight: number 
 	for _, m in maps do
 		local f: number? = (LobbyRules.TEAM_FREQUENCY :: { [string]: number })[m.id]
 		local w = if f ~= nil then f else math.max(0, tonumber(m.weight) or 0)
-		-- (Empires Front 2026-10-31: the free-for-all maps, World and the continents, are never team games)
-		if m.ffa_only then
-			w = 0
-		end
+		-- (Empires Front 2026-11-01: every map is played both ways, free for all and in teams)
 		table.insert(out, { id = m.id, weight = w })
 	end
 	return out

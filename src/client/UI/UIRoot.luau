@@ -1637,7 +1637,7 @@ function UIRoot._on_play_solo(self, difficulty: number)
 	self._solo_msec = UICtx.msec()
 	ctx:set_setting("difficulty", difficulty)
 	ctx:sfx("click")
-	ctx:session_call("start_solo", { difficulty, UIMaps.valid(ctx:setting("map_id", UIMaps.DEFAULT_ID)) })
+	ctx:session_call("start_solo", { difficulty, UIMaps.valid(ctx:setting("map_id", UIMaps.DEFAULT_ID)), UIRoot.solo_opts(ctx) })
 end
 
 --- A fresh solo match from inside one: the results screen's "Play again", the game menu's "Restart
@@ -1645,6 +1645,13 @@ end
 --- _on_play_solo, whose "already in solo" guard (meant for a second tap on the title) made all three
 --- dead buttons. Session.start_solo builds the new world in the background (the old one stays frozen
 --- meanwhile, with the "Deploying a new world…" chip) and swaps it in on state_ready.
+--- Empires Front: the solo match's options from the saved settings (the PLAY SOLO menu's Mode row):
+--- { teams = 2 | 4 } for a team game, {} for a free-for-all.
+function UIRoot.solo_opts(ctx: any): { [string]: any }
+	local t = math.floor(tonumber(ctx:setting("solo_teams", 0)) or 0)
+	return if t >= 2 then { teams = t } else {}
+end
+
 function UIRoot._restart_solo(self, difficulty: number)
 	local ctx = self.ctx
 	if
@@ -1662,7 +1669,7 @@ function UIRoot._restart_solo(self, difficulty: number)
 	ctx:set_setting("difficulty", difficulty)
 	ctx:sfx("click")
 	self._restart_pending = true
-	ctx:session_call("start_solo", { difficulty, UIMaps.valid(ctx:setting("map_id", UIMaps.DEFAULT_ID)) })
+	ctx:session_call("start_solo", { difficulty, UIMaps.valid(ctx:setting("map_id", UIMaps.DEFAULT_ID)), UIRoot.solo_opts(ctx) })
 	self:_update_pause()
 end
 

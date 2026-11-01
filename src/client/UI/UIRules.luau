@@ -104,7 +104,7 @@ UIRules.BLURBS = {
 	port = "Coastal. Sends trade ships for gold and builds warships.",
 	factory = "Road hub: every building within its reach joins the roads. Carts pay gold at every city, port, mine and market they pass.",
 	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time.",
-	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}",
+	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}. At most 2 Forges per player: build near one to upgrade it.",
 	farm = "Grows {farm_food} Food a second for each level (less on hills or dry land). Your army eats: without Food it stops growing and deserts.",
 	mine = "Digs {mine_ore} Ore a second for each level. Only on hills or mountains (more in mountains). On the roads (a Factory in reach): +50% Ore.",
 	market = "Sells up to {mkt_ore} spare Ore a second for each level at the match's Ore price (it keeps what your next Forge level needs). Each trade pact raises what it gets by 20%. On the roads: sells 50% more.",
@@ -814,7 +814,7 @@ UIRules.PLACE_REASONS = {
 	no_coast = "Ports must be on your coast",
 	no_port = "Warships need a finished port on this water",
 	gold = "Not enough gold",
-	limit = "Limit reached: 4 Barracks per player (upgrade one instead)",
+	limit = "Limit reached: at most 4 Barracks and 2 Forges per player (upgrade one instead)",
 	invalid = "Can't build here",
 }
 
@@ -1414,9 +1414,10 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 			})
 			-- Empires Front: pacts and resources between allies (SimDiplomacy, SimEconomy)
 			if type(s.has_pact) == "function" then
-				for _, pk in { { 1, "trade", "Trade Pact" }, { 2, "defense", "Defence Pact" } } do
+				-- (2026-11-01: Military Access: march through their land and sail from their ports)
+				for _, pk in { { 1, "trade", "Trade Pact" }, { 2, "defense", "Defence Pact" }, { 3, "access", "Military Access" } } do
 					local kid, kname, label = pk[1], pk[2], pk[3]
-					local picon = "pact_" .. kname
+					local picon = if kname == "access" then "alliance" else "pact_" .. kname
 					if s:has_pact(me, own, kid) then
 						table.insert(items, { id = "pact:" .. kname, label = label, icon = picon, ok = false, reason = "Signed", danger = false })
 					elseif s:pact_requested(own, me, kid) then

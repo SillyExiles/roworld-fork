@@ -16,8 +16,11 @@ local Rules = require("./Rules")
 
 local SimDiplomacy = {}
 
-SimDiplomacy.KINDS = { trade = 1, defense = 2 }
-SimDiplomacy.NAMES = { [1] = "trade pact", [2] = "defence pact" }
+--- (2026-11-01) Military Access ("access"): asked for and granted between allies; the asker's troops may
+--- march through the granter's land to attack (SimAttacks.passage_tile) and its transports may sail from
+--- the granter's ports (SimNaval._partner_port). A pact holds both ways once signed.
+SimDiplomacy.KINDS = { trade = 1, defense = 2, access = 3 }
+SimDiplomacy.NAMES = { [1] = "trade pact", [2] = "defence pact", [3] = "Military Access pact" }
 SimDiplomacy.TRADE_INCOME_BONUS = 0.06
 --- Proposals lapse after this many ticks.
 SimDiplomacy.REQUEST_TICKS = 300
@@ -99,7 +102,10 @@ function SimDiplomacy.install(C)
 		end
 		if self.o_ai[target] == 1 then
 			-- an AI ally signs a trade pact, and a defence pact unless it is far stronger than the asker
-			local ok = kind == 1 or self.o_troops[target] < self.o_troops[id] * 3.0
+			-- (Military Access: unless the asker's army is over twice its own, a march through is a risk)
+			local ok = kind == 1
+				or (kind == 2 and self.o_troops[target] < self.o_troops[id] * 3.0)
+				or (kind == 3 and self.o_troops[id] < self.o_troops[target] * 2.0)
 			if ok then
 				self:_sign_pact(id, target, kind)
 			else

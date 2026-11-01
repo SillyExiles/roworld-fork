@@ -1228,7 +1228,14 @@ function Sim.assign_teams(self: any, groups: { [number]: string }?)
 		return
 	end
 	local players = {}
-	for _, h in self.humans do
+	-- (Empires Front 2026-11-01: the teams are drawn at random, people too, not in join order: the
+	-- humans come in a shuffled order, a party still going onto one team)
+	local humans = table.clone(self.humans)
+	for i = #humans, 2, -1 do
+		local j = self.rng:randi_range(1, i)
+		humans[i], humans[j] = humans[j], humans[i]
+	end
+	for _, h in humans do
 		table.insert(players, { id = h, group = if groups then groups[h] else nil, filler = self.o_bot[h] == 1 })
 	end
 	-- (nations, when a team game has them, fill like bot players, after all humans)
@@ -1377,9 +1384,10 @@ function Sim.intent_attack_troops(self: any, id: number, t: number, amount: numb
 	o_troops[id] -= troops
 	self.dbg_flow[id * 5] += troops
 	local a = self:start_attack(id, tg, troops, -1)
-	if a == nil and o_troops[id] >= home - 0.5 and self.team_mode then
-		-- Empires Front (2026-10-31): no border of our own, but a teammate's: the troops march through
-		-- the teammate's land and attack from its border nearest the tap (SimAttacks passage_tile).
+	if a == nil and o_troops[id] >= home - 0.5 then
+		-- Empires Front (2026-10-31): no border of our own, but a teammate's (or, since 2026-11-01, an
+		-- ally's that granted Military Access): the troops march through its land and attack from its
+		-- border nearest the tap (SimAttacks passage_tile).
 		local via, mate = self:passage_tile(id, tg, t)
 		if via >= 0 then
 			o_troops[id] -= troops

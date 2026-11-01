@@ -428,6 +428,10 @@ function Session.start_solo(self: any, p_difficulty: number, map_id: string?, op
 	local countdown = if type(opts) == "table" and type(opts.countdown_ticks) == "number"
 		then opts.countdown_ticks
 		else nil
+	-- Empires Front (2026-11-01): a solo team game (2 or 4 teams drawn at random among you and the nations)
+	local teams = if type(opts) == "table" and type(opts.teams) == "number" and opts.teams >= 2
+		then math.floor(opts.teams)
+		else nil
 	self:_start_local(MODE_SOLO, {
 		seed = self:_rand_seed(),
 		difficulty = self.difficulty,
@@ -436,6 +440,7 @@ function Session.start_solo(self: any, p_difficulty: number, map_id: string?, op
 		max_humans = 1,
 		time_limit_s = 0,
 		map_id = self.map_id,
+		teams = teams,
 	}, self:local_display_name())
 end
 
@@ -1033,6 +1038,10 @@ function Session._build_local(self: any, config: { [string]: any }, human_name: 
 	local id = 0
 	if human_name ~= "" then
 		id = sim:add_human("local", human_name)
+	end
+	-- a solo team game: the teams, now that the player and the nations are in
+	if sim.team_mode and type(sim.assign_teams) == "function" then
+		sim:assign_teams()
 	end
 	local snap = sim:snapshot()
 	Coop.check()
