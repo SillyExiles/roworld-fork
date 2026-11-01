@@ -529,6 +529,9 @@ function Analytics.report(player: any, kind: any, a: any, b: any, c: any)
 		if open then
 			end_match(player, e, "Left", minutes(a))
 		end
+	elseif kind == "play_again" then
+		-- (Empires Front) the results' PLAY AGAIN (a: "solo" | "multi"): straight into another match
+		custom(player, "Play Again", 1, nil, if a == "solo" then "Solo" else "Multiplayer")
 	elseif kind == "help" then
 		custom(player, "How To Play", 1, if open then m else nil, if type(a) == "string" then Analytics.WHERE[a] else nil)
 	elseif kind == "spectate" then

@@ -564,7 +564,11 @@ function GameOver.open(self, kind: string, winner: number, killer: number, stats
 	-- the Stars this match (or this life) paid, if the payout is in already
 	local sess = ctx.session
 	self:set_award(if sess ~= nil then sess.last_award else nil)
-	self._again:set_visible(solo)
+	-- (Empires Front) every match ends on PLAY AGAIN: solo restarts, a public match finds the next one
+	self._again:set_visible(solo or ctx:mode() == UICtx.MODE_MULTI)
+	if self._finding_at ~= nil and not self:finding() then
+		self:set_finding(false)
+	end
 	self._spec:set_visible(kind == "eliminated" and running)
 	self._spec:set_text("Keep watching")
 	self._home:set_text("Return to title")
@@ -775,6 +779,20 @@ function GameOver.set_building(self, on: boolean)
 	self._again:set_text(if on then "DEPLOYING…" else "PLAY AGAIN")
 end
 
+--- (Empires Front) PLAY AGAIN in a public match: on the way to the next one (the teleport takes a few
+--- seconds). The button comes back after FINDING_S if nothing happened (a failed teleport).
+GameOver.FINDING_S = 20.0
+function GameOver.set_finding(self, on: boolean)
+	self._finding_at = if on then os.clock() else nil
+	self._again:set_disabled(on)
+	self._again:set_text(if on then "FINDING MATCH…" else "PLAY AGAIN")
+end
+
+function GameOver.finding(self): boolean
+	local at = self._finding_at
+	return at ~= nil and os.clock() - at < GameOver.FINDING_S
+end
+
 --- Fills the winner / leader pill for owner `id` (hidden when there is none, and on VICTORY).
 --- Only touches the label when the text changes (called on every live refresh).
 function GameOver._set_pill(self, id: number)
@@ -959,7 +977,12 @@ function GameOver._refresh_next(self)
 	local lb = ctx:lobby()
 	local stage = tostring(lb.stage or "")
 	local cd = tonumber(lb.countdown_s) or 0.0
-	if stage == "over" then
+	if stage == "over" and lb.hosted == true then
+		-- (Empires Front) a public match is played once: everyone goes back to the lobby after the results
+		self._next:set_text(
+			string.format("Back to the lobby in %s  ·  PLAY AGAIN jumps into a new match now", UITheme.fmt_time(math.ceil(cd)))
+		)
+	elseif stage == "over" then
 		local rematch = 12.0
 		local sess = ctx.session
 		if sess ~= nil and type(sess.REMATCH_COUNTDOWN_SEC) == "number" then
@@ -1165,6 +1188,9 @@ function GameOver._process(self, delta: number)
 	if self._next_accum >= 0.25 then
 		self._next_accum = 0.0
 		self:_refresh_next()
+		if self._finding_at ~= nil and not self:finding() then
+			self:set_finding(false)
+		end
 		-- ELIMINATED while the war goes on: the "Current leader" pill follows the leaderboard
 		-- (review R2-2; the original kept the snapshot taken when the screen opened).
 		local s = self.ctx.state

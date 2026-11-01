@@ -579,6 +579,14 @@ function Main.start()
 			and type(ui.autostart_solo) == "function"
 		then
 			ui:autostart_solo(tonumber(data.solo.d) or 0, if type(data.solo.m) == "string" then data.solo.m else nil)
+		elseif
+			type(data) == "table"
+			and type(data.again) == "string"
+			and ui ~= nil
+			and type(ui.autostart_public) == "function"
+		then
+			-- (Empires Front) PLAY AGAIN at a public match's results: straight into the next one
+			ui:autostart_public(data.again)
 		end
 	end)
 	if ui ~= nil and ui.crate_opening ~= nil and ui.crate_opening.shown ~= nil then

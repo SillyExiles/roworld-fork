@@ -1053,6 +1053,12 @@ function UIRoot._build(self)
 	over.name = "GameOver"
 	self.over = over
 	over.play_again:Connect(function()
+		-- (Empires Front) a public match's results: straight into the next public match of its kind
+		if ctx:mode() == UICtx.MODE_MULTI then
+			self:_again_public()
+			return
+		end
+		ctx:session_call("report", { "play_again", "solo" })
 		over:close()
 		self:_restart_solo(
 			math.clamp(tonumber(ctx:setting("difficulty", UICtx.DEFAULT_DIFFICULTY)) or UICtx.DEFAULT_DIFFICULTY, 0, 2)
@@ -1601,7 +1607,61 @@ function UIRoot.autostart_solo(self, difficulty: number, map_id: string?)
 	}
 end
 
+--- (Empires Front) PLAY AGAIN from a public match: the next public match of `mode` ("ffa" | "team" |
+--- "world"), asked for as soon as the title is up and the hub can be reached (after the teleport from
+--- the match's server: Main reads TeleportData.again; in Studio, right after leaving the match).
+function UIRoot.autostart_public(self, mode: any)
+	local m = if mode == "team" or mode == "world" then mode else "ffa"
+	self._autostart_pub = { mode = m, deadline = UICtx.msec() + 30000 }
+end
+
+--- The results' PLAY AGAIN in a public match.
+function UIRoot._again_public(self)
+	local ctx = self.ctx
+	if self.over:finding() then
+		return
+	end
+	local lb = ctx:lobby()
+	local mode = if lb.public_mode == "team" or lb.public_mode == "world" then lb.public_mode else "ffa"
+	ctx:sfx("click")
+	-- a match's own server: the hub takes it from here (the results stay up until the teleport)
+	if lb.hosted == true and ctx:session_call("again_public", { mode }) == true then
+		self.over:set_finding(true)
+		return
+	end
+	-- Studio (lobbies play on the hub itself), or no line to the server: leave, then queue from the title
+	self.over:close()
+	ctx:session_call("leave_match")
+	self:autostart_public(mode)
+end
+
+function UIRoot._autostart_public_step(self)
+	local p = self._autostart_pub
+	local ctx = self.ctx
+	if p == nil then
+		return
+	end
+	if UICtx.msec() > p.deadline or ctx:mode() ~= UICtx.MODE_TITLE then
+		self._autostart_pub = nil
+		return
+	end
+	if
+		self._screen ~= "title"
+		or ctx:session_call("is_building") == true
+		or ctx:session_call("multiplayer_available") ~= true
+	then
+		return
+	end
+	self._autostart_pub = nil
+	local pub = ctx.session and ctx.session.public
+	if type(pub) == "table" and pub.state ~= nil and pub.state ~= "idle" then
+		return -- (asking already)
+	end
+	ctx:session_call("join_public", { p.mode })
+end
+
 function UIRoot._autostart_step(self)
+	self:_autostart_public_step()
 	local a = self._autostart
 	local ctx = self.ctx
 	if a == nil then

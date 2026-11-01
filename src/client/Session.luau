@@ -728,6 +728,18 @@ function Session.join_public(self: any, mode: string)
 	self.env.net.send(OP.JOIN_PUBLIC, mode)
 end
 
+--- (Empires Front) PLAY AGAIN at a public match's results, on that match's own reserved server: off to a
+--- hub, which this client asks for a seat in the next public match of `mode` the moment it arrives
+--- (server/ServerMain OP.LEAVE puts { again = mode } in the teleport data; Main → UIRoot.autostart_public).
+--- False when the server can't be told (UIRoot then leaves and queues from here).
+function Session.again_public(self: any, mode: string): boolean
+	if not self:multiplayer_available() or self.mode ~= MODE_MULTI then
+		return false
+	end
+	self.env.net.send(OP.LEAVE, mode)
+	return true
+end
+
 --- Quick Play: leave the line.
 function Session.leave_line(self: any)
 	if self:multiplayer_available() then

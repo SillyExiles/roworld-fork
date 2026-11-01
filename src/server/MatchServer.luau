@@ -1271,12 +1271,16 @@ function MatchServer.lobby_info(self: any, peer: any): { [string]: any }
 	local max = nil
 	local lobby_map = nil
 	local teams = nil
+	local public_mode = nil
+	local hosted = false
 	if lobby ~= nil then
 		local ok, info = pcall(lobby.info)
 		if ok and type(info) == "table" then
 			max = info.max
 			lobby_map = info.map_id
 			teams = if info.mode == "team" then info.teams else nil
+			public_mode = info.mode
+			hosted = info.hosted == true
 		end
 	end
 	return {
@@ -1285,6 +1289,10 @@ function MatchServer.lobby_info(self: any, peer: any): { [string]: any }
 		teams = teams,
 		-- "match": a public lobby's own server (clients join at once); "hub": the shared queue
 		kind = if lobby ~= nil then "match" else "hub",
+		-- (Empires Front) the kind of public match ("ffa" | "team" | "world") and whether this is its own
+		-- reserved server: the results' PLAY AGAIN finds the next match of the kind
+		public_mode = public_mode,
+		hosted = hosted,
 		max = max,
 		stage = self._stage,
 		countdown_s = math.max(self._stage_time, 0.0),

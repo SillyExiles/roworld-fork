@@ -372,7 +372,14 @@ function ServerMain.start()
 				local l = current()
 				-- public matches play their map a bit smaller ("world@80"); a team game's teams
 				return if l
-					then { map_id = LobbyRules.match_map_id(l.map), max = l.max, mode = l.mode, teams = l.teams }
+					then {
+						map_id = LobbyRules.match_map_id(l.map),
+						max = l.max,
+						mode = l.mode,
+						teams = l.teams,
+						-- (Empires Front) a reserved match server: its PLAY AGAIN goes by way of a hub
+						hosted = host ~= nil,
+					}
 					else nil
 			end,
 			party_of = function(uid: string): string?
@@ -1068,11 +1075,18 @@ function ServerMain.start()
 				end
 			end)
 		elseif op == OP.LEAVE and is_match_server then
-			-- leaving a public match's server = back to a hub
+			-- leaving a public match's server = back to a hub. (Empires Front) With a kind of public match
+			-- (the results' PLAY AGAIN): the teleport data says so, and on arrival the client asks the hub
+			-- for a seat in the next match of that kind at once (Main → UIRoot.autostart_public).
+			local again = ...
+			local data = if LobbyRules.is_mode(again) then { again = again } else nil
 			pcall(Analytics.report, player, "left")
+			if data ~= nil then
+				pcall(Analytics.report, player, "play_again", "multi")
+			end
 			pcall(server.leave, server, player)
 			task.spawn(function()
-				teleports.to_hub({ player })
+				teleports.to_hub({ player }, data)
 			end)
 		else
 			local name = player.DisplayName
