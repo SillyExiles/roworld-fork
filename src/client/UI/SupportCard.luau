@@ -129,7 +129,7 @@ function SupportCard.refresh(self, on_title: boolean)
 		-- (the party panel grows and shrinks with its members and invites: follow its bottom)
 		local party = self._party_ref
 		local key = if party ~= nil and party.state ~= nil and party.visible
-			then string.format("%d:%s", party._panel:get_combined_minimum_size().Y, tostring(party._open))
+			then string.format("%d:%s", math.floor(party._panel:get_combined_minimum_size().Y), tostring(party._open))
 			else "-"
 		if key ~= self._layout_key then
 			self:apply_layout(party)
@@ -149,7 +149,7 @@ function SupportCard.apply_layout(self, party: any?)
 	local x = 12.0 + ctx.insets.x
 	local party_on = party ~= nil and party.state ~= nil and party.visible
 	self._layout_key = if party_on
-		then string.format("%d:%s", party._panel:get_combined_minimum_size().Y, tostring(party._open))
+		then string.format("%d:%s", math.floor(party._panel:get_combined_minimum_size().Y), tostring(party._open))
 		else "-"
 	p:set_visible(not compact)
 	pill:set_visible(compact)
