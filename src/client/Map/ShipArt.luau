@@ -1,8 +1,9 @@
 --!native
 -- Empires Front: the ships on the map in the style of the era in play (Map/ShipData: side-view pixel art,
--- grey-scale, tinted with the owner's colour like the base game's sprites): galleys and round merchantmen
--- in antiquity (Rome, Persia), junks in Ming China, galleons, caravels and carracks in the Age of Sail.
--- EditableImages made once per style, kind and facing.
+-- 32 x 32, grey-scale, tinted with the owner's colour like the base game's sprites): triremes and corbitas
+-- in antiquity, dhows for Persia and Mali, lateen galleys for the Ottomans, junks for China and the Mongols,
+-- atakebune and bezaisen for Japan, war canoes and balsa rafts in the Americas, and ships of the line,
+-- fluyts and brigs in the Age of Sail. EditableImages made once per style, kind and facing.
 local AssetService = game:GetService("AssetService")
 local RS = game:GetService("ReplicatedStorage")
 local Era = require(RS:WaitForChild("Airfront"):WaitForChild("Core"):WaitForChild("Era")) :: any
@@ -10,22 +11,21 @@ local ShipData = require(script.Parent:WaitForChild("ShipData")) :: any
 
 local ShipArt = {}
 
-ShipArt.STYLE_OF_ERA =
-	{
-		rome = "ancient",
-		persia = "ancient",
-		china = "junk",
-		mongol = "junk",
-		ottoman = "ancient",
-		russia = "sail",
-		britain = "sail",
-		nations = "sail",
-		inca = "ancient",
-		aztec = "ancient",
-		mali = "ancient",
-		greece = "ancient",
-		japan = "junk",
-	}
+ShipArt.STYLE_OF_ERA = {
+	rome = "ancient",
+	greece = "ancient",
+	persia = "dhow",
+	mali = "dhow",
+	ottoman = "galley",
+	china = "junk",
+	mongol = "junk",
+	japan = "japan",
+	inca = "canoe",
+	aztec = "canoe",
+	russia = "sail",
+	britain = "sail",
+	nations = "sail",
+}
 
 local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 local INV: { [number]: number } = {}
