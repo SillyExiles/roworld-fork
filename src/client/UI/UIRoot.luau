@@ -2540,7 +2540,7 @@ function UIRoot._process(self, delta: number)
 	if self._hop ~= nil and UICtx.msec() > self._hop.deadline then
 		guard("UIRoot hop", self._hop_fallback, self)
 	end
-	if self._autostart ~= nil then
+	if self._autostart ~= nil or self._autostart_pub ~= nil then
 		guard("UIRoot autostart", self._autostart_step, self)
 	end
 	if self._tutorial_at ~= nil then
