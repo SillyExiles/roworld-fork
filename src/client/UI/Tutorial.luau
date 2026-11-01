@@ -32,6 +32,8 @@ local Tutorial = W.class(W.Control)
 
 --- The card stays green this long after a step, and the last card this long.
 Tutorial.DONE_S = 0.9
+--- Skip does nothing this long after a step moves on (a GOT IT tapped late isn't a Skip).
+Tutorial.GUARD_S = 1.5
 Tutorial.END_S = 9.0
 --- Spawn spots tried for the roomiest one.
 Tutorial.SPAWN_TRIES = 240
@@ -126,7 +128,11 @@ function Tutorial.new(c: any, ui: any)
 	self._skip.pressed:Connect(function()
 		if self._ending > 0.0 then
 			self:_close()
-		elseif self.active and self._flash <= 0.0 and (Data.STEPS[self._i] or {}).info then
+		elseif self.active and (self._flash > 0.0 or os.clock() < (self._guard or 0.0)) then
+			-- (2026-11-01: a GOT IT tapped just as its card moved on, or on the green card, would
+			-- have been the next step's Skip and ended the whole tutorial)
+			return
+		elseif self.active and (Data.STEPS[self._i] or {}).info then
 			-- (a step to read: GOT IT moves on)
 			self:_advance()
 		else
@@ -331,6 +337,7 @@ function Tutorial._advance(self, passed: boolean?)
 	self._step_t = 0.0
 	self._idle = 0.0
 	self._shown = nil
+	self._guard = os.clock() + Tutorial.GUARD_S
 	if self._i > #Data.STEPS then
 		self.step_done:Fire(#Data.FUNNEL, Data.FUNNEL[#Data.FUNNEL])
 		self:stop("done")

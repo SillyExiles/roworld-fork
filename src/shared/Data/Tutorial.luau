@@ -135,7 +135,7 @@ Tutorial.NUDGE_S = 5
 --- The steps, in order. `touch` / `desktop`: what the card says; `%s` is the neighbour's name.
 --- `info`: nothing to do but read it; the card's button says GOT IT and moves on (or INFO_S passes).
 --- `mark`: what the tap mark says instead of "Tap here".
-Tutorial.INFO_S = 9
+Tutorial.INFO_S = 12
 Tutorial.STEPS = {
 	{ id = "spawn", touch = "Tap the map to found your empire", desktop = "Click the map to found your empire" },
 	{ id = "expand", touch = "Tap the land next to you to claim it", desktop = "Click the land next to you to claim it" },

@@ -629,7 +629,7 @@ Eras.list = {
 		period = "431 BC · The Classical Age",
 		words = {
 			-- (2026-11-01) the ecosystem's buildings
-			{ "Palace", "Acropolis" },
+			{ "Palace", "Megaron" },
 			{ "Fortress", "Citadel" },
 			{ "University", "Lyceum" },
 			{ "Mine", "Silver Mine" },
