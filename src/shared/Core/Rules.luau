@@ -1323,6 +1323,12 @@ local function build(K_LIN: number, into: any?): any
 	Rules.HUMAN_GRACE_NEAR = 40
 	Rules.HUMAN_GRACE_PER_TILE = 3
 	Rules.HUMAN_GRACE_MAX_EXTRA = 1200
+	--- Empires Front (2026-11-03): a player's first ROOKIE_MATCHES matches (solo and public) protect them
+	--- more: every AI waits ROOKIE_GRACE_MULT times as long before it may attack them, and at most
+	--- ROOKIE_MAX_WARS AI fight them at once.
+	Rules.ROOKIE_MATCHES = 3
+	Rules.ROOKIE_GRACE_MULT = 2.0
+	Rules.ROOKIE_MAX_WARS = 1
 	--- At most this many AI nations may be at war with one human at once (tribes don't count).
 	Rules.MAX_AI_WARS_ON_HUMAN = zt({ 1, 2, 3 })
 	--- The smart bot players of a public match (Sim.SMART_BOTS, playing at Sim.SMART_SKILL) are no

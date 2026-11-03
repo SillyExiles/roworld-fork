@@ -499,6 +499,17 @@ function TopStatus.grace_left(self): number
 	if type(g) ~= "number" then
 		return 0.0
 	end
+	-- (Empires Front 2026-11-03) a new player's first matches: the AI waits Rules.ROOKIE_GRACE_MULT as long
+	local rookie = false
+	if ctx:mode() == 1 then
+		local sim = ctx:session_call("local_sim")
+		rookie = sim ~= nil and sim.o_rookie ~= nil and sim.o_rookie[ctx:me()] == 1
+	else
+		rookie = ctx:lobby().rookie == true
+	end
+	if rookie then
+		g *= tonumber(UITheme.core("Rules").ROOKIE_GRACE_MULT) or 1
+	end
 	return (ctx.play_start_tick + g - ctx:render_tick()) / Defs.TICK_RATE
 end
 

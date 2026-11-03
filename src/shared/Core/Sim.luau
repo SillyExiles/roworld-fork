@@ -270,6 +270,14 @@ function Sim.human_difficulty(self: any, id: number): number
 	return d
 end
 
+--- (Empires Front 2026-11-03) `id` is a new player (their first Rules.ROOKIE_MATCHES matches): the AI
+--- leaves them alone longer and fewer of it fight them at once (SimAI._may_attack_human).
+function Sim.set_rookie(self: any, id: number, on: boolean)
+	if id > 0 and self.o_rookie ~= nil then
+		self.o_rookie[id] = if on then 1 else 0
+	end
+end
+
 --- A novice bot player (weaker troop numbers).
 function Sim.is_novice_bot(self: any, id: number): boolean
 	return self.o_bot[id] == 1 and self.o_skill[id] == Sim.NOVICE_SKILL

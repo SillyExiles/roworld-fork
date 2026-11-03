@@ -380,6 +380,8 @@ function UIRoot.start_tutorial(self)
 			win_share = TutorialData.WIN_SHARE,
 			-- (no revolts in the first match: Core/SimRevolts)
 			revolts = false,
+			-- (and the gentlest AI there is: Rules.ROOKIE_*)
+			rookie = true,
 		},
 	})
 end
@@ -1743,7 +1745,14 @@ end
 --- { teams = 2 | 4 } for a team game, {} for a free-for-all.
 function UIRoot.solo_opts(ctx: any): { [string]: any }
 	local t = math.floor(tonumber(ctx:setting("solo_teams", 0)) or 0)
-	return if t >= 2 then { teams = t } else {}
+	local o: { [string]: any } = if t >= 2 then { teams = t } else {}
+	-- (Empires Front 2026-11-03) a new player's first matches: the AI is gentler (Rules.ROOKIE_MATCHES)
+	local tel = ctx.telemetry
+	local R = UICtx.core("Rules")
+	if tel ~= nil and R ~= nil and tel:matches_before() < (R.ROOKIE_MATCHES or 0) then
+		o.rookie = true
+	end
+	return o
 end
 
 function UIRoot._restart_solo(self, difficulty: number)

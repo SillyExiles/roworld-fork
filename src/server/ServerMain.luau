@@ -155,6 +155,17 @@ function ServerMain.start()
 	local joining_lobby: { [Player]: boolean } = {}
 	--- Players who came to watch (a hub's Watch teleport, or Studio's local Watch).
 	local spectating: { [Player]: boolean } = {}
+	--- (Empires Front 2026-11-03) players in their first Rules.ROOKIE_MATCHES matches (the saved
+	--- match count when they arrived on this server): the AI is gentler with them (Sim.set_rookie)
+	local rookie: { [Player]: boolean } = {}
+	local function tag_rookie(player: Player)
+		SettingsStore.when_loaded(player, function(data: any)
+			local st = if type(data) == "table" then data[Analytics.STATS] else nil
+			local n = if type(st) == "table" then tonumber(st.matches) or 0 else 0
+			local R = require(Shared.Core.Rules) :: any
+			rookie[player] = n < (R.ROOKIE_MATCHES or 0)
+		end)
+	end
 
 	-- Dev diagnostics (workspace attribute AF_DIAG; never set in the shipped place) can add fake
 	-- participants (tables) next to real Players.
@@ -1142,7 +1153,12 @@ function ServerMain.start()
 				debug.traceback,
 				server,
 				player,
-				{ uid = tostring(player.UserId), name = name, spectate = spectating[player] == true },
+				{
+					uid = tostring(player.UserId),
+					name = name,
+					spectate = spectating[player] == true,
+					rookie = rookie[player] == true,
+				},
 				op,
 				...
 			)
@@ -1507,6 +1523,7 @@ function ServerMain.start()
 		task.spawn(join_party_on_arrival, player)
 		check_admin(player)
 		SettingsStore.load(player)
+		task.spawn(tag_rookie, player)
 		if host ~= nil then
 			host:set_present(players_present())
 			host:set_roster(present_uids())
@@ -1521,9 +1538,11 @@ function ServerMain.start()
 		tag_spectator(p)
 		check_admin(p)
 		SettingsStore.load(p)
+		task.spawn(tag_rookie, p)
 	end
 	Players.PlayerRemoving:Connect(function(player: Player)
 		server:peer_disconnected(player)
+		rookie[player] = nil
 		listening[player] = nil
 		hop_at[player] = nil
 		local i = table.find(listening_list, player)

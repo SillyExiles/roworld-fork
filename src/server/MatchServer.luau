@@ -256,7 +256,7 @@ end
 -- =============================================================================================
 
 --- A peer asks to queue for / join the match. `info = {uid = account id, name = display name}`.
-function MatchServer.join(self: any, peer: any, info: { uid: string, name: string, key: string?, spectate: boolean? })
+function MatchServer.join(self: any, peer: any, info: { uid: string, name: string, key: string?, spectate: boolean?, rookie: boolean? })
 	if self._closed then
 		return
 	end
@@ -294,6 +294,8 @@ function MatchServer.join(self: any, peer: any, info: { uid: string, name: strin
 	self._participants[peer] = {
 		uid = info.uid,
 		key = key,
+		-- (Empires Front) a new player: the AI is gentler with them (Sim.set_rookie)
+		rookie = info.rookie == true,
 		name = nice,
 		owner = 0,
 		active_msec = now,
@@ -986,6 +988,9 @@ function MatchServer._ensure_owner(self: any, peer: any): number
 	end
 	if part.owner == 0 then
 		part.owner = sim:add_human(part.key, part.name) or 0
+		if part.owner ~= 0 and part.rookie and type(sim.set_rookie) == "function" then
+			sim:set_rookie(part.owner, true)
+		end
 		if part.owner ~= 0 then
 			self._snap = nil
 			self._snap_tick = -1
@@ -1314,6 +1319,8 @@ function MatchServer.lobby_info(self: any, peer: any): { [string]: any }
 		vote_started = self._vote_start_at ~= nil,
 		in_match = me ~= nil,
 		spectating = me ~= nil and me.spectator,
+		-- (Empires Front) this player is new: the AI waits longer for them (the "Protected" countdown)
+		rookie = me ~= nil and me.rookie == true,
 		map_id = if self._mp_sim ~= nil then self._mp_sim.map_id else (lobby_map or self._map_id),
 	}
 end

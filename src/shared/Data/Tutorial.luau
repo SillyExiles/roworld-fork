@@ -26,6 +26,9 @@
 -- can't be built there, `needs`, is passed over), and reads a card each on the Palace, Universities
 -- and Fortresses, Forges and Barracks, boats, alliances and revolts (`info`, with `button`: the
 -- command-bar slot the mark points at, or `at`: what on the map).)
+-- (2026-11-03: easier and skippable. 13 steps: the terrain card went to How to Play, Markets and Ports
+-- to a card, and the boats, allies, Palace and revolts to two. Every card has NEXT (pass this step) and
+-- SKIP ALL (end the tutorial; the match goes on), the first one too.)
 local Tutorial = {}
 
 --- Stars for finishing it: none (2026-10-31). Kept at 0 for old callers.
@@ -135,7 +138,9 @@ Tutorial.NUDGE_S = 5
 --- The steps, in order. `touch` / `desktop`: what the card says; `%s` is the neighbour's name.
 --- `info`: nothing to do but read it; the card's button says GOT IT and moves on (or INFO_S passes).
 --- `mark`: what the tap mark says instead of "Tap here".
-Tutorial.INFO_S = 12
+Tutorial.INFO_S = 10
+--- (2026-11-03) A building step nobody finishes in this long is passed over (the gold stays theirs).
+Tutorial.BUILD_MAX_S = 45
 Tutorial.STEPS = {
 	{ id = "spawn", touch = "Tap the map to found your empire", desktop = "Click the map to found your empire" },
 	{ id = "expand", touch = "Tap the land next to you to claim it", desktop = "Click the land next to you to claim it" },
@@ -162,24 +167,20 @@ Tutorial.STEPS = {
 		max_s = Tutorial.RATIO_MAX_S,
 	},
 	{
-		id = "terrain",
-		info = true,
-		touch = "Hills and mountains slow armies down",
-		desktop = "Hills and mountains are natural walls: armies cross them slowly",
-		mark = "Mountains",
-		max_s = Tutorial.INFO_S,
-	},
-	{
 		id = "city",
 		build = "city",
+		max_s = Tutorial.BUILD_MAX_S,
 		touch = "Open BUILD, pick City, tap your land",
 		desktop = "Pick City (1) and click your land",
 		note = "Here is gold for your first City",
 	},
-	-- (2026-11-01: the rest of the game, one building or one idea a card)
+	-- (2026-11-01: the rest of the game, one building or one idea a card; 2026-11-03: shorter and
+	-- easier, 13 steps instead of 18: the gold for every building is given, a building nobody places
+	-- in BUILD_MAX_S is passed over, and the ideas are four cards)
 	{
 		id = "farm",
 		build = "farm",
+		max_s = Tutorial.BUILD_MAX_S,
 		touch = "Build a Farm: it feeds a bigger army",
 		desktop = "Build a Farm: it feeds a bigger army",
 	},
@@ -187,104 +188,71 @@ Tutorial.STEPS = {
 		id = "mine",
 		build = "mine",
 		needs = "hills",
+		max_s = Tutorial.BUILD_MAX_S,
 		touch = "Build a Mine on the hills: it digs Ore",
 		desktop = "Build a Mine on the hills: it digs Ore",
 	},
 	{
-		id = "market",
-		build = "market",
-		touch = "Build a Market: it sells Ore for gold",
-		desktop = "Build a Market: it sells Ore for gold",
-	},
-	{
-		id = "port",
-		build = "port",
-		needs = "coast",
-		touch = "Build a Port: trade ships bring gold",
-		desktop = "Build a Port on your coast: trade ships bring gold",
-	},
-	{
 		id = "temple",
 		build = "temple",
+		max_s = Tutorial.BUILD_MAX_S,
 		touch = "Build a Temple: it calms your land",
 		desktop = "Build a Temple: it calms the land around it",
 	},
 	{
-		id = "palace",
+		id = "economy",
 		info = true,
-		button = "palace",
-		touch = "Palace: more taxes. Universities: gold",
-		desktop = "One Palace raises your taxes; Universities near it bring more gold",
+		button = "market",
+		touch = "Markets sell Ore. Ports trade for gold",
+		desktop = "Markets sell your Ore for gold; Ports send trade ships that bring more",
 		max_s = Tutorial.INFO_S,
 	},
 	{
 		id = "army",
 		info = true,
 		button = "forge",
-		touch = "Arm troops at Forges, train at Barracks",
-		desktop = "Forges arm your troops with Ore; your army grows faster with Barracks",
+		touch = "Forges arm troops. Walls guard borders",
+		desktop = "Forges arm your troops with Ore; Walls and Fortresses guard your borders",
 		max_s = Tutorial.INFO_S,
 	},
 	{
-		id = "defense",
-		info = true,
-		button = "fortress",
-		touch = "Walls and Fortresses guard borders",
-		desktop = "Walls, Defense Posts and Fortresses (on hills) guard your borders",
-		max_s = Tutorial.INFO_S,
-	},
-	{
-		id = "boats",
-		info = true,
-		at = "sea",
-		touch = "Tap land over the sea to send a boat",
-		desktop = "Click land across the sea to send troops by boat",
-		mark = "Sea",
-		max_s = Tutorial.INFO_S,
-	},
-	{
-		id = "allies",
+		id = "world",
 		info = true,
 		at = "neighbour",
-		touch = "Hold a nation to ally or trade with it",
-		desktop = "Right-click a nation to ally or trade Ore with it",
+		touch = "Hold a nation to ally with it",
+		desktop = "Right-click a nation to ally with it; click land over the sea to send boats",
 		mark = "A nation",
 		max_s = Tutorial.INFO_S,
 	},
 	{
-		id = "revolts",
+		id = "empire",
 		info = true,
-		touch = "Big empires revolt: Temples calm them",
-		desktop = "Big empires can revolt: Temples, the Palace and troops keep the peace",
+		button = "palace",
+		touch = "A Palace raises taxes and stops revolts",
+		desktop = "A Palace raises your taxes; Palace, Temples and troops keep big empires from revolting",
 		max_s = Tutorial.INFO_S,
 	},
 }
 
 --- The "Tutorial" funnel's steps (Creator Dashboard): 1 is the match starting, then one a step,
 --- then finishing. A step passed over is not logged.
-Tutorial.FUNNEL =
-	{
-		"Started",
-		"Spawned",
-		"First Tap",
-		"Grew",
-		"Attacked",
-		"Used Slider",
-		"Saw Terrain",
-		"Built City",
-		"Built Farm",
-		"Built Mine",
-		"Built Market",
-		"Built Port",
-		"Built Temple",
-		"Saw Palace",
-		"Saw Army",
-		"Saw Defense",
-		"Saw Boats",
-		"Saw Allies",
-		"Saw Revolts",
-		"Completed",
-	}
+Tutorial.FUNNEL = {
+	"Started",
+	"Spawned",
+	"First Tap",
+	"Grew",
+	"Attacked",
+	"Used Slider",
+	"Built City",
+	"Built Farm",
+	"Built Mine",
+	"Built Temple",
+	"Saw Economy",
+	"Saw Army",
+	"Saw World",
+	"Saw Empire",
+	"Completed",
+}
 
 --- The funnel step of finishing step `id` (2..#STEPS + 1), or nil.
 function Tutorial.funnel_step(id: string): number?

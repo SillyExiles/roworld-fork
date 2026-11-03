@@ -437,7 +437,9 @@ function Session.start_solo(self: any, p_difficulty: number, map_id: string?, op
 	local win_share = if type(opts) == "table" and type(opts.win_share) == "number" then opts.win_share else nil
 	-- (the first match has no revolts: Core/SimRevolts)
 	local revolts = if type(opts) == "table" and opts.revolts == false then false else nil
+	local rookie = type(opts) == "table" and opts.rookie == true
 	self:_start_local(MODE_SOLO, {
+		rookie = rookie,
 		seed = self:_rand_seed(),
 		difficulty = self.difficulty,
 		tribes = tribes,
@@ -1067,6 +1069,10 @@ function Session._build_local(self: any, config: { [string]: any }, human_name: 
 	local id = 0
 	if human_name ~= "" then
 		id = sim:add_human("local", human_name)
+		-- (Empires Front) a new player's first matches: the AI is gentler with them
+		if config.rookie == true and id ~= 0 and type(sim.set_rookie) == "function" then
+			sim:set_rookie(id, true)
+		end
 	end
 	-- a solo team game: the teams, now that the player and the nations are in
 	if sim.team_mode and type(sim.assign_teams) == "function" then

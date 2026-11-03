@@ -394,6 +394,8 @@ function SimState.install(C: any)
 		self.o_traitor_until = filled(MAXO, 0)
 		--- The tick a person's spawn shield ends (Rules.SPAWN_SHIELD_TICKS; 0 = none).
 		self.o_shield_until = filled(MAXO, 0)
+		--- (Empires Front) 1: a player in their first Rules.ROOKIE_MATCHES matches (Sim.set_rookie)
+		self.o_rookie = filled(MAXO, 0)
 		self.o_spawn_tile = filled(MAXO, -1)
 		self.o_killer = filled(MAXO, 0)
 		--- Owners whose conquest (Ev.CONQUEST, Sim._conquest_gold) was already announced.

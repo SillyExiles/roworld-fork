@@ -121,21 +121,32 @@ function Tutorial.new(c: any, ui: any)
 	self._bar:set_mouse_filter(W.MOUSE_IGNORE)
 	v:add_child(self._bar)
 	h:add_child(v)
-	self._skip = UITheme.button("Skip", "GhostButton", "", 36.0)
+	-- (2026-11-03) NEXT passes this step (GOT IT on a card to read); SKIP ALL ends the tutorial
+	self._next = UITheme.button("Next", "PrimaryButton", "", 36.0)
+	self._next:set_font_size(12)
+	self._next:set_min_size(Vector2.new(60, 36))
+	self._next.size_flags_vertical = W.SHRINK_CENTER
+	self._next.pressed:Connect(function()
+		if self._ending > 0.0 then
+			self:_close()
+		elseif not self.active or self._flash > 0.0 or os.clock() < (self._guard or 0.0) then
+			-- (a tap just as the card moved on, or on the green card, is not for the next step)
+			return
+		elseif (Data.STEPS[self._i] or {}).info then
+			self:_advance() -- (read: counts as done)
+		elseif self._i > 1 then
+			self:_advance(true) -- (passed over)
+		end
+	end)
+	h:add_child(self._next)
+	self._skip = UITheme.button("Skip all", "GhostButton", "", 36.0)
 	self._skip:set_font_size(12)
-	self._skip:set_min_size(Vector2.new(52, 36))
+	self._skip:set_min_size(Vector2.new(70, 36))
 	self._skip.size_flags_vertical = W.SHRINK_CENTER
 	self._skip.pressed:Connect(function()
 		if self._ending > 0.0 then
 			self:_close()
-		elseif self.active and (self._flash > 0.0 or os.clock() < (self._guard or 0.0)) then
-			-- (2026-11-01: a GOT IT tapped just as its card moved on, or on the green card, would
-			-- have been the next step's Skip and ended the whole tutorial)
-			return
-		elseif self.active and (Data.STEPS[self._i] or {}).info then
-			-- (a step to read: GOT IT moves on)
-			self:_advance()
-		else
+		elseif self.active then
 			self:stop("skipped")
 		end
 	end)
@@ -157,6 +168,7 @@ function Tutorial.begin(self)
 	self._spot = nil
 	self._spot_state = nil
 	self._picked = false
+	self._shown = nil
 	self._base = nil
 	self._neighbour = nil
 	self._gold_given = {}
@@ -187,6 +199,8 @@ function Tutorial.stop(self, how: string)
 		self._text:set_text(Data.DONE_TEXT or "Your empire is ready!")
 		self._bar:set_visible(false)
 		self._skip:set_text("OK")
+		self._skip:set_visible(true)
+		self._next:set_visible(false)
 		self:_tint(UITheme.GREEN)
 		self._card:set_visible(true)
 		self:_place()
@@ -311,13 +325,16 @@ function Tutorial._say(self, i: number, arg: string?)
 	self._fill.Size = UDim2.fromScale(0, 1)
 	self._fill.BackgroundColor3 = UITheme.AMBER
 	self._fill_f = 0.0
-	self._skip:set_text(if step.info then "Got it" else "Skip")
+	self._next:set_text(if step.info then "Got it" else "Next")
+	-- (the start has to be picked: a spot is picked for the player after AUTO_SPAWN_S anyway)
+	self._next:set_visible(i > 1)
+	self._skip:set_visible(true)
+	self._skip:set_text("Skip all")
 	self:_tint(UITheme.AMBER)
-	self._card:set_visible(i > 1)
-	if i > 1 then
-		self:_place()
-		UICtx.pop_in(self._card, 0.0, 0.94, 0.3, true)
-	end
+	-- (2026-11-03: the first card too, so the tutorial can be skipped from the start)
+	self._card:set_visible(true)
+	self:_place()
+	UICtx.pop_in(self._card, 0.0, 0.94, 0.3, true)
 end
 
 --- Step `i` is finished (`passed`: nobody did it in time, it is passed over without a tick).
@@ -404,6 +421,11 @@ function Tutorial._process(self, delta: number)
 	local word: string? = nil
 	local id = step.id
 	if id == "spawn" then
+		if self._shown ~= i then
+			-- (2026-11-03: its card too, for SKIP ALL)
+			self._shown = i
+			self:_say(i)
+		end
 		if o ~= nil and o.spawned then
 			self:_advance()
 			return

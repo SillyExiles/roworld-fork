@@ -605,6 +605,11 @@ function SimAI:_may_attack_human(sim, id: number, h: number, age: number): boole
 		-- novice bot players leave real players alone for twice as long (~10 min)
 		grace *= SimAI.NOVICE_GRACE_MULT
 	end
+	local rookie = sim.o_rookie ~= nil and sim.o_rookie[h] == 1
+	if rookie then
+		-- (a new player: longer still, Rules.ROOKIE_GRACE_MULT)
+		grace *= Rules.ROOKIE_GRACE_MULT
+	end
 	local a = if sim.o_spawn_tile[id] >= 0 then sim.o_spawn_tile[id] else sim:centre_tile(id)
 	local b = sim.o_spawn_tile[h]
 	if a >= 0 and b >= 0 then
@@ -621,7 +626,9 @@ function SimAI:_may_attack_human(sim, id: number, h: number, age: number): boole
 	end
 	if
 		(sim.o_kind[id] == KIND_NATION or sim.o_bot[id] == 1)
-		and self.attackers_on[h] >= Rules.MAX_AI_WARS_ON_HUMAN[d]
+		and self.attackers_on[h] >= (if rookie
+			then math.min(Rules.ROOKIE_MAX_WARS, Rules.MAX_AI_WARS_ON_HUMAN[d])
+			else Rules.MAX_AI_WARS_ON_HUMAN[d])
 	then
 		return false
 	end
