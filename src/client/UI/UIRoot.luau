@@ -1066,9 +1066,19 @@ function UIRoot._build(self)
 	over.name = "GameOver"
 	self.over = over
 	over.play_again:Connect(function()
-		-- (Empires Front) a public match's results: straight into the next public match of its kind
+		-- (Empires Front) a public match's results: straight into the next public match of its kind.
+		-- (2026-11-03: and into the public match that starts soonest, whatever its kind, from a solo
+		-- match's results too: other players keep a player longer. Solo again when the hub can't be reached.)
 		if ctx:mode() == UICtx.MODE_MULTI then
 			self:_again_public()
+			return
+		end
+		if ctx:session_call("multiplayer_available") == true then
+			ctx:session_call("report", { "play_again", "solo" })
+			ctx:sfx("click")
+			over:close()
+			ctx:session_call("leave_match")
+			self:autostart_public("soonest")
 			return
 		end
 		ctx:session_call("report", { "play_again", "solo" })
@@ -1624,10 +1634,11 @@ function UIRoot.autostart_solo(self, difficulty: number, map_id: string?)
 end
 
 --- (Empires Front) PLAY AGAIN from a public match: the next public match of `mode` ("ffa" | "team" |
---- "world"), asked for as soon as the title is up and the hub can be reached (after the teleport from
---- the match's server: Main reads TeleportData.again; in Studio, right after leaving the match).
+--- "world", or "soonest": whichever starts first, the hub picks), asked for as soon as the title is up
+--- and the hub can be reached (after the teleport from the match's server: Main reads
+--- TeleportData.again; in Studio, right after leaving the match).
 function UIRoot.autostart_public(self, mode: any)
-	local m = if mode == "team" or mode == "world" then mode else "ffa"
+	local m = if mode == "team" or mode == "world" or mode == "soonest" then mode else "ffa"
 	self._autostart_pub = { mode = m, deadline = UICtx.msec() + 30000 }
 end
 
@@ -1638,7 +1649,8 @@ function UIRoot._again_public(self)
 		return
 	end
 	local lb = ctx:lobby()
-	local mode = if lb.public_mode == "team" or lb.public_mode == "world" then lb.public_mode else "ffa"
+	-- (2026-11-03) the public match that starts soonest, whatever its kind
+	local mode = "soonest"
 	ctx:sfx("click")
 	-- a match's own server: the hub takes it from here (the results stay up until the teleport)
 	if lb.hosted == true and ctx:session_call("again_public", { mode }) == true then

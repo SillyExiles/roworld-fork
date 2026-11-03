@@ -697,6 +697,28 @@ function ServerMain.start()
 		end
 	end
 	ServerMain.public_join = public_join
+	--- (Empires Front 2026-11-03) PLAY AGAIN's "soonest": the kind of public match whose next lobby
+	--- starts first (any kind with room this hub may seat in), so the player is in a match as soon as
+	--- possible; "ffa" when none is listed.
+	local function soonest_mode(): string
+		if directory == nil then
+			return LobbyRules.MODE_FFA
+		end
+		local t = now()
+		local best, best_at = nil, math.huge
+		for _, l in directory:lobbies() do
+			local m = LobbyRules.mode_of(l)
+			if
+				l.starts < best_at
+				and LobbyRules.joinable(l, t)
+				and (m ~= LobbyRules.MODE_TEAM or TEAM_GAMES)
+			then
+				best, best_at = m, l.starts
+			end
+		end
+		return best or LobbyRules.MODE_FFA
+	end
+	ServerMain.soonest_mode = soonest_mode
 	-- a public-match teleport that failed after it began: the seat goes back, and once the player is
 	-- put in line again on their own
 	if directory ~= nil and not RunService:IsStudio() then
@@ -790,6 +812,9 @@ function ServerMain.start()
 		elseif op == OP.JOIN_PUBLIC then
 			-- Quick Play: a public match of a kind ("ffa" | "team" | "world"), or false to leave the line
 			local mode = ...
+			if mode == "soonest" then
+				mode = soonest_mode()
+			end
 			if mode == false then
 				public_cancel(player)
 			elseif LobbyRules.is_mode(mode) and (mode ~= LobbyRules.MODE_TEAM or TEAM_GAMES) then
@@ -1098,7 +1123,7 @@ function ServerMain.start()
 			-- (the results' PLAY AGAIN): the teleport data says so, and on arrival the client asks the hub
 			-- for a seat in the next match of that kind at once (Main → UIRoot.autostart_public).
 			local again = ...
-			local data = if LobbyRules.is_mode(again) then { again = again } else nil
+			local data = if LobbyRules.is_mode(again) or again == "soonest" then { again = again } else nil
 			pcall(Analytics.report, player, "left")
 			if data ~= nil then
 				pcall(Analytics.report, player, "play_again", "multi")
