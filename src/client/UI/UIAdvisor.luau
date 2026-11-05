@@ -682,7 +682,16 @@ function UIAdvisor.on_alliance_changed(
 	ui.feed:close_request(other)
 	if formed then
 		ctx:sfx("alliance")
-		ui.feed:toast(Defs.MSG_ALLIANCE, "Alliance formed with " .. nm, "alliance")
+		-- (Empires Front 2026-11-05: what it is worth, Rules.ALLY_INCOME / ALLIED_VICTORY)
+		ui.feed:toast(
+			Defs.MSG_ALLIANCE,
+			string.format(
+				"Alliance formed with %s: +%d%% gold income, and you win together",
+				nm,
+				math.floor((Rules().ALLY_INCOME or 0) * 100 + 0.5)
+			),
+			"alliance"
+		)
 	elseif traitor == me then
 		ctx:sfx("betrayal")
 		ui.feed:toast(
@@ -879,6 +888,10 @@ function UIAdvisor.on_game_over(self: any, winner: number, reason: number)
 	local wt = if s ~= nil then tonumber(s.winner_team) or 0 else 0
 	if wt ~= 0 and me ~= 0 and s:team_of(me) ~= 0 then
 		kind = if s:team_of(me) == wt then "victory" else (if dead then "result" else "defeat")
+	end
+	-- (Empires Front) an allied victory: every member of the group won
+	if s ~= nil and me ~= 0 and type(s.winner_allies) == "table" and table.find(s.winner_allies, me) ~= nil then
+		kind = "victory"
 	end
 	ctx:sfx(if kind == "victory" then "victory" else "defeat")
 	-- An ELIMINATED screen still up turns into the result in place (no close + reopen race).

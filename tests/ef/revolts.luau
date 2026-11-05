@@ -157,6 +157,10 @@ expect(sm.o_alive[rid] == 0 and r.state == SimRevolts.PAID, "the band is gone, m
 
 -- recognize: a free nation, allied with its old empire
 local sr, idr, ridr = fresh_revolt(7)
+if ridr == 0 then
+	-- (the seed's trajectory left no far province to rise: the next one)
+	sr, idr, ridr = fresh_revolt(8)
+end
 expect(sr:recognize_rebels(idr, ridr), "recognized")
 local rr = sr._rv.rebels[ridr]
 expect(rr.state == SimRevolts.FREE and sr.o_kind[ridr] == Defs.KIND_NATION, "a free nation at once")

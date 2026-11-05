@@ -156,6 +156,16 @@ function GameOver.new(c: any)
 	self._rw_bal:set_alignment(W.ALIGN_CENTER)
 	self._rw_bal:set_visible(false)
 	rv:add_child(self._rw_bal)
+	-- (2026-11-05) the Stars buy a flag already: straight to the Empire Shop
+	self._rw_shop = UITheme.button("GET A FLAG", "PrimaryButton", "star", 36.0)
+	self._rw_shop:set_font_size(12)
+	self._rw_shop:add_theme_constant_override("icon_max_width", 14)
+	self._rw_shop.size_flags_horizontal = W.SHRINK_CENTER
+	self._rw_shop:set_visible(false)
+	self._rw_shop.pressed:Connect(function()
+		self.open_arsenal:Fire()
+	end)
+	rv:add_child(self._rw_shop)
 	rw:set_visible(false)
 	self._reward = rw
 	self._center:add_child(rw)
@@ -464,6 +474,30 @@ function GameOver.set_award(self, award: any)
 	end
 end
 
+--- (2026-11-05) The Stars price of the cheapest Empire Shop flag the player doesn't own (nil: none).
+function GameOver.cheapest_flag(ctx: any): number?
+	local ok, Shop = pcall(UICtx.data, "EmpireShop")
+	if not ok or Shop == nil then
+		return nil
+	end
+	local sess = ctx.session
+	local inv = if sess ~= nil then sess.inventory else nil
+	local owned = {}
+	if type(inv) == "table" and type(inv.owned) == "table" then
+		for _, id in inv.owned do
+			owned[id] = true
+		end
+	end
+	local best = nil
+	for _, f in Shop.flags() do
+		local price = tonumber(f.stars) or 0
+		if price > 0 and not owned[Shop.item_id(f.key)] and (best == nil or price < best) then
+			best = price
+		end
+	end
+	return best
+end
+
 --- (2026-11-05) The rewards panel's rows for `award`: one per line (hidden, they come in one by one).
 function GameOver._fill_reward(self, award: any)
 	local StarsData = UICtx.data("Stars")
@@ -474,10 +508,10 @@ function GameOver._fill_reward(self, award: any)
 	local compact = self.ctx.compact
 	for _, l in award.lines do
 		local key, amount = l[1], l[2]
-		local bonus = key == "session"
+		local bonus = key == "session" or key == "first"
 		local row = UITheme.hbox(16)
 		local name = StarsData.LABELS[key] or key
-		if bonus then
+		if key == "session" then
 			local n = award.session and award.session.n or 2
 			local pct = award.session and award.session.pct or 0
 			name = string.format("%s +%d%% (%d in a row)", name, math.floor(pct * 100 + 0.5), n)
@@ -512,6 +546,11 @@ function GameOver._fill_reward(self, award: any)
 	self._rw_bal:set_text(string.format("You have %s Stars", UICtx.commas(bal)))
 	self._rw_bal:set_visible(bal > 0)
 	self._rw_bal:set_modulate_a(0.0)
+	-- (a flag the Stars buy now, not owned yet: the cheapest one's price)
+	local cheapest = GameOver.cheapest_flag(self.ctx)
+	local can = cheapest ~= nil and bal >= cheapest
+	self._rw_shop:set_visible(can)
+	self._rw_shop:set_modulate_a(0.0)
 	self._rw_t = 0.0
 	self._rw_shown = 0.0
 	self._rw_landed = false
@@ -568,6 +607,9 @@ function GameOver._animate_reward(self, delta: number)
 		end
 		if self._rw_bal.visible then
 			UICtx.pop_in(self._rw_bal, 0.3, 0.95, 0.3, true)
+		end
+		if self._rw_shop.visible then
+			UICtx.pop_in(self._rw_shop, 0.5, 0.9, 0.3, true)
 		end
 	end
 end

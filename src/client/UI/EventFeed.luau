@@ -363,7 +363,7 @@ end
 function EventFeed.alliance_request(self, from_id: number)
 	local ctx = self.ctx
 	self:_ally_card(from_id, from_id, {
-		text = "proposes an alliance",
+		text = "proposes an alliance: +5% gold, win together",
 		row_text = "wants an alliance",
 		yes = "Accept",
 		no = "Decline",

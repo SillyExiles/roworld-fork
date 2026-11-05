@@ -60,9 +60,9 @@ local function deliver(player: any, lines: { { any } }, total: number, mode: str
 	end
 	-- (Empires Front 2026-11-05) the session bonus on top: matches one after another pay more
 	-- (Data/Stars.session_*; the run is kept on the player's record, deps.add_match_stars)
-	local ok, balance, bonus, n
+	local ok, balance, bonus, n, first
 	if deps.add_match_stars then
-		ok, balance, bonus, n = deps.add_match_stars(player, total)
+		ok, balance, bonus, n, first = deps.add_match_stars(player, total)
 	else
 		ok, balance = deps.add_stars(player, total)
 	end
@@ -74,6 +74,12 @@ local function deliver(player: any, lines: { { any } }, total: number, mode: str
 	if bonus > 0 then
 		table.insert(lines, { "session", bonus })
 		total += bonus
+	end
+	-- (a new player's first match: Data/Stars.FIRST_BONUS, enough for a flag)
+	first = tonumber(first) or 0
+	if first > 0 then
+		table.insert(lines, { "first", first })
+		total += first
 	end
 	if deps.send then
 		pcall(deps.send, player, {

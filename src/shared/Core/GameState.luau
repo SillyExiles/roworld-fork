@@ -1500,6 +1500,8 @@ HANDLERS[Ev.GAME_OVER] = function(self, e)
 	self.winner = e[2]
 	self.over_reason = e[3]
 	self.winner_team = tonumber(e[4]) or 0
+	-- (Empires Front) an allied victory: every member of the group won
+	self.winner_allies = if type(e[5]) == "table" then e[5] else nil
 	self.phase = Defs.PHASE_OVER
 	self.game_over:Fire(self.winner, self.over_reason)
 end

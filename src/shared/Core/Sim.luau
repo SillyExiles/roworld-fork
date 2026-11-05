@@ -1661,6 +1661,11 @@ function Sim._income_of(self: any, id: number): number
 		land *= 1.0 + Rules.PALACE_TAX
 	end
 	local mult = if self.o_uni_mult ~= nil then self.o_uni_mult[id] or 1.0 else 1.0
+	-- (Empires Front 2026-11-05) allies trade: Rules.ALLY_INCOME an ally
+	local allies = if self.o_ally_count ~= nil then math.min(self.o_ally_count[id] or 0, Rules.ALLY_INCOME_MAX) else 0
+	if allies > 0 then
+		mult *= 1.0 + Rules.ALLY_INCOME * allies
+	end
 	return (Rules.passive_income(kind, self.o_tiles[id]) + land) * mult
 end
 
@@ -1839,6 +1844,47 @@ function Sim._conquest_gold(self: any, victim: number, by: number)
 	end
 end
 
+--- (Empires Front 2026-11-05) A free-for-all's allied victory: the allies (and their allies) whose land
+--- together reaches `need` tiles, with a player among them. Returns (their biggest member, the group)
+--- or (0, nil).
+function Sim._allied_victory(self: any, need: number): (number, { number }?)
+	local o_alive, o_tiles, o_kind = self.o_alive, self.o_tiles, self.o_kind
+	local seen: { [number]: boolean } = {}
+	for id = 1, self.owner_total do
+		if o_alive[id] == 1 and not seen[id] and (self.o_ally_count[id] or 0) > 0 and o_kind[id] ~= Defs.KIND_TRIBE then
+			local group, stack = {}, { id }
+			seen[id] = true
+			while #stack > 0 do
+				local x = table.remove(stack)
+				table.insert(group, x)
+				for _, y in self:allies_of(x) do
+					if not seen[y] and o_alive[y] == 1 and o_kind[y] ~= Defs.KIND_TRIBE then
+						seen[y] = true
+						table.insert(stack, y)
+					end
+				end
+			end
+			if #group >= 2 then
+				local sum, best, bt, player = 0, 0, -1, false
+				for _, x in group do
+					sum += o_tiles[x]
+					if o_tiles[x] > bt then
+						best, bt = x, o_tiles[x]
+					end
+					if self.o_ai[x] == 0 and (self.o_bot == nil or self.o_bot[x] ~= 1) then
+						player = true
+					end
+				end
+				if player and sum >= need then
+					table.sort(group)
+					return best, group
+				end
+			end
+		end
+	end
+	return 0, nil
+end
+
 function Sim._check_victory(self: any)
 	local best = 0
 	local bt = -1
@@ -1873,6 +1919,14 @@ function Sim._check_victory(self: any)
 	if best > 0 and bt >= self.win_share * (self.map.contestable_count - self.fallout_count) then
 		self:_game_over(best, Defs.OVER_DOMINATION, team)
 		return
+	end
+	-- (Empires Front 2026-11-05) allies win together (Rules.ALLIED_VICTORY)
+	if team == 0 and Rules.ALLIED_VICTORY then
+		local w, group = self:_allied_victory(self.win_share * (self.map.contestable_count - self.fallout_count))
+		if w > 0 then
+			self:_game_over(w, Defs.OVER_DOMINATION, 0, group)
+			return
+		end
 	end
 	if self:_check_objective() then
 		return
@@ -1974,13 +2028,17 @@ function Sim._check_objective(self: any): boolean
 	return false
 end
 
-function Sim._game_over(self: any, w: number, reason: number, team: number?)
+function Sim._game_over(self: any, w: number, reason: number, team: number?, allies: { number }?)
 	self.phase = Defs.PHASE_OVER
 	self.winner = w
 	self.over_reason = reason
 	local t = team or 0
 	self.winner_team = t
-	if t ~= 0 then
+	-- (Empires Front) an allied victory: every member of the group won (Sim._allied_victory)
+	self.winner_allies = allies
+	if allies ~= nil then
+		self:ev({ Ev.GAME_OVER, w, reason, t, allies })
+	elseif t ~= 0 then
 		self:ev({ Ev.GAME_OVER, w, reason, t })
 	else
 		self:ev({ Ev.GAME_OVER, w, reason })
@@ -1999,6 +2057,8 @@ function Sim._game_over(self: any, w: number, reason: number, team: number?)
 	elseif w > 0 and reason == Defs.OVER_OBJECTIVE then
 		local era = Era.current()
 		self:msg(-1, Defs.MSG_ALERT, string.format("%s fulfilled %s", self.o_name[w], if era then era.objective.title else "the objective"))
+	elseif w > 0 and reason == Defs.OVER_DOMINATION and allies ~= nil then
+		self:msg(-1, Defs.MSG_ALERT, self.o_name[w] .. " and its allies have conquered the world together")
 	elseif w > 0 and reason == Defs.OVER_DOMINATION then
 		self:msg(-1, Defs.MSG_ALERT, self.o_name[w] .. " has conquered the world")
 	elseif w > 0 and reason == Defs.OVER_TIME then

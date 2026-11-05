@@ -56,7 +56,14 @@ Stars.LABELS = {
 	double = "2x Stars",
 	general = "General +50%",
 	session = "Session bonus",
+	first = "First match bonus",
 }
+
+--- (Empires Front 2026-11-05) A new player's first paid match adds FIRST_BONUS Stars, once per account
+--- (server/Purchases.add_match_stars): with the match's own Stars, enough for a Common flag of the
+--- Empire Shop (Data/EmpireFlags: 1,500) the moment the match ends. Only for an account that has
+--- earned less than this in all (veterans had their first match long ago).
+Stars.FIRST_BONUS = 1500
 
 --- (Empires Front 2026-11-05) The session bonus: matches played one after another pay more. The n-th
 --- match of a run pays SESSION_BONUS[n] (the last entry from then on) of its Stars on top. A match
@@ -362,7 +369,12 @@ function Tracker.result(self: any, id: number, left: boolean?): Result
 		-- (a team game: everyone on the winning team won)
 		won = not gone
 			and sim.phase == PHASE_OVER
-			and (sim.winner == id or ((sim.winner_team or 0) ~= 0 and sim.o_team ~= nil and sim.o_team[id] == sim.winner_team)),
+			and (
+				sim.winner == id
+				or ((sim.winner_team or 0) ~= 0 and sim.o_team ~= nil and sim.o_team[id] == sim.winner_team)
+				-- (Empires Front: an allied victory)
+				or (type(sim.winner_allies) == "table" and table.find(sim.winner_allies, id) ~= nil)
+			),
 		minutes = math.max(0, (seat.out_tick or sim.tick) - seat.start) / TICKS_PER_MINUTE,
 		shares = seat.peak / share,
 		kills = seat.kills,
