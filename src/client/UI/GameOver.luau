@@ -149,6 +149,7 @@ function GameOver.new(c: any)
 	self._rw_hint = UITheme.label("", 12, 700, UITheme.GREEN)
 	self._rw_hint:set_alignment(W.ALIGN_CENTER)
 	self._rw_hint:set_autowrap(true)
+	self._rw_hint:set_min_size(Vector2.new(320, 0))
 	self._rw_hint:set_visible(false)
 	rv:add_child(self._rw_hint)
 	self._rw_bal = UITheme.label("", 11, 600, UITheme.TEXT_2)
@@ -479,24 +480,38 @@ function GameOver._fill_reward(self, award: any)
 		if bonus then
 			local n = award.session and award.session.n or 2
 			local pct = award.session and award.session.pct or 0
-			name = string.format("%s +%d%%  ·  match %d in a row", name, math.floor(pct * 100 + 0.5), n)
+			name = string.format("%s +%d%% (%d in a row)", name, math.floor(pct * 100 + 0.5), n)
 		end
 		local lab = UITheme.label(name, if compact then 12 else 13, if bonus then 800 else 600, if bonus then UITheme.GREEN else UITheme.TEXT_2)
 		lab.size_flags_horizontal = W.EXPAND_FILL
-		lab:set_min_size(Vector2.new(if compact then 150 else 210, 0))
+		lab:set_min_size(Vector2.new(if compact then 190 else 250, 0))
 		row:add_child(lab)
 		local amt = UITheme.label("+" .. UICtx.commas(amount), if compact then 12 else 13, 800, if bonus then UITheme.GREEN else UITheme.GOLD)
 		amt:set_alignment(W.ALIGN_RIGHT)
+		amt:set_min_size(Vector2.new(56, 0))
 		row:add_child(amt)
-		row:set_visible(false)
+		-- (in the layout from the start, so the screen is placed for its full height; seen when it comes in)
+		row:set_modulate_a(0.0)
 		self._rw_lines:add_child(row)
 		table.insert(self._rw_rows, row)
 	end
+	self._rw_seen = {}
 	-- (phones: the lines stay folded; the total and the bonus say it)
 	self._rw_lines:set_visible(not compact)
 	self._rw_total:set_text("+0")
-	self._rw_hint:set_visible(false)
-	self._rw_bal:set_visible(false)
+	local ses = award.session
+	local nxt = if type(ses) == "table" then tonumber(ses.next_pct) or 0 else 0
+	self._rw_hint:set_text(
+		if nxt > 0
+			then string.format("Play again now: next match +%d%% Stars!", math.floor(nxt * 100 + 0.5))
+			else ""
+	)
+	self._rw_hint:set_visible(nxt > 0)
+	self._rw_hint:set_modulate_a(0.0)
+	local bal = tonumber(award.balance) or 0
+	self._rw_bal:set_text(string.format("You have %s Stars", UICtx.commas(bal)))
+	self._rw_bal:set_visible(bal > 0)
+	self._rw_bal:set_modulate_a(0.0)
 	self._rw_t = 0.0
 	self._rw_shown = 0.0
 	self._rw_landed = false
@@ -519,9 +534,9 @@ function GameOver._animate_reward(self, delta: number)
 	local lines_s = if folded then 0.0 else #rows * GameOver.ROW_S
 	if not folded then
 		for i, row in rows do
-			if not row.visible and t >= 0.2 + (i - 1) * GameOver.ROW_S then
-				row:set_visible(true)
-				UICtx.pop_in(row, 0.0, 0.9, 0.25)
+			if not self._rw_seen[i] and t >= 0.2 + (i - 1) * GameOver.ROW_S then
+				self._rw_seen[i] = true
+				UICtx.pop_in(row, 0.0, 0.9, 0.25, true)
 				self.ctx:sfx("star_tick", -4.0, 0.0, 0.9 + 0.08 * i)
 			end
 		end
@@ -547,17 +562,11 @@ function GameOver._animate_reward(self, delta: number)
 		self.ctx:sfx("star_get")
 		UICtx.pop_in(self._rw_tot_row, 0.0, 1.25, 0.35)
 		self._reward:set_border(UITheme.GOLD)
-		local ses = award.session
-		local nxt = if type(ses) == "table" then tonumber(ses.next_pct) or 0 else 0
-		if nxt > 0 then
-			-- what playing on is worth
-			self._rw_hint:set_text(string.format("Play again now: your next match pays +%d%% Stars!", math.floor(nxt * 100 + 0.5)))
-			self._rw_hint:set_visible(true)
-			UICtx.pop_in(self._rw_hint, 0.15, 0.9, 0.3)
+		-- what playing on is worth, and the balance
+		if self._rw_hint.visible then
+			UICtx.pop_in(self._rw_hint, 0.15, 0.9, 0.3, true)
 		end
-		if tonumber(award.balance) ~= nil and award.balance > 0 then
-			self._rw_bal:set_text(string.format("You have %s Stars", UICtx.commas(award.balance)))
-			self._rw_bal:set_visible(true)
+		if self._rw_bal.visible then
 			UICtx.pop_in(self._rw_bal, 0.3, 0.95, 0.3, true)
 		end
 	end
