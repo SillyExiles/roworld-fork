@@ -594,6 +594,13 @@ function SimStructures.install(C)
 			self:msg(id, Defs.MSG_INFO, string.format("Unlock %s in the Arsenal first", struct_title(kind)))
 			return false
 		end
+		-- (2026-11-05) a Defense Post on one's own post on the hills raises it into a Fortress
+		if kind == S_DEFENSE then
+			local post = self:_post_to_raise(id, t)
+			if post ~= nil then
+				return self:_raise_fortress(id, post)
+			end
+		end
 		local cost = Rules.build_cost_kind(kind, self:cost_count(id, kind))
 		if self.o_gold[id] < cost then
 			self:msg(id, Defs.MSG_INFO, string.format("Not enough gold for %s", a_an(struct_title(kind))))
@@ -644,6 +651,50 @@ function SimStructures.install(C)
 		self.o_ore[id] -= ore_need
 		self:add_struct(kind, id, site)
 		return true
+	end
+
+	--- (2026-11-05) `id`'s finished Defense Post on hills or mountains nearest `t` within
+	--- Rules.raise_snap() (Rules.raise_post's rule), or nil.
+	function C:_post_to_raise(id: number, t: number): Struct?
+		local r = self.R.raise_snap()
+		local best, bd = nil, r * r
+		local range_d2 = self.range_d2
+		for _, s in self.struct_list do
+			if
+				not s.dead
+				and s.owner == id
+				and s.kind == S_DEFENSE
+				and s.active
+				and readu8(self.terr, s.tile) >= Defs.T_HIGHLAND
+			then
+				local d = range_d2(s.tile, t)
+				if d <= bd then
+					best, bd = s, d
+				end
+			end
+		end
+		return best
+	end
+
+	--- (2026-11-05) Raises `id`'s Defense Post `post` into a Fortress on its tile (a Fortress's price and
+	--- cap). Returns ok, true (an upgrade).
+	function C:_raise_fortress(id: number, post: Struct): (boolean, boolean?)
+		local F = Defs.S_FORTRESS
+		local b = id * STRUCT_KINDS + F
+		if not Rules.under_limit(F, self.o_scount[b], self.o_slevel[b], false) then
+			self:msg(id, Defs.MSG_INFO, Rules.limit_text("fortress"))
+			return false
+		end
+		local cost = Rules.build_cost_kind(F, self:cost_count(id, F))
+		if self.o_gold[id] < cost then
+			self:msg(id, Defs.MSG_INFO, "Not enough gold to raise a Fortress")
+			return false
+		end
+		self.o_gold[id] -= cost
+		local tile = post.tile
+		self:destroy_struct(post)
+		self:add_struct(F, id, tile)
+		return true, true
 	end
 
 	-- Count the price of `kind` grows with: min(levels owned, levels built). (Empires Front

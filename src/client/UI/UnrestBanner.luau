@@ -181,6 +181,34 @@ local function causes(parts: { number }?): string
 	return line
 end
 
+--- (2026-11-05) Why a province rose (the unrest parts at the rising, SimRevolts.PARTS), and what
+--- keeps the next one down: "Why: far from the capital, few troops. Calm: Temples, a Palace ... ".
+UnrestBanner.WHY = {
+	{ 10, "few troops at home" },
+	{ 8, "a huge empire" },
+	{ 1, "you lead the world" },
+	{ 6, "far from your capital" },
+	{ 8, "new conquests" },
+}
+function UnrestBanner.why_line(parts: { number }?): string
+	if type(parts) ~= "table" then
+		return ""
+	end
+	local out = {}
+	for i, c in UnrestBanner.WHY do
+		if (parts[i] or 0) >= c[1] then
+			table.insert(out, c[2])
+		end
+	end
+	if (parts[6] or 0) < 10 then
+		table.insert(out, "no Temple or Palace near")
+	end
+	if #out == 0 then
+		return ""
+	end
+	return "Why it rose: " .. table.concat(out, ", ") .. ". Temples, a Palace and Fortresses keep provinces calm.\n"
+end
+
 function UnrestBanner._style(self, mode: string)
 	if self._mode == mode then
 		return
@@ -232,7 +260,8 @@ function UnrestBanner.refresh(self)
 		-- what the province is worth (the Sim's valuation, Ev.REBEL): its price to buy it back
 		local price = UIRules.rebel_price(s, me, reb.id)
 		self._detail:set_text(string.format(
-			"Province worth %s: land %s · troops %s · buildings %s. Buy it back, or recognize it as an independent nation (your ally).",
+			"%sProvince worth %s: land %s · troops %s · buildings %s. Buy it back, or recognize it as an independent nation (your ally).",
+			UnrestBanner.why_line(reb.rebel_why),
 			T.fmt_cost(math.max(price, 0)),
 			T.fmt_cost(tonumber(reb.rebel_land) or 0),
 			T.fmt_cost(tonumber(reb.rebel_troops_value) or 0),

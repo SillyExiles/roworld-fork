@@ -50,7 +50,7 @@ expect(farm >= 0 and sim.o_farm_mult[id] > 1.0, "a Farm raises the troop cap (x"
 expect(sim.o_cap[id] > cap0, "the cap grew: " .. math.floor(cap0) .. " -> " .. math.floor(sim.o_cap[id]))
 local fm1 = sim.o_farm_mult[id]
 -- Temple next to it: the harvest is blessed
-local temple = build(Defs.S_TEMPLE, function(t) return sim.range_d2(t, farm) < 400 end)
+local temple = build(Defs.S_TEMPLE, function(t) return sim.range_d2(t, farm) < (sim.R.temple_range(1) * 0.8) ^ 2 end)
 finish()
 expect(temple >= 0, "a Temple near the Farm")
 expect(sim.o_farm_mult[id] > fm1 + 0.001, string.format("blessed harvest: x%.3f -> x%.3f", fm1, sim.o_farm_mult[id]))
@@ -79,7 +79,7 @@ for _, t in own do
 end
 if far >= 0 then
 	local c0 = sim:_province_calm(id, far)
-	local t2 = build(Defs.S_TEMPLE, function(t) return sim.range_d2(t, far) < 100 end)
+	local t2 = build(Defs.S_TEMPLE, function(t) return sim.range_d2(t, far) < (sim.R.temple_range(1) * 0.6) ^ 2 end)
 	finish()
 	expect(t2 >= 0 and sim:_province_calm(id, far) >= c0 + Rules.CALM_TEMPLE, "a Temple calms its province")
 end

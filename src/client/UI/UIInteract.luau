@@ -743,6 +743,9 @@ function UIInteract._ghost_caption(self: any, kind: string, pl: { [string]: any 
 		return if r ~= nil and r ~= "" then tostring(r) else "Can't place here"
 	end
 	local cost = T().fmt_cost(ctx.rules:availability(kind).cost)
+	if pl.upgrade and pl.into == "fortress" then
+		return "Raise into a Fortress · " .. T().fmt_cost(tonumber(pl.cost) or 0)
+	end
 	if pl.upgrade then
 		return string.format("Upgrade %s → Lv %d · %s", UIRules.SHORT[kind], tonumber(pl.level) or 2, cost)
 	end
@@ -755,6 +758,11 @@ function UIInteract._ghost_caption(self: any, kind: string, pl: { [string]: any 
 			return string.format("%d SAM%s cover this target", n_sam, if n_sam == 1 then "" else "s")
 		end
 		return string.format("Launch %s · %s", UIRules.SHORT[kind], cost)
+	end
+	-- (Empires Front 2026-11-05) what it gets right here
+	local _, short = ctx.rules:site_bonus(kind, tonumber(pl.tile) or -1)
+	if short ~= "" then
+		return string.format("%s · %s · %s", title, cost, short)
 	end
 	return string.format("%s · %s", title, cost)
 end
@@ -1431,10 +1439,26 @@ function UIInteract._aim_spec(self: any, tile: number): { [string]: any }
 	local pl = ctx.rules:placement(k, tile)
 	-- Your own structure under the cursor: the click upgrades it (same wording as the touch caption).
 	local upgrade = pl.ok and pl.upgrade == true and not nuke
-	if upgrade then
+	local raise = pl.upgrade == true and pl.into == "fortress"
+	if raise then
+		-- (2026-11-05) a Defense Post on the hills rises into a Fortress (Rules.raise_post)
+		spec.title = "Raise into a Fortress"
+	elseif upgrade then
 		spec.title = string.format("Upgrade %s → Lv %d", title, tonumber(pl.level) or 2)
 	end
-	local rows = { { "Cost", Th.fmt_cost(av.cost) .. " gold", Th.GOLD } }
+	local rows = { { "Cost", Th.fmt_cost(if raise and pl.cost then pl.cost else av.cost) .. " gold", Th.GOLD } }
+	if raise then
+		local R = ctx:rules_call("fortress_range", {}) or 0
+		table.insert(rows, { "Defense", string.format("%sx troops · %sx time", tostring(UICtx.core("Rules").FORTRESS_MAG), tostring(UICtx.core("Rules").FORTRESS_COST)), Th.GREEN })
+		table.insert(rows, { "Reach", string.format("%d tiles · calms the province", math.floor(tonumber(R) or 0)), Th.GREEN })
+	end
+	-- (Empires Front 2026-11-05) what it gets right here: the land, a Temple or Palace in reach, the roads
+	if not nuke and (pl.ok or pl.code == "gold") then
+		local brows = ctx.rules:site_bonus(k, tonumber(pl.tile) or tile)
+		for _, r in brows do
+			table.insert(rows, r)
+		end
+	end
 	if nuke then
 		table.insert(rows, { "Blast radius", UIRules.blast_text(k), Th.TEXT })
 		if tile >= 0 and ctx.state:tile_owner(tile) ~= 0 then

@@ -36,10 +36,10 @@ UIRules.__index = UIRules
 -- (Empires Front: no SAMs, silos, bombs or Arsenal; no farms: 2026-10-31)
 -- (Empires Front 2026-10-31: the Border Wall and the Barracks)
 -- (2026-11-01: the empire's ecosystem: Farm, Temple, Palace, Fortress, University)
-UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "fortress", "university" }
+UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university" }
 UIRules.NUKE_KINDS = {}
 --- Hotkeys 1..9, 0 in this order.
-UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "fortress", "university" }
+UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university" }
 UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]", "\\" }
 --- The Arsenal's kinds (Data/Arsenal: unlocked with Stars or Robux), in the order of its tray:
 --- structures, munitions launched like a nuke (the last two from their own structure: strikes), and
@@ -112,7 +112,7 @@ UIRules.BLURBS = {
 	city = "Raises your troop cap by {city}. Joins the road network.",
 	port = "Coastal. Sends trade ships for gold and builds warships.",
 	factory = "Road hub: every building within its reach joins the roads. Carts pay gold at every city, port, mine and market they pass.",
-	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time.",
+	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time. On hills or mountains, build on your own post again to raise it into a Fortress: {fort_mag}x the troops and {fort_cost}x the time within {fort_r} tiles, and it calms the province (at most {fort_lim}).",
 	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}. At most 2 Forges per player: build near one to upgrade it.",
 	farm = "Feeds a bigger army: your troop cap +{farm_pct}% a level ({farm_plain}% on plains, less on hills or cold land). Near a Temple: x{farm_bless} (a blessed harvest).",
 	temple = "Calms the provinces within {temple_r} tiles and blesses the Farms there (x{farm_bless}). Each Temple also calms your whole empire a little. Universities near one study x{uni_temple}. At most {temple_lim}, no upgrades.",
@@ -880,6 +880,131 @@ function UIRules.snap_radius(): number
 	return tonumber(UIRules.rules_const("BUILD_SNAP_RADIUS", 15.0 / Rules().K_LIN)) :: number
 end
 
+--- (Empires Front 2026-11-05) What a `kind` built at `tile` gets there, before it is built: the land
+--- under a Farm or a Mine, a Temple or the Palace in reach, the roads (a Factory in reach), what a
+--- Temple or the Palace would reach. Returns rows { label, value, color } for the build card and a
+--- short line for the phones' caption ("" when there is nothing to say).
+UIRules.TERRAIN_WORD = { [2] = "plains", [3] = "hills", [4] = "mountains", [5] = "tundra", [6] = "ice" }
+function UIRules.site_bonus(self: any, kind: string, tile: number): ({ { any } }, string)
+	local ctx = self.ctx
+	local s = ctx.state
+	local me = ctx:me()
+	if s == nil or s.map == nil or tile == nil or tile < 0 or me == 0 then
+		return {}, ""
+	end
+	local R = Rules()
+	local Th = T()
+	local d2 = s.map.range_d2
+	local terr = if s.map.terrain ~= nil then buffer.readu8(s.map.terrain, tile) else 2
+	local function own_near(k: number, reach: (any) -> number): { any }
+		local out = {}
+		for _, st in s.structures do
+			if st.owner == me and st.kind == k then
+				local r = reach(st)
+				if d2(st.tile, tile) <= r * r then
+					table.insert(out, st)
+				end
+			end
+		end
+		return out
+	end
+	local function temple_r(st: any): number
+		return R.temple_range(st.level or 1)
+	end
+	local function palace_r(_st: any): number
+		return R.palace_range()
+	end
+	local function factory_near(): boolean
+		local rmax = R.ROAD_MAX_TILES
+		for _, st in s.structures do
+			if st.kind == Defs.S_FACTORY and d2(st.tile, tile) <= rmax * rmax then
+				return true
+			end
+		end
+		return false
+	end
+	local function pct(x: number): string
+		return string.format("+%s%%", if x >= 10 then tostring(math.floor(x + 0.5)) else string.format("%.1f", x))
+	end
+	local rows, short = {}, ""
+	if kind == "farm" then
+		local tm = R.FARM_TERRAIN[terr] or 1.0
+		local blessed = #own_near(Defs.S_TEMPLE, temple_r) > 0
+		local m = tm * (if blessed then R.FARM_BLESSED else 1.0)
+		local v = R.FARM_CAP * m * 100
+		table.insert(rows, { "Land", string.format("%s x%s", UIRules.TERRAIN_WORD[terr] or "land", tostring(tm)), if tm >= 1.2 then Th.GREEN else Th.TEXT })
+		if blessed then
+			table.insert(rows, { "Temple near", string.format("blessed x%s", tostring(R.FARM_BLESSED)), Th.GREEN })
+		end
+		table.insert(rows, { "Troop cap", pct(v), Th.GREEN })
+		short = "Troop cap " .. pct(v) .. (if blessed then " (blessed)" else "")
+	elseif kind == "university" then
+		local m, why = 1.0, ""
+		if #own_near(Defs.S_PALACE, palace_r) > 0 then
+			m, why = R.UNI_NEAR_PALACE, "Palace near"
+		elseif #own_near(Defs.S_TEMPLE, temple_r) > 0 then
+			m, why = R.UNI_NEAR_TEMPLE, "Temple near"
+		end
+		if why ~= "" then
+			table.insert(rows, { why, string.format("x%s", tostring(m)), Th.GREEN })
+		end
+		local v = R.UNI_INCOME * m * 100
+		table.insert(rows, { "Gold income", pct(v), Th.GREEN })
+		short = "Gold " .. pct(v) .. (if why ~= "" then " (" .. string.lower(why) .. ")" else "")
+	elseif kind == "mine" then
+		local m = if terr == Defs.T_MOUNTAIN then 1.5 else 1.0
+		local road = factory_near()
+		if terr == Defs.T_MOUNTAIN then
+			table.insert(rows, { "Mountains", "x1.5 Ore", Th.GREEN })
+		end
+		if road then
+			m *= 1.5
+			table.insert(rows, { "On the roads", "x1.5 Ore", Th.GREEN })
+		end
+		local ore = 3.0 * m
+		table.insert(rows, { "Ore", string.format("%s a second", if ore % 1 == 0 then tostring(ore) else string.format("%.1f", ore)), Th.GOLD })
+		short = string.format("%s Ore/s", if ore % 1 == 0 then tostring(ore) else string.format("%.1f", ore))
+	elseif kind == "market" then
+		if factory_near() then
+			table.insert(rows, { "On the roads", "sells +50%", Th.GREEN })
+			short = "On the roads: sells +50%"
+		else
+			table.insert(rows, { "No Factory in reach", "build one for +50%", Th.TEXT_3 })
+		end
+	elseif kind == "temple" then
+		local r = R.temple_range(1)
+		local farms, unis = 0, 0
+		for _, st in s.structures do
+			if st.owner == me and d2(st.tile, tile) <= r * r then
+				if st.kind == Defs.S_FARM then
+					farms += 1
+				elseif st.kind == Defs.S_UNIVERSITY then
+					unis += 1
+				end
+			end
+		end
+		table.insert(rows, { "Farms blessed", tostring(farms), if farms > 0 then Th.GREEN else Th.TEXT_3 })
+		if unis > 0 then
+			table.insert(rows, { "Universities", string.format("%d study x%s", unis, tostring(R.UNI_NEAR_TEMPLE)), Th.GREEN })
+		end
+		short = string.format("Blesses %d Farm%s", farms, if farms == 1 then "" else "s")
+	elseif kind == "palace" then
+		local r = R.palace_range()
+		local unis = 0
+		for _, st in s.structures do
+			if st.owner == me and st.kind == Defs.S_UNIVERSITY and d2(st.tile, tile) <= r * r then
+				unis += 1
+			end
+		end
+		table.insert(rows, { "No revolts within", string.format("%d tiles", math.floor(R.PALACE_RANGE_FULL)), Th.GREEN })
+		if unis > 0 then
+			table.insert(rows, { "Universities", string.format("%d study x%s", unis, tostring(R.UNI_NEAR_PALACE)), Th.GREEN })
+		end
+		short = "No revolts around it" .. (if unis > 0 then string.format(" · %d Universities x%s", unis, tostring(R.UNI_NEAR_PALACE)) else "")
+	end
+	return rows, short
+end
+
 --- Friendly copy for Rules.placement reasons.
 UIRules.PLACE_REASONS = {
 	not_own = "Build on your own land",
@@ -937,7 +1062,7 @@ function UIRules.resolve_placement(self: any, kind: string, tile: number): { [st
 	out.ok = code == "" or code == "gold"
 	out.tile = if rtile >= 0 then rtile else tile
 	out.reason = if code == "limit"
-		then Rules().limit_text(kind)
+		then Rules().limit_text(r.limit_kind or kind)
 		elseif code ~= "" then (UIRules.PLACE_REASONS[code] or "Can't build here")
 		else ""
 	out.code = code
@@ -946,6 +1071,9 @@ function UIRules.resolve_placement(self: any, kind: string, tile: number): { [st
 		out.upgrade = true
 		out.sid = sid
 		out.level = s.structures[sid].level + 1
+		-- (2026-11-05) a Defense Post on the hills rises into a Fortress (Rules.raise_post)
+		out.into = r.into
+		out.cost = tonumber(r.cost)
 	end
 	if code == "gold" then
 		out.ok = false

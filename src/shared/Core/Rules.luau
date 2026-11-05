@@ -296,6 +296,40 @@ local function build(K_LIN: number, into: any?): any
 		[Defs.S_FARM] = 12,
 	}
 
+	--- (2026-11-05) A Defense Post on hills or mountains rises into a Fortress: a Defense Post built
+	--- within RAISE_SNAP_FULL tiles of one's own finished post there raises that post (at a Fortress's
+	--- price, within FORTRESS_LIMIT) instead of building a second one. The Fortress has no button of its
+	--- own any more.
+	Rules.RAISE_SNAP_FULL = 15.0
+	function Rules.raise_snap(): number
+		return Rules.RAISE_SNAP_FULL / K_LIN
+	end
+
+	--- The client's view of it (GameState data): the sid and tile of `id`'s finished Defense Post on
+	--- hills or mountains nearest `tile` within raise_snap(), or nil.
+	function Rules.raise_post(state: any, id: number, tile: number): (number?, number?)
+		local map = state.map
+		if map == nil or map.terrain == nil or tile < 0 then
+			return nil, nil
+		end
+		local r = Rules.raise_snap()
+		local best, bt, bd = nil, nil, r * r
+		for _, st in state.structures do
+			if
+				st.owner == id
+				and st.kind == Defs.S_DEFENSE
+				and (st.active_tick or 0) <= (state.tick or 0)
+				and buffer.readu8(map.terrain, st.tile) >= Defs.T_HIGHLAND
+			then
+				local d = map.range_d2(st.tile, tile)
+				if d <= bd then
+					best, bt, bd = st.sid, st.tile, d
+				end
+			end
+		end
+		return best, bt
+	end
+
 	--- How many structures of `kind` one player may hold (nil: no limit).
 	function Rules.struct_limit(kind: number): number?
 		return Rules.STRUCT_LIMITS[kind]
@@ -676,7 +710,21 @@ local function build(K_LIN: number, into: any?): any
 			return R.placement(state, id, kind_name, tile)
 		end
 		local out = { ok = false, tile = -1, upgrade_sid = 0, cost = Rules.cost_of(state, id, kind_name), reason = "" }
-		if kind_name == "warship" then
+		-- (2026-11-05) a Defense Post on one's own post on the hills: it rises into a Fortress
+		local raise_sid, raise_tile = nil, nil
+		if kind_name == "defense" then
+			raise_sid, raise_tile = Rules.raise_post(state, id, tile)
+		end
+		if raise_sid ~= nil then
+			out.tile = raise_tile :: number
+			out.upgrade_sid = raise_sid
+			out.into = "fortress"
+			out.cost = Rules.cost_of(state, id, "fortress")
+			if not Rules.under_limit(Defs.S_FORTRESS, state:count_structures(id, Defs.S_FORTRESS), 0, false) then
+				out.reason = "limit"
+				out.limit_kind = "fortress"
+			end
+		elseif kind_name == "warship" then
 			local p = Rules.warship_port(state, id, tile)
 			out.tile = p
 			out.reason = if p >= 0 then "" else "no_port"

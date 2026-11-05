@@ -1471,6 +1471,14 @@ function GameState._set_rebel(self: any, row: { any }, o: number)
 	own.rebel_land = tonumber(row[o + 6]) or 0
 	own.rebel_troops_value = tonumber(row[o + 7]) or 0
 	own.rebel_buildings = tonumber(row[o + 8]) or 0
+	-- (2026-11-05) why it rose: the unrest parts at the rising (SimRevolts.PARTS)
+	if row[o + 9] ~= nil then
+		local why = {}
+		for i = 1, 6 do
+			why[i] = tonumber(row[o + 8 + i]) or 0
+		end
+		own.rebel_why = why
+	end
 	self.rebels_changed:Fire(own.id, own.rebel_state)
 end
 

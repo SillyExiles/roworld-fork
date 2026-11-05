@@ -563,6 +563,8 @@ function SimRevolts.install(C: any)
 			terrain = if nt > 0 then tv / nt else 1.0,
 			price0 = 0,
 			state = SimRevolts.RISING,
+			-- (2026-11-05) why it rose: the empire's unrest parts at the rising (unrest_of), for the card
+			why = table.clone(s.parts[id] or { 0, 0, 0, 0, 0, 0 }),
 		}
 		s.rebels[rid] = rec
 		rec.price0 = self:rebel_value(rid)
@@ -599,13 +601,15 @@ function SimRevolts.install(C: any)
 		return Rules.province_value(share, if r ~= nil then r.terrain or 1.0 else 1.0, self.o_troops[rid], sg)
 	end
 
-	--- Ev.REBEL {rid, parent, born, state, price, land, troops, buildings} (the worth while they rise).
+	--- Ev.REBEL {rid, parent, born, state, price, land, troops, buildings, why x6} (the worth while
+	--- they rise; why: the unrest parts at the rising, SimRevolts.PARTS).
 	function C._rebel_row(self: any, rid: number, r: any): { number }
 		local total, land, tg, bg = 0, 0, 0, 0
 		if r.state == SimRevolts.RISING and self.o_alive[rid] == 1 then
 			total, land, tg, bg = self:rebel_value(rid)
 		end
-		return { rid, r.parent, r.born, r.state, total, land, tg, bg }
+		local w = r.why or {}
+		return { rid, r.parent, r.born, r.state, total, land, tg, bg, w[1] or 0, w[2] or 0, w[3] or 0, w[4] or 0, w[5] or 0, w[6] or 0 }
 	end
 
 	function C._rebel_send(self: any, rid: number, r: any)
