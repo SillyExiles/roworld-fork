@@ -65,6 +65,10 @@ local EmpireShop: any = if IS_ROBLOX
 	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.EmpireShop)
 	else require("../shared/Data/EmpireShop")
 
+local StarsData: any = if IS_ROBLOX
+	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.Stars)
+	else require("../shared/Data/Stars")
+
 local Purchases = {}
 
 Purchases.STORE = "RofrontPurchases_v1"
@@ -96,6 +100,9 @@ type Record = {
 	gifts: { [string]: boolean },
 	--- RoWorld General: the UTC day whose perks were given (Purchases.general_perks)
 	general_day: number?,
+	--- (Empires Front) the session bonus's run: the last match's place in it and when it paid (os.time)
+	chain_n: number?,
+	chain_at: number?,
 }
 
 --- Reading a player's record when they join: GetAsync attempts and the waits between them. Roblox
@@ -173,6 +180,11 @@ local function clean(v: any, user_id: number?): Record
 	rec.fav_paid = if v.fav_paid == true then true else nil
 	local gday = tonumber(v.general_day)
 	rec.general_day = if gday ~= nil and gday == gday then math.floor(gday) else nil
+	local cn, ca = tonumber(v.chain_n), tonumber(v.chain_at)
+	if cn ~= nil and ca ~= nil and cn == cn and ca == ca then
+		rec.chain_n = math.clamp(math.floor(cn), 1, 1000)
+		rec.chain_at = math.floor(ca)
+	end
 	if type(v.unlocks) == "table" then
 		for k, on in v.unlocks do
 			if on == true and Arsenal.item(k) ~= nil then
@@ -942,6 +954,40 @@ function Purchases.add_stars(player: any, amount: number): (boolean, number)
 	remember(player, stored :: Record)
 	notify(player)
 	return true, (stored :: Record).stars
+end
+
+--- (Empires Front 2026-11-05) A match's Stars with the session bonus (Data/Stars.session_*): `base` and,
+--- on top, the bonus for this match's place in the player's run of matches, in one write that also
+--- moves the run on. Yields. (ok, balance, bonus, n): n is this match's place in the run.
+function Purchases.add_match_stars(player: any, base: number): (boolean, number, number, number)
+	local add = math.floor(tonumber(base) or 0)
+	if add ~= add or add <= 0 then
+		return false, Purchases.stars(player), 0, 1
+	end
+	local t = now_s()
+	local stored: Record? = nil
+	local bonus, n = 0, 1
+	local ok, err = pcall(function()
+		deps.datastore:UpdateAsync(key(player.UserId), function(old: any): any
+			local rec = clean(old, player.UserId)
+			local gap = if rec.chain_at ~= nil then t - rec.chain_at else nil
+			n = StarsData.session_next(rec.chain_n or 0, gap)
+			bonus = StarsData.session_stars(add, StarsData.session_bonus(n))
+			rec.chain_n = n
+			rec.chain_at = t
+			rec.stars = math.min(rec.stars + add + bonus, Purchases.MAX_STARS)
+			rec.stars_earned = math.min(rec.stars_earned + add + bonus, Purchases.MAX_STARS)
+			stored = rec
+			return rec
+		end)
+	end)
+	if not ok or stored == nil then
+		log("could not pay " .. tostring(add) .. " match Stars to " .. tostring(player.UserId) .. ": " .. tostring(err))
+		return false, Purchases.stars(player), 0, 1
+	end
+	remember(player, stored :: Record)
+	notify(player)
+	return true, (stored :: Record).stars, bonus, n
 end
 
 --- Unlock Arsenal item `key` with Stars: one write takes its price and unlocks it. Yields.

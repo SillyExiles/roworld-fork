@@ -1926,6 +1926,10 @@ function UIRoot._bind_state(self, s: any)
 	c("alliance_request_closed", function(from, to)
 		adv:on_alliance_request_closed(from, to)
 	end)
+	-- (Empires Front) pacts an ally proposes: a card in the corner like an alliance request
+	c("pacts_changed", function(a, b, kind, st)
+		adv:on_pact(a, b, kind, st)
+	end)
 	c("alliance_changed", function(a, b, formed, traitor, expired)
 		adv:on_alliance_changed(a, b, formed, traitor, expired)
 	end)
@@ -1988,6 +1992,13 @@ function UIRoot._bind_refresh(self)
 	for _, key in ipairs(keys) do
 		if key % 1024 == s.local_owner and s.local_owner ~= 0 and not self.feed:has_request_card(key // 1024) then
 			self.feed:alliance_request(key // 1024)
+		end
+	end
+	-- (and the pacts proposed to the player while away)
+	for rk in pairs(s.pact_reqs or {}) do
+		local kind, pair = rk % 4, rk // 4
+		if pair % 1024 == s.local_owner and s.local_owner ~= 0 then
+			self.feed:pact_request(pair // 1024, kind)
 		end
 	end
 	ctx.state_bound:Fire()

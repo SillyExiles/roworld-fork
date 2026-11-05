@@ -378,6 +378,48 @@ function EventFeed.alliance_request(self, from_id: number)
 	})
 end
 
+--- (Empires Front 2026-11-05) The pacts an ally may propose (Core/SimDiplomacy.KINDS): kind -> what the
+--- card says, the intent's kind name, and its icon.
+EventFeed.PACTS = {
+	[1] = { name = "trade", text = "proposes a Trade Pact: more income for both", row = "wants a Trade Pact", icon = "pact_trade" },
+	[2] = { name = "defense", text = "proposes a Defense Pact: you defend each other", row = "wants a Defense Pact", icon = "pact_defense" },
+	[3] = { name = "access", text = "asks for Military Access through your land", row = "asks Military Access", icon = "alliance" },
+}
+
+--- The card key of a pact proposal from `from_id` of `kind` (apart from alliance and renewal cards).
+function EventFeed.pact_key(from_id: number, kind: number): number
+	return 1000000 + from_id * 4 + kind
+end
+
+--- An ally proposes a pact (trade / defence / Military Access): Accept / Decline, the bar runs out
+--- with the proposal (Core/SimDiplomacy.REQUEST_TICKS).
+function EventFeed.pact_request(self, from_id: number, kind: number)
+	local p = EventFeed.PACTS[kind]
+	if p == nil then
+		return
+	end
+	local ctx = self.ctx
+	self:_ally_card(EventFeed.pact_key(from_id, kind), from_id, {
+		text = p.text,
+		row_text = p.row,
+		icon = p.icon,
+		yes = "Accept",
+		no = "Decline",
+		on_yes = function()
+			ctx:send({ type = "pact_reply", target = from_id, kind = p.name, accept = true })
+		end,
+		on_no = function()
+			ctx:send({ type = "pact_reply", target = from_id, kind = p.name, accept = false })
+		end,
+		tick_start = ctx:render_tick(),
+		span = 300,
+	})
+end
+
+function EventFeed.close_pact(self, from_id: number, kind: number)
+	self:close_request(EventFeed.pact_key(from_id, kind))
+end
+
 --- The "about to expire" event: the alliance with `other` is in its last
 --- ALLIANCE_EXTEND_WINDOW_TICKS; Renew sends ally_extend (renewed once both asked). The bar runs
 --- out with the alliance.
@@ -429,7 +471,7 @@ function EventFeed._ally_card(self, key: number, owner_id: number, spec: { [stri
 	local v = T.vbox(if not ctx.compact then 8 else 5)
 	card:add_child(v)
 	local head = T.hbox(10)
-	head:add_child(self:_icon_disc("alliance", T.VIOLET, if not ctx.compact then 30.0 else 24.0))
+	head:add_child(self:_icon_disc(spec.icon or "alliance", T.VIOLET, if not ctx.compact then 30.0 else 24.0))
 	local tv = T.vbox(0)
 	tv.size_flags_horizontal = W.EXPAND_FILL
 	local nr = T.hbox(6)
@@ -488,7 +530,7 @@ function EventFeed._alliance_row(self, key: number, o: any, spec: { [string]: an
 	local fs = EventFeed.PHONE_FONT
 	local bs = EventFeed.PHONE_BUTTON
 	local row = T.hbox(5)
-	local ic = T.icon_rect("alliance", 12.0, T.VIOLET)
+	local ic = T.icon_rect(spec.icon or "alliance", 12.0, T.VIOLET)
 	ic.size_flags_vertical = W.SHRINK_CENTER
 	row:add_child(ic)
 	local sw = T.swatch(o.color, 8.0, 2)

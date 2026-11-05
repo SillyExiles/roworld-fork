@@ -1579,6 +1579,14 @@ function Session._on_net(self: any, op: number, ...: any)
 				total = p.total,
 				balance = tonumber(p.balance) or 0,
 				mode = if type(p.mode) == "string" then p.mode else "public",
+				-- (Empires Front) the session bonus: this match's place in the run, what the next adds
+				session = if type(p.session) == "table"
+					then {
+						n = tonumber(p.session.n) or 1,
+						pct = tonumber(p.session.pct) or 0,
+						next_pct = tonumber(p.session.next_pct) or 0,
+					}
+					else nil,
 			}
 			self.last_award = award
 			self:_emit("stars_awarded", award)

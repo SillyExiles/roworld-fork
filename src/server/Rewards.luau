@@ -17,7 +17,8 @@
 --   Rewards.solo_result(player, report)  OP.SOLO_RESULT (yields)
 --   Rewards.pay(player, result, mode)    a result this server measured itself (yields)
 --   Rewards.release(player)              PlayerRemoving
--- The payload sent to the client (OP.STARS): { lines = { { key, amount } }, total, balance, mode }.
+-- The payload sent to the client (OP.STARS): { lines = { { key, amount } }, total, balance, mode,
+-- session = { n, pct, next_pct } } (the session bonus: Data/Stars.session_*).
 local IS_ROBLOX = typeof(game) == "Instance"
 local Stars: any = if IS_ROBLOX
 	then require((game :: any):GetService("ReplicatedStorage"):WaitForChild("Airfront").Data.Stars)
@@ -57,12 +58,32 @@ local function deliver(player: any, lines: { { any } }, total: number, mode: str
 	if total <= 0 then
 		return 0
 	end
-	local ok, balance = deps.add_stars(player, total)
+	-- (Empires Front 2026-11-05) the session bonus on top: matches one after another pay more
+	-- (Data/Stars.session_*; the run is kept on the player's record, deps.add_match_stars)
+	local ok, balance, bonus, n
+	if deps.add_match_stars then
+		ok, balance, bonus, n = deps.add_match_stars(player, total)
+	else
+		ok, balance = deps.add_stars(player, total)
+	end
 	if not ok then
 		return 0
 	end
+	bonus = tonumber(bonus) or 0
+	n = tonumber(n) or 1
+	if bonus > 0 then
+		table.insert(lines, { "session", bonus })
+		total += bonus
+	end
 	if deps.send then
-		pcall(deps.send, player, { lines = lines, total = total, balance = balance, mode = mode })
+		pcall(deps.send, player, {
+			lines = lines,
+			total = total,
+			balance = balance,
+			mode = mode,
+			-- this match's place in the run, and what the run's next match adds
+			session = { n = n, pct = Stars.session_bonus(n), next_pct = Stars.session_bonus(n + 1) },
+		})
 	end
 	if deps.log then
 		deps.log(string.format("[Rewards] %s +%d Stars (%s)", tostring(player.UserId), total, mode))

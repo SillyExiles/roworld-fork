@@ -55,7 +55,44 @@ Stars.LABELS = {
 	victory = "Victory",
 	double = "2x Stars",
 	general = "General +50%",
+	session = "Session bonus",
 }
+
+--- (Empires Front 2026-11-05) The session bonus: matches played one after another pay more. The n-th
+--- match of a run pays SESSION_BONUS[n] (the last entry from then on) of its Stars on top. A match
+--- whose Stars come within SESSION_GAP_S of the last match's continues the run; a payout within
+--- SESSION_STEP_S of the last is the same match's (a solo takeover's second life) and doesn't count
+--- as the next. Kept on the player's record (server/Purchases.add_match_stars), so it follows the
+--- player from the hub to a match's own server and back.
+Stars.SESSION_BONUS = { 0, 0.25, 0.5 }
+Stars.SESSION_GAP_S = 45 * 60
+Stars.SESSION_STEP_S = 180
+
+--- The share of a match's Stars the session bonus adds to the `n`-th match of a run.
+function Stars.session_bonus(n: number): number
+	local t = Stars.SESSION_BONUS
+	return t[math.clamp(math.floor(n), 1, #t)] or 0
+end
+
+--- The run's count for a payout `gap_s` seconds after the last one, which was the `n`-th of its run
+--- (gap_s nil: no payout before).
+function Stars.session_next(n: number, gap_s: number?): number
+	if gap_s == nil or gap_s < 0 or gap_s > Stars.SESSION_GAP_S or n < 1 then
+		return 1
+	end
+	if gap_s < Stars.SESSION_STEP_S then
+		return n
+	end
+	return n + 1
+end
+
+--- The Stars a session bonus of `pct` adds to `base` (rounded to the quantum; nothing on nothing).
+function Stars.session_stars(base: number, pct: number): number
+	if base <= 0 or pct <= 0 then
+		return 0
+	end
+	return math.max(Stars.QUANTUM, math.floor(base * pct / Stars.QUANTUM + 0.5) * Stars.QUANTUM)
+end
 
 export type Result = {
 	spawned: boolean,

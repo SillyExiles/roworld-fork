@@ -1453,6 +1453,7 @@ function ServerMain.start()
 	-- matches on the client's report within what the clock allows
 	Rewards.configure({
 		add_stars = Purchases.add_stars,
+		add_match_stars = Purchases.add_match_stars,
 		-- Empires Front: no 2x Stars nor subscription bonus: a match pays at most Stars.MAX_WIN
 		double = function(_player: Player): boolean
 			return false

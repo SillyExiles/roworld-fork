@@ -637,6 +637,25 @@ function UIAdvisor.on_alliance_requested(self: any, from: number, to: number)
 	end
 end
 
+--- (Empires Front 2026-11-05) A pact proposed to the player gets a card in the corner (Accept /
+--- Decline); signed, declined or lapsed, the card goes. Ev.PACT state: 0 proposed by `a` to `b`, 1
+--- signed, 2 ended, 3 withdrawn / declined / lapsed.
+function UIAdvisor.on_pact(self: any, a: number, b: number, kind: number, st: number)
+	local ctx = self.ctx
+	local me = ctx:me()
+	if me == 0 then
+		return
+	end
+	if st == 0 then
+		if b == me and ctx:in_match() then
+			self.ui.feed:pact_request(a, kind)
+			ctx:sfx("ally_request")
+		end
+	elseif a == me or b == me then
+		self.ui.feed:close_pact(if a == me then b else a, kind)
+	end
+end
+
 function UIAdvisor.on_alliance_request_closed(self: any, from: number, to: number)
 	if to == self.ctx:me() then
 		self.ui.feed:close_request(from)

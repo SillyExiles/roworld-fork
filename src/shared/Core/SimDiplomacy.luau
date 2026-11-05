@@ -24,6 +24,11 @@ SimDiplomacy.NAMES = { [1] = "trade pact", [2] = "defence pact", [3] = "Military
 SimDiplomacy.TRADE_INCOME_BONUS = 0.06
 --- Proposals lapse after this many ticks.
 SimDiplomacy.REQUEST_TICKS = 300
+--- (2026-11-05) An AI nation allied with a player proposes the pacts they don't have yet, one at a time
+--- (trade, then defence, then Military Access): each second, 1 in AI_PROPOSE_ODDS, from AI_PROPOSE_AFTER
+--- ticks into the alliance; each kind once per alliance (a declined one isn't asked again).
+SimDiplomacy.AI_PROPOSE_ODDS = 45
+SimDiplomacy.AI_PROPOSE_AFTER = 300
 
 local function key(a: number, b: number): number
 	return math.min(a, b) * 1024 + math.max(a, b)
@@ -114,12 +119,8 @@ function SimDiplomacy.install(C)
 			return ok
 		end
 		self.pact_req[(id * 1024 + target) * 4 + kind] = self.tick
+		-- (the player is asked by a card in the corner, Accept / Decline: UI/EventFeed.pact_request)
 		self:ev({ Ev.PACT, id, target, kind, 0 })
-		self:msg(
-			target,
-			Defs.MSG_ALLIANCE,
-			string.format("%s proposes a %s: open their menu to accept", self.o_name[id], SimDiplomacy.NAMES[kind])
-		)
 		return true
 	end
 
@@ -158,6 +159,7 @@ function SimDiplomacy.install(C)
 	--- Lapsed proposals (once a second).
 	function C:_pacts_tick()
 		local now = self.tick
+		self:_ai_propose_pacts()
 		local stale = nil
 		for rk, t in self.pact_req do
 			if now - t >= SimDiplomacy.REQUEST_TICKS then
@@ -171,6 +173,50 @@ function SimDiplomacy.install(C)
 				local kind = rk % 4
 				local pair = rk // 4
 				self:ev({ Ev.PACT, pair // 1024, pair % 1024, kind, 3 })
+			end
+		end
+	end
+
+	--- (2026-11-05) AI allies of a player propose the pacts they lack (see AI_PROPOSE_*).
+	function C:_ai_propose_pacts()
+		self._ai_asked = self._ai_asked or {}
+		self._ally_since = self._ally_since or {}
+		local rng = self.rng
+		for _, k in self:_ordered_keys(self.alliances) do
+			local a, b = k // 1024, k % 1024
+			local since = self._ally_since[k]
+			if since == nil then
+				self._ally_since[k] = self.tick
+				continue
+			end
+			if self.tick - since < SimDiplomacy.AI_PROPOSE_AFTER then
+				continue
+			end
+			local ai, h = 0, 0
+			if self.o_ai[a] == 1 and self.o_ai[b] == 0 then
+				ai, h = a, b
+			elseif self.o_ai[b] == 1 and self.o_ai[a] == 0 then
+				ai, h = b, a
+			end
+			if ai == 0 or self.o_alive[ai] == 0 or self.o_alive[h] == 0 or self.o_kind[ai] == Defs.KIND_TRIBE then
+				continue
+			end
+			if rng:randi() % SimDiplomacy.AI_PROPOSE_ODDS ~= 0 then
+				continue
+			end
+			for kind = 1, 3 do
+				local ask = (k * 4 + kind)
+				if
+					not self:has_pact(ai, h, kind)
+					and not self._ai_asked[ask]
+					and self.pact_req[(ai * 1024 + h) * 4 + kind] == nil
+					and self.pact_req[(h * 1024 + ai) * 4 + kind] == nil
+				then
+					self._ai_asked[ask] = true
+					self.pact_req[(ai * 1024 + h) * 4 + kind] = self.tick
+					self:ev({ Ev.PACT, ai, h, kind, 0 })
+					break
+				end
 			end
 		end
 	end
@@ -195,6 +241,16 @@ function SimDiplomacy.install(C)
 		end_alliance(self, a, b, traitor, expired)
 		if had then
 			self:_end_pacts(a, b)
+			-- (a new alliance between them starts the AI's proposals over)
+			local k = math.min(a, b) * 1024 + math.max(a, b)
+			if self._ally_since ~= nil then
+				self._ally_since[k] = nil
+			end
+			if self._ai_asked ~= nil then
+				for kind = 1, 3 do
+					self._ai_asked[k * 4 + kind] = nil
+				end
+			end
 		end
 	end
 

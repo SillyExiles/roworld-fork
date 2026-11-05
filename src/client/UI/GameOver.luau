@@ -118,6 +118,55 @@ function GameOver.new(c: any)
 	self._gap3 = spacer(28)
 	self._center:add_child(self._gap3)
 
+	-- (Empires Front 2026-11-05) the Stars the match paid, animated: each line comes in, then the total
+	-- counts up and lands with a chime, then the session bonus says what the next match adds (the
+	-- old gold pill stays for a screen the takeover offer fills)
+	local rw = GlassPanel.new(18.0, 12.0, UITheme.R_MD, true, 18)
+	rw:set_accent(UITheme.GOLD)
+	rw:set_border(UITheme.c(UITheme.GOLD, 0.45))
+	rw.size_flags_horizontal = W.SHRINK_CENTER
+	local rv = UITheme.vbox(5)
+	rw:add_child(rv)
+	local rh = UITheme.hbox(8)
+	rh:set_alignment(W.ALIGN_CENTER)
+	local ric = UITheme.icon_rect("star", 16.0, UITheme.GOLD)
+	ric.size_flags_vertical = W.SHRINK_CENTER
+	rh:add_child(ric)
+	rh:add_child(UITheme.label("STARS EARNED", 12, 800, UITheme.GOLD, 2))
+	rv:add_child(rh)
+	self._rw_lines = UITheme.vbox(3)
+	rv:add_child(self._rw_lines)
+	local tot = UITheme.hbox(8)
+	tot:set_alignment(W.ALIGN_CENTER)
+	self._rw_star = UITheme.icon_rect("star", 30.0, UITheme.GOLD)
+	self._rw_star.size_flags_vertical = W.SHRINK_CENTER
+	tot:add_child(self._rw_star)
+	self._rw_total = UITheme.label("+0", 32, 800, UITheme.GOLD)
+	self._rw_total.size_flags_vertical = W.SHRINK_CENTER
+	tot:add_child(self._rw_total)
+	self._rw_tot_row = tot
+	rv:add_child(tot)
+	self._rw_hint = UITheme.label("", 12, 700, UITheme.GREEN)
+	self._rw_hint:set_alignment(W.ALIGN_CENTER)
+	self._rw_hint:set_autowrap(true)
+	self._rw_hint:set_visible(false)
+	rv:add_child(self._rw_hint)
+	self._rw_bal = UITheme.label("", 11, 600, UITheme.TEXT_2)
+	self._rw_bal:set_alignment(W.ALIGN_CENTER)
+	self._rw_bal:set_visible(false)
+	rv:add_child(self._rw_bal)
+	rw:set_visible(false)
+	self._reward = rw
+	self._center:add_child(rw)
+	self._gap_rw = spacer(14)
+	self._gap_rw:set_visible(false)
+	self._center:add_child(self._gap_rw)
+	--- the animation: seconds since the payout came in, the lines' rows, the count, done
+	self._rw_t = -1.0
+	self._rw_rows = {}
+	self._rw_shown = 0.0
+	self._rw_landed = false
+
 	-- take over the nation that conquered you (Takeover.luau; hidden without an offer). 2026-09-29: the
 	-- eliminated screen advertised the revive purchase badly, so the offer is the
 	-- screen's centrepiece while it shows (the stat cards step aside): the nation's flag (or colour),
@@ -390,6 +439,9 @@ function GameOver.set_award(self, award: any)
 	if not GameOver.SHOW_STARS or award == nil or (tonumber(award.total) or 0) <= 0 then
 		self._award = nil
 		self._stars_btn:set_visible(false)
+		self._reward:set_visible(false)
+		self._gap_rw:set_visible(false)
+		self._rw_t = -1.0
 		self:_refresh_offers()
 		return
 	end
@@ -402,11 +454,112 @@ function GameOver.set_award(self, award: any)
 	self._stars_done = false
 	self._stars_btn:set_text("+0")
 	self._stars_btn:set_visible(true)
+	self:_fill_reward(award)
 	self:_refresh_offers()
 	if self.is_open then
 		UICtx.pop_in(self._stars_btn, 0.0, 0.8, 0.35)
 		UICtx.pop_in(self._offers, 0.5, 0.9, 0.35)
 		self:apply_layout()
+	end
+end
+
+--- (2026-11-05) The rewards panel's rows for `award`: one per line (hidden, they come in one by one).
+function GameOver._fill_reward(self, award: any)
+	local StarsData = UICtx.data("Stars")
+	for _, r in self._rw_rows do
+		r:queue_free()
+	end
+	self._rw_rows = {}
+	local compact = self.ctx.compact
+	for _, l in award.lines do
+		local key, amount = l[1], l[2]
+		local bonus = key == "session"
+		local row = UITheme.hbox(16)
+		local name = StarsData.LABELS[key] or key
+		if bonus then
+			local n = award.session and award.session.n or 2
+			local pct = award.session and award.session.pct or 0
+			name = string.format("%s +%d%%  ·  match %d in a row", name, math.floor(pct * 100 + 0.5), n)
+		end
+		local lab = UITheme.label(name, if compact then 12 else 13, if bonus then 800 else 600, if bonus then UITheme.GREEN else UITheme.TEXT_2)
+		lab.size_flags_horizontal = W.EXPAND_FILL
+		lab:set_min_size(Vector2.new(if compact then 150 else 210, 0))
+		row:add_child(lab)
+		local amt = UITheme.label("+" .. UICtx.commas(amount), if compact then 12 else 13, 800, if bonus then UITheme.GREEN else UITheme.GOLD)
+		amt:set_alignment(W.ALIGN_RIGHT)
+		row:add_child(amt)
+		row:set_visible(false)
+		self._rw_lines:add_child(row)
+		table.insert(self._rw_rows, row)
+	end
+	-- (phones: the lines stay folded; the total and the bonus say it)
+	self._rw_lines:set_visible(not compact)
+	self._rw_total:set_text("+0")
+	self._rw_hint:set_visible(false)
+	self._rw_bal:set_visible(false)
+	self._rw_t = 0.0
+	self._rw_shown = 0.0
+	self._rw_landed = false
+	self._reward:set_border(UITheme.c(UITheme.GOLD, 0.45))
+end
+
+--- (2026-11-05) The rewards panel's animation, per frame: a line every ROW_S, the total counting up
+--- for COUNT_S, the landing (a chime, a pop, a brighter border), then the session bonus line.
+GameOver.ROW_S = 0.28
+GameOver.COUNT_S = 1.1
+function GameOver._animate_reward(self, delta: number)
+	local award = self._award
+	if award == nil or self._rw_t < 0.0 or not self._reward:is_visible_in_tree() then
+		return
+	end
+	self._rw_t += delta
+	local t = self._rw_t
+	local rows = self._rw_rows
+	local folded = not self._rw_lines.visible
+	local lines_s = if folded then 0.0 else #rows * GameOver.ROW_S
+	if not folded then
+		for i, row in rows do
+			if not row.visible and t >= 0.2 + (i - 1) * GameOver.ROW_S then
+				row:set_visible(true)
+				UICtx.pop_in(row, 0.0, 0.9, 0.25)
+				self.ctx:sfx("star_tick", -4.0, 0.0, 0.9 + 0.08 * i)
+			end
+		end
+	end
+	local start = 0.3 + lines_s
+	if t < start or self._rw_landed then
+		return
+	end
+	local total = tonumber(award.total) or 0
+	local k = math.clamp((t - start) / GameOver.COUNT_S, 0, 1)
+	-- (eased: fast, then slowing into the total)
+	local shown = math.floor(total * (1 - (1 - k) ^ 3))
+	if shown ~= self._rw_shown then
+		self._rw_shown = shown
+		self._rw_total:set_text("+" .. UICtx.commas(shown))
+		if math.floor(t * 12) ~= math.floor((t - delta) * 12) then
+			self.ctx:sfx("star_tick", -8.0, 0.0, 0.8 + 0.7 * k)
+		end
+	end
+	if k >= 1 then
+		self._rw_landed = true
+		self._rw_total:set_text("+" .. UICtx.commas(total))
+		self.ctx:sfx("star_get")
+		UICtx.pop_in(self._rw_tot_row, 0.0, 1.25, 0.35)
+		self._reward:set_border(UITheme.GOLD)
+		local ses = award.session
+		local nxt = if type(ses) == "table" then tonumber(ses.next_pct) or 0 else 0
+		if nxt > 0 then
+			-- what playing on is worth
+			self._rw_hint:set_text(string.format("Play again now: your next match pays +%d%% Stars!", math.floor(nxt * 100 + 0.5)))
+			self._rw_hint:set_visible(true)
+			UICtx.pop_in(self._rw_hint, 0.15, 0.9, 0.3)
+		end
+		if tonumber(award.balance) ~= nil and award.balance > 0 then
+			self._rw_bal:set_text(string.format("You have %s Stars", UICtx.commas(award.balance)))
+			self._rw_bal:set_visible(true)
+			UICtx.pop_in(self._rw_bal, 0.3, 0.95, 0.3, true)
+		end
 	end
 end
 
@@ -1075,8 +1228,19 @@ function GameOver.apply_layout(self)
 	self._gap3:set_visible(not take)
 	self._gap2:set_min_size(Vector2.new(0, if compact then 14 else (if take then 18 else 26)))
 	self._gap3:set_min_size(Vector2.new(0, if compact then 14 else (if take then 18 else 28)))
+	-- (2026-11-05) the Stars: the animated panel, or the small pill beside the takeover offer
+	local award_on = self._award ~= nil
+	self._reward:set_visible(award_on and not take)
+	self._gap_rw:set_visible(award_on and not take)
+	self._gap_rw:set_min_size(Vector2.new(0, if compact then 8 else 14))
+	self._stars_btn:set_visible(award_on and take)
 	local sz = self._center:get_combined_minimum_size()
 	local area = ctx:clear_rect()
+	if award_on and not take and sz.Y > area.Height - 8.0 and self._rw_lines.visible then
+		-- (a short screen: the lines fold, the total and the bonus stay)
+		self._rw_lines:set_visible(false)
+		sz = self._center:get_combined_minimum_size()
+	end
 	if sz.Y > area.Height - 8.0 then
 		-- Short screens (phones; a screen with the takeover offer): drop the kicker line and tighten
 		-- the gaps until it fits.
@@ -1202,6 +1366,7 @@ function GameOver._process(self, delta: number)
 		end
 	end
 	self:_animate_take(delta)
+	self:_animate_reward(delta)
 	if self._sweep_t < 0.0 then
 		return
 	end
