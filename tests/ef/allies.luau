@@ -89,6 +89,32 @@ for _ = 1, 3000 do sim:step() end
 local worst = 0
 for id = 1, sim.owner_total do worst = math.max(worst, sim.o_ally_count[id] or 0) end
 expect(worst <= Rules.ALLY_MAX, "after 3000 ticks of diplomacy the most alliances anyone holds is " .. worst)
+-- (2026-11-06) reaching 3 alliances closes every pending request from or to that player at once
+do
+	local free = {}
+	for id = 1, sim.owner_total do
+		if sim.o_alive[id] == 1 and sim.o_kind[id] == Defs.KIND_NATION and sim.o_ai[id] == 1 and #free < 5 then
+			table.insert(free, id)
+		end
+	end
+	for _, p in { h, table.unpack(free) } do
+		for _, q in sim:allies_of(p) do
+			sim:end_alliance(p, q, 0, true)
+		end
+	end
+	expect(#free == 5 and sim.o_ally_count[h] == 0, "five AI nations and the player, none allied")
+	sim:form_alliance(h, free[1])
+	sim:form_alliance(h, free[2])
+	sim:add_request(free[3], h)
+	sim:add_request(h, free[4])
+	sim:add_request(free[4], free[3])
+	expect(sim:has_request(free[3], h) and sim:has_request(h, free[4]), "two pending requests with the player")
+	sim:form_alliance(h, free[5])
+	expect(sim.o_ally_count[h] == 3, "the player's 3rd alliance")
+	expect(not sim:has_request(free[3], h), "a request to the full player closes")
+	expect(not sim:has_request(h, free[4]), "the full player's own request closes")
+	expect(sim:has_request(free[4], free[3]), "a request between others stays")
+end
 -- (2026-11-05) a team game: no alliances with other teams (the team is the alliance)
 do
 	local ts = Sim.new(WorldMap.get("rome"), { seed = 9, difficulty = 1, tribes = 20, max_humans = 1, teams = 2 })

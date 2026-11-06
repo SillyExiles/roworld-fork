@@ -118,10 +118,12 @@ function UIAdvisor.check_threats(self: any)
 		self.ui.feed:toast(
 			Defs.MSG_BAD,
 			string.format(
-				"%s (%s troops) borders you with %d× your army. Fortify or find allies.",
+				"%s (%s troops) borders you with %d× your army. %s",
 				s:owner_name(worst),
 				T().fmt_troops(worst_troops),
-				ratio_x
+				ratio_x,
+				-- (Empires Front 2026-11-06: a team game has no alliances with other teams)
+				if s:is_team_game() then "Fortify, or signal your team for help." else "Fortify or find allies."
 			),
 			"defense"
 		)

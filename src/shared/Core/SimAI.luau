@@ -546,7 +546,8 @@ function SimAI:_consider_war(sim, id: number, fill: number, age: number): boolea
 	local w = math.clamp((age - SimAI.LATE_WAR_FROM) / SimAI.LATE_WAR_SPAN, 0.0, 1.0)
 	local need = WAR_RATIO[d] * (1.0 + (0.5 - 1.0) * w)
 	if best < 0 or best_s < need then
-		return false
+		-- (Empires Front 2026-11-06) no war of its own: help a Military Access partner instead
+		return self:_consider_passage_war(sim, id, need, age)
 	end
 	local new_war = sim:attack_between(id, best) == nil
 	if new_war and sim:count_attacks_by(id, true) >= (if my_share >= 0.12 then 3 else 2) then
@@ -566,6 +567,72 @@ function SimAI:_consider_war(sim, id: number, fill: number, age: number): boolea
 	local ok = sim:intent_attack(id, sim.sc_tile[best], ratio)
 	if ok and new_war then
 		attackers_on[best] += 1
+	end
+	return ok
+end
+
+--- (Empires Front 2026-11-06) Military Access, the AI's side: with no war of its own worth starting, an
+--- AI nation marches through a partner's land (an ally that signed Military Access, or a teammate:
+--- SimAttacks._passage_ok) against that partner's enemy, whoever is attacking the partner first (x
+--- PASSAGE_HELP), then whoever the partner is attacking. The Sim finds the way in (passage_tile).
+SimAI.PASSAGE_HELP = 1.5
+function SimAI:_consider_passage_war(sim, id: number, need: number, age: number): boolean
+	if (sim.o_ally_count[id] or 0) == 0 and not sim.team_mode then
+		return false
+	end
+	local mine = sim.o_troops[id]
+	local best, best_s = -1, 0.0
+	local partner: { [number]: boolean } = {}
+	local function is_partner(m: number): boolean
+		local ok = partner[m]
+		if ok == nil then
+			ok = sim:_passage_ok(id, m)
+			partner[m] = ok
+		end
+		return ok
+	end
+	local function consider(m: number, q: number, help: number)
+		if q <= 0 or q == id or q == m or not is_partner(m) or sim.o_alive[q] == 0 or sim:allied(id, q) then
+			return
+		end
+		if
+			sim.o_kind[q] == KIND_HUMAN
+			and sim:attack_between(id, q) == nil
+			and not self:_may_attack_human(sim, id, q, age)
+		then
+			return
+		end
+		local s = mine / (sim.o_troops[q] + 1.0) * help * self.aggression[id]
+		if s > best_s then
+			best, best_s = q, s
+		end
+	end
+	for _, a in sim.attacks do
+		if a.dead or a.troops < 1.0 or a.retreat_at > 0 or a.target <= 0 or a.attacker == id then
+			continue
+		end
+		-- the partner under attack (its attacker), or the partner attacking (its target)
+		consider(a.target, a.attacker, SimAI.PASSAGE_HELP)
+		consider(a.attacker, a.target, 1.0)
+	end
+	if best < 0 or best_s < need then
+		return false
+	end
+	local new_war = sim:attack_between(id, best) == nil
+	if new_war and sim:count_attacks_by(id, true) >= (if sim:land_share(id) >= 0.12 then 3 else 2) then
+		return false
+	end
+	local ratio = _above(sim, id, self.reserve_r[id])
+	if ratio * mine < 1.0 then
+		return false
+	end
+	local tile = sim.bhead[best]
+	if tile == nil or tile < 0 then
+		return false
+	end
+	local ok = sim:intent_attack(id, tile, ratio)
+	if ok and new_war then
+		self.attackers_on[best] += 1
 	end
 	return ok
 end

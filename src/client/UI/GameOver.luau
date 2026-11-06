@@ -58,6 +58,8 @@ function GameOver.new(c: any)
 	self._dominated = false
 	self._pill_id = 0
 	self._pill_text = ""
+	--- (Empires Front 2026-11-06) ELIMINATED: PLAY AGAIN presses itself at this os.clock() (nil: off)
+	self._auto_at = nil :: number?
 	self._close_tween = nil
 	self._enter_tween = nil
 	self:set_anchors_and_offsets_preset(W.PRESET_FULL_RECT)
@@ -361,12 +363,14 @@ function GameOver.new(c: any)
 	self._again = UITheme.button("PLAY AGAIN", "PrimaryButton", "play", 52.0)
 	self._again:set_min_size(Vector2.new(200, 52))
 	self._again.pressed:Connect(function()
+		self._auto_at = nil
 		self.play_again:Fire()
 	end)
 	self._buttons:add_child(self._again)
 	self._spec = UITheme.button("Spectate", "GlassButton", "eye", 52.0)
 	self._spec:set_min_size(Vector2.new(170, 52))
 	self._spec.pressed:Connect(function()
+		self:cancel_auto()
 		self:close()
 		self.spectate:Fire()
 	end)
@@ -374,6 +378,7 @@ function GameOver.new(c: any)
 	self._home = UITheme.button("Return to title", "GlassButton", "exit", 52.0)
 	self._home:set_min_size(Vector2.new(200, 52))
 	self._home.pressed:Connect(function()
+		self:cancel_auto()
 		self.to_title:Fire()
 	end)
 	self._buttons:add_child(self._home)
@@ -685,6 +690,19 @@ function GameOver._stat_card(self, icon_name: string, value: string, caption: st
 	return card
 end
 
+--- (Empires Front 2026-11-06) On the ELIMINATED screen PLAY AGAIN counts down and presses itself
+--- (straight into the next match) unless the player picks something else: Keep watching, Return to
+--- title, or the solo takeover is on offer.
+GameOver.AUTO_NEXT_S = 15.0
+function GameOver.cancel_auto(self)
+	if self._auto_at ~= nil then
+		self._auto_at = nil
+		if not self._again.disabled then
+			self._again:set_text("PLAY AGAIN")
+		end
+	end
+end
+
 --- kind: "victory", "defeat", "eliminated" or "result" (the match ended while you were not in it).
 --- reason: Defs.OVER_* (ignored for "eliminated"). stats: {peak_share, max_troops, kills, duration_s}
 function GameOver.open(self, kind: string, winner: number, killer: number, stats: any, reason: number?)
@@ -779,6 +797,11 @@ function GameOver.open(self, kind: string, winner: number, killer: number, stats
 	self._next:set_visible(ctx:mode() == UICtx.MODE_MULTI and kind ~= "eliminated")
 	self:_refresh_next()
 	self:_show_takeover()
+	-- (2026-11-06) ELIMINATED: the next match in AUTO_NEXT_S unless the player picks something else
+	if kind == "eliminated" and self._again.visible and self._take_info == nil and not self:finding() then
+		self._auto_at = os.clock() + GameOver.AUTO_NEXT_S
+		self:_tick_auto()
+	end
 	self:apply_layout()
 	-- Entrance (the dim stays put when the screen was already showing)
 	if not was_shown then
@@ -859,6 +882,10 @@ end
 function GameOver._show_takeover(self)
 	local info = self._take_info
 	local show = info ~= nil and self._kind == "eliminated"
+	if show then
+		-- (the takeover is on offer: no automatic next match)
+		self:cancel_auto()
+	end
 	self._take:set_visible(show)
 	self._gap4:set_visible(show)
 	-- the offer takes the stat cards' place
@@ -976,6 +1003,26 @@ function GameOver._size_take(self)
 	self._take_price.TextSize = math.floor(th * 0.62)
 	self._take_corner.CornerRadius = UDim.new(0, 12 * u)
 	self._take:set_min_size(Vector2.new(w, 0))
+end
+
+--- The ELIMINATED countdown: PLAY AGAIN · n, then it presses itself.
+function GameOver._tick_auto(self)
+	local at = self._auto_at
+	if at == nil or not self.is_open then
+		return
+	end
+	if self._again.disabled or not self._again.visible then
+		self._auto_at = nil
+		return
+	end
+	local left = math.ceil(at - os.clock())
+	if left <= 0 then
+		self._auto_at = nil
+		self.ctx:sfx("click")
+		self.play_again:Fire()
+		return
+	end
+	self._again:set_text(string.format("PLAY AGAIN · %d", left))
 end
 
 function GameOver.set_building(self, on: boolean)
@@ -1210,6 +1257,7 @@ function GameOver.close(self)
 	if not self.is_open then
 		return
 	end
+	self._auto_at = nil
 	self.is_open = false
 	if self._enter_tween ~= nil then
 		self._enter_tween:kill()
@@ -1402,6 +1450,7 @@ function GameOver._process(self, delta: number)
 	self._next_accum += delta
 	if self._next_accum >= 0.25 then
 		self._next_accum = 0.0
+		self:_tick_auto()
 		self:_refresh_next()
 		if self._finding_at ~= nil and not self:finding() then
 			self:set_finding(false)

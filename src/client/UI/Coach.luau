@@ -39,6 +39,9 @@ Coach.TIPS = {
 		icon = "alliance",
 		desktop = "You now border %s. Click their land to attack, or right-click it to propose an alliance.",
 		touch = "You now border %s. Tap their land to size them up, tap again to attack. Long-press for more.",
+		-- (Empires Front 2026-11-06) a team game has no alliances with other teams
+		team_desktop = "You now border %s. Click their land to attack; right-click for more. Your team is your alliance.",
+		team_touch = "You now border %s. Tap their land to size them up, tap again to attack. Your team is your alliance.",
 	},
 	boat = {
 		icon = "boat",
@@ -266,6 +269,11 @@ function Coach._next(self)
 	self.current = id
 	self._target = q.target
 	local txt = if ctx.touch then tip.touch else tip.desktop
+	-- (a team game's wording, when the tip has one)
+	local team = ctx.state ~= nil and ctx.state.is_team_game ~= nil and ctx.state:is_team_game()
+	if team then
+		txt = (if ctx.touch then tip.team_touch else tip.team_desktop) or txt
+	end
 	if string.find(txt, "%s", 1, true) then
 		txt = string.format(txt, q.arg)
 	end

@@ -212,7 +212,7 @@ Tutorial.STEPS = {
 		info = true,
 		button = "forge",
 		touch = "Forges arm troops. Walls guard borders",
-		desktop = "Forges arm your troops with Ore; Walls and Fortresses guard your borders",
+		desktop = "Forges arm your troops with Ore; Walls and Defense Posts guard your borders",
 		max_s = Tutorial.INFO_S,
 	},
 	{

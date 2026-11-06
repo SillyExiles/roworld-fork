@@ -82,6 +82,42 @@ if port_body ~= nil then
 else
 	print("  (B has no port on a sea A lacks: boat case skipped)")
 end
+-- (2026-11-06) the AI side: an AI ally with Military Access marches through B against B's attacker
+do
+	-- C attacks B
+	local btile = -1
+	for t = 0, sim.N - 1 do
+		if buffer.readi32(sim.owner, t * 4) == B then
+			for _, n in { t - 1, t + 1, t - W, t + W } do
+				if n >= 0 and n < sim.N and buffer.readi32(sim.owner, n * 4) == C then btile = t break end
+			end
+		end
+		if btile >= 0 then break end
+	end
+	sim.o_troops[C] = math.max(sim.o_troops[C], 20000)
+	expect(sim:intent_attack(C, btile, 0.3), "C attacks B")
+	for _, a in sim.attacks do
+		if not a.dead and a.attacker == A and a.target == C then a.troops = 0 a.dead = true end
+	end
+	sim.o_troops[A] = sim.o_cap[A] * 0.95
+	local ok = sim.ai:_consider_passage_war(sim, A, 0.01, 10 ^ 9)
+	local by_a = nil
+	for _, a in sim.attacks do
+		if not a.dead and a.attacker == A and a.target == C then by_a = a end
+	end
+	expect(ok and by_a ~= nil, "the AI ally A attacks C, B's attacker")
+	expect(not sim:borders(A, C) and by_a ~= nil and (by_a.via or -1) >= 0, "through B's land (A doesn't border C; via a tile of B)")
+	-- without the pact it doesn't
+	local saved = sim.pacts[math.min(A, B) * 1024 + math.max(A, B)]
+	sim.pacts[math.min(A, B) * 1024 + math.max(A, B)] = nil
+	if by_a then by_a.dead = true by_a.troops = 0 end
+	sim.o_troops[A] = sim.o_cap[A] * 0.95
+	expect(sim.ai:_consider_passage_war(sim, A, 0.01, 10 ^ 9) == false, "no Military Access: no march through B")
+	sim.pacts[math.min(A, B) * 1024 + math.max(A, B)] = saved
+	for _, a in sim.attacks do
+		if a.attacker == C and a.target == B then a.dead = true a.troops = 0 end
+	end
+end
 -- the order itself, as the client sends it
 sim.o_troops[A] = 50000
 local c0 = sim.o_tiles[C]

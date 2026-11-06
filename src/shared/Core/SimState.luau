@@ -931,7 +931,45 @@ function SimState.install(C: any)
 		self:msg(a, Defs.MSG_ALLIANCE, "You are now allied with " .. self.o_name[b])
 		self:msg(b, Defs.MSG_ALLIANCE, "You are now allied with " .. self.o_name[a])
 		self:_on_alliance_formed(a, b)
+		-- (2026-11-06) someone now at Rules.ALLY_MAX: their pending requests close at once
+		self:_close_full_requests(a)
+		self:_close_full_requests(b)
 		return true
+	end
+
+	--- (Empires Front 2026-11-06) `id` holds Rules.ALLY_MAX alliances: every pending alliance request from
+	--- or to it closes now (none could be answered), and both sides hear why.
+	function C._close_full_requests(self: any, id: number)
+		if not Rules.ally_full(self.o_ally_count[id]) or next(self.requests) == nil then
+			return
+		end
+		local mine = 0
+		for _, k in self:_ordered_keys(self.requests) do
+			local from, to = k // 1024, k % 1024
+			if from == id then
+				self:close_request(from, to)
+				mine += 1
+			elseif to == id then
+				self:close_request(from, to)
+				self:msg(
+					from,
+					Defs.MSG_INFO,
+					string.format("%s now has %d alliances: your request was closed", self.o_name[id], Rules.ALLY_MAX)
+				)
+				self:msg(
+					id,
+					Defs.MSG_INFO,
+					string.format("%s's alliance request was closed: you have %d alliances", self.o_name[from], Rules.ALLY_MAX)
+				)
+			end
+		end
+		if mine > 0 then
+			self:msg(
+				id,
+				Defs.MSG_INFO,
+				string.format("You have %d alliances: your pending request%s withdrawn", Rules.ALLY_MAX, if mine == 1 then " was" else "s were")
+			)
+		end
 	end
 
 	--- Overridden by SimAttacks to stop fighting between new allies.

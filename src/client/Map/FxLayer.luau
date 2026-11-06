@@ -42,6 +42,8 @@ local Rules = require(Airfront:WaitForChild("Core"):WaitForChild("Rules")) :: an
 -- all new art): the explosions, the debris a nuke leaves and the conquest's flag.
 local MapFx = require(Airfront:WaitForChild("Assets"):WaitForChild("MapFx")) :: any
 local FrameClock = require(script.Parent:WaitForChild("FrameClock")) :: any
+-- (Empires Front 2026-11-06: the atlas drawn by the client; the uploaded one is not this experience's)
+local MapFxImage = require(script.Parent:WaitForChild("MapFxImage")) :: any
 local PixelIcons = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PixelIcons")) :: any
 
 local FxLayer = {}
@@ -246,6 +248,9 @@ function FxLayer.new(parent: Instance, view: any)
 	self._ping_gui = {} :: { any }
 	-- Fetch the atlas now: a cold download outlasts the 2.5 s conquest popup.
 	task.spawn(function()
+		if MapFxImage.drawn() then
+			return
+		end
 		pcall(function()
 			ContentProvider:PreloadAsync({ MapFx.id })
 		end)
@@ -854,7 +859,7 @@ local function pop_gui(self: any, n: number): PopGui
 		l.Name = name
 		l.BackgroundTransparency = 1
 		l.AnchorPoint = Vector2.new(0.5, 0.5)
-		l.Image = MapFx.id
+		MapFxImage.apply(l)
 		l.ImageRectSize = Vector2.new(row.w, row.h)
 		l.ResampleMode = Enum.ResamplerMode.Pixelated
 		l.ZIndex = FxLayer.Z
@@ -1068,7 +1073,7 @@ local function bursts_step(self: any, cam: any, now: number, list: { Burst }, po
 			img.Name = "Explosion"
 			img.BackgroundTransparency = 1
 			img.AnchorPoint = Vector2.new(0.5, 0.5)
-			img.Image = MapFx.id
+			MapFxImage.apply(img)
 			img.ResampleMode = Enum.ResamplerMode.Pixelated
 			img.ZIndex = z
 			img.Parent = self.root
