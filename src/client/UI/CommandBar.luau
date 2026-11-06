@@ -70,6 +70,10 @@ function CommandBar.new(c: any)
 	self.arsenal_wanted = Signal.new()
 	--- The row gained or lost a slot (an Arsenal kind was unlocked).
 	self.slots_changed = Signal.new()
+	--- (Empires Front 2026-11-06) buildings joined a new player's bar (UIRules.ROOKIE_STAGES): { kind }
+	self.rookie_unlocked = Signal.new()
+	--- the kinds a new player's bar holds back, as last arranged ("market,temple"; nil: not yet seen)
+	self._rookie_sig = nil :: string?
 	--- the Arsenal kinds with a slot (the unlocked ones), as last arranged: "artillery,mega"
 	self._arsenal_sig = ""
 	self.buttons = {} -- kind -> BuildButton
@@ -577,9 +581,14 @@ function CommandBar._arrange_slots(self, two_rows: boolean)
 	self._arsenal_sig = table.concat(unlocked, ",")
 	-- (2026-11-01: fifteen build slots; with two rows the second half of them goes to the second row)
 	local acts = {}
+	local rules = self.ctx.rules
 	for _, k in UIRules().ACTIONS do
 		if not R.is_nuke(k) then
-			table.insert(acts, k)
+			if rules ~= nil and rules:rookie_hidden(k) then
+				self:_detach(self.buttons[k]) -- (a new player's bar: not yet)
+			else
+				table.insert(acts, k)
+			end
 		end
 	end
 	local half = if two_rows and #acts > 10 then math.ceil(#acts / 2) else #acts
@@ -609,6 +618,21 @@ function CommandBar._arrange_slots(self, two_rows: boolean)
 		row:add_child(self.buttons[k])
 	end
 	row:add_child(self._arsenal_wrap)
+end
+
+--- The build kinds a new player's bar holds back now (UIRules.rookie_hidden), in ACTIONS order.
+function CommandBar._rookie_held(self): { string }
+	local out = {}
+	local rules = self.ctx.rules
+	if rules == nil or rules.rookie_hidden == nil then
+		return out
+	end
+	for _, k in UIRules().ACTIONS do
+		if not UIRules().is_nuke(k) and rules:rookie_hidden(k) then
+			table.insert(out, k)
+		end
+	end
+	return out
 end
 
 function CommandBar._detach(_self, c)
@@ -746,7 +770,7 @@ function CommandBar._reflow(self)
 		-- One row when it fits between the safe edges (the ten slots, the unlocked Arsenal kinds and
 		-- the SHOP button: the slots narrow a little first, then SHOP), else builds over nukes.
 		local avail = ctx.vp.X - ctx.insets.x - ctx.insets.z - 16.0
-		local slots = #UIRules().ACTIONS - (if self._siege_shown then 0 else #UIRules().NUKE_KINDS)
+		local slots = #UIRules().ACTIONS - (if self._siege_shown then 0 else #UIRules().NUKE_KINDS) - #self:_rookie_held()
 		local fit = TrayFit.fit(avail, slots + #self:_unlocked_arsenal(), #self._shop:locked())
 		for _, b in pairs(self.buttons) do
 			b:set_slot_width(fit.slot_w)
@@ -867,6 +891,33 @@ function CommandBar._refresh_buttons_now(self)
 	local siege = rules ~= nil and rules:struct_count(UITheme.core("Defs").S_SILO) > 0
 	if siege ~= self._siege_shown then
 		self._siege_shown = siege
+		cards_changed = true
+	end
+	-- (2026-11-06) a new player's bar: buildings join it as the match goes on (UIRules.ROOKIE_STAGES)
+	local held = self:_rookie_held()
+	local sig = table.concat(held, ",")
+	if sig ~= self._rookie_sig then
+		if self._rookie_sig ~= nil then
+			local was: { [string]: boolean } = {}
+			for k in string.gmatch(self._rookie_sig, "[^,]+") do
+				was[k] = true
+			end
+			local now: { [string]: boolean } = {}
+			for _, k in held do
+				now[k] = true
+			end
+			local joined = {}
+			for k in was do
+				if not now[k] then
+					table.insert(joined, k)
+				end
+			end
+			if #joined > 0 then
+				table.sort(joined)
+				self.rookie_unlocked:Fire(joined)
+			end
+		end
+		self._rookie_sig = sig
 		cards_changed = true
 	end
 	if table.concat(self:_unlocked_arsenal(), ",") ~= self._arsenal_sig or cards_changed then

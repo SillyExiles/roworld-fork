@@ -960,6 +960,10 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 end
 
 function SimAI:_nuke_target(sim, id: number, p: number, kind: number): number
+	-- (Empires Front 2026-11-06) a new player is safe from the siege weapons
+	if sim.o_rookie ~= nil and sim.o_rookie[p] == 1 then
+		return -1
+	end
 	local cands = {}
 	for _, k in { Defs.S_CITY, Defs.S_SILO, Defs.S_FACTORY, Defs.S_PORT } do
 		if sim:struct_count(p, k) > 0 then

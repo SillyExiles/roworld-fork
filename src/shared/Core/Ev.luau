@@ -59,6 +59,9 @@ Ev.PLAGUE = 39 -- id, until_tick (0: over), source_id, severity x100 (Core/SimNu
 Ev.BLAZE = 40 -- uid, owner, tile, radius_tiles, start_tick, spread_ticks  (fire spreading from `tile`)
 
 --- Number of event ids (ids are 0..COUNT-1).
-Ev.COUNT = 41
+--- (Empires Front 2026-11-06) a new player (Rules.ROOKIE_MATCHES): safe from the siege weapons, the AI
+--- gentler with them (Sim.set_rookie).
+Ev.ROOKIE = 41 -- id, on (1 / 0)
+Ev.COUNT = 42
 
 return Ev

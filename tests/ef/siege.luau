@@ -223,5 +223,35 @@ end
 if wall_t >= 0 then
 	expect(sim:_shielded(wall_t, buffer.readi32(sim.owner, wall_t * 4)), "a walled tile is shielded")
 end
+-- (2026-11-06) a new player is safe: no siege weapon may be aimed at them, a blast spares their land,
+-- the plague never takes them, and the AI picks no target of theirs
+ensure_silo()
+local Rk, rk_tile = 0, -1
+for u = 0, sim.N - 1, 7 do
+	local o = buffer.readi32(sim.owner, u * 4)
+	if o > 0 and o ~= A and sim.o_kind[o] == Defs.KIND_NATION and not sim:has_alliance(A, o) and sim.range_d2(site, u) < (reach - 10) ^ 2 and sim.range_d2(site, u) > 400 then
+		Rk, rk_tile = o, u
+		break
+	end
+end
+expect(Rk > 0, "a nation to make a new player")
+sim:set_rookie(Rk, true)
+expect(not sim:launch_nuke(A, "atom", rk_tile), "a bombard can't be aimed at a new player")
+expect(not sim:launch_nuke(A, "plague", rk_tile), "nor the plague")
+expect(not sim:_infect(Rk, A, 100), "the plague never takes a new player")
+local SimAI = require("../../src/shared/Core/SimAI")
+expect(SimAI._nuke_target(sim.ai, sim, A, Rk, Defs.N_ATOM) == -1, "the AI picks no target of theirs")
+-- a bombard and a fire landing on their land (as if a shot aimed next door went wide) spare it
+local rk_tiles0 = sim.o_tiles[Rk]
+local rk_structs0 = 0
+for k = 0, Defs.STRUCT_KIND_COUNT - 1 do rk_structs0 += #sim:structs_of(Rk, k) end
+sim:_detonate({ uid = 990001, kind = Defs.N_ATOM, owner = A, to_tile = rk_tile, target_owner = Rk })
+sim:_ignite({ uid = 990002, kind = Defs.N_HYDROGEN, owner = A, to_tile = rk_tile, target_owner = Rk })
+for _ = 1, Rules.FIRE_SPREAD_TICKS + 5 do sim:step() end
+local rk_structs1 = 0
+for k = 0, Defs.STRUCT_KIND_COUNT - 1 do rk_structs1 += #sim:structs_of(Rk, k) end
+expect(sim.o_tiles[Rk] >= rk_tiles0 - 5, string.format("a blast on their land spared it (%d -> %d tiles)", rk_tiles0, sim.o_tiles[Rk]))
+expect(rk_structs1 >= rk_structs0, "and their buildings")
+expect(#sim:rookie_rows() >= 1, "the snapshot lists the new player")
 local _ = ps
 print(if fails == 0 then "all ok" else fails .. " FAILED")

@@ -189,6 +189,11 @@ function SimNukes.install(C)
 			self:msg(id, Defs.MSG_INFO, "Aim the plague at a nation's land")
 			return false
 		end
+		-- (2026-11-06) a new player (their first Rules.ROOKIE_MATCHES matches) is safe from them
+		if siege and tg > 0 and self.o_rookie[tg] == 1 then
+			self:msg(id, Defs.MSG_INFO, string.format("%s is new to war: siege weapons can't hit them yet", self:name_of(tg)))
+			return false
+		end
 		-- (a siege weapon aimed at an ally breaks the alliance, as a traitor: below. A teammate, never.)
 		if tg ~= 0 and self:allied(id, tg) and not (siege and not self:same_team(id, tg)) then
 			self:msg(
@@ -703,7 +708,11 @@ function SimNukes.install(C)
 				continue
 			end
 			local o = readi32(owner, t * 4)
-			-- (Empires Front: behind a wall or within a Fortress's reach, half as likely)
+			-- (Empires Front: a new player's land is never razed; behind a wall or within a Fortress's
+			-- reach, half as likely)
+			if o > 0 and self.o_rookie[o] == 1 then
+				continue
+			end
 			if o > 0 and self:_shielded(t, o) and rng:randf() >= Rules.PROTECT_MULT then
 				continue
 			end
@@ -736,7 +745,11 @@ function SimNukes.install(C)
 		for _, s in self:structs_in_box(to, self.geo_span(to, radius), r) do
 			if not s.dead and range_d2(to, s.tile) <= r2 then
 				local so = s.owner
-				-- (Empires Front: a building behind a wall or within a Fortress's reach may stand)
+				-- (Empires Front: a new player's buildings stand; one behind a wall or within a
+				-- Fortress's reach may)
+				if so > 0 and self.o_rookie[so] == 1 then
+					continue
+				end
 				if self:_shielded(s.tile, so) and rng:randf() < Rules.PROTECT_SAVE then
 					continue
 				end
@@ -977,6 +990,9 @@ function SimNukes.install(C)
 				b.i += 1
 				local p = if d <= b.inner2 then Rules.FIRE_BURN_INNER else Rules.FIRE_BURN_OUTER
 				local o = readi32(owner, t * 4)
+				if o > 0 and self.o_rookie[o] == 1 then
+					continue -- (a new player's land does not burn)
+				end
 				if o > 0 and self:_shielded(t, o) then
 					p *= Rules.PROTECT_MULT
 				end
@@ -1002,6 +1018,9 @@ function SimNukes.install(C)
 					continue
 				end
 				local so = s.owner
+				if so > 0 and self.o_rookie[so] == 1 then
+					continue
+				end
 				if self:_shielded(s.tile, so) and rng:randf() < Rules.PROTECT_SAVE then
 					continue
 				end
@@ -1066,6 +1085,10 @@ function SimNukes.install(C)
 	--- Makes `o` sick with the plague for `ticks` (sent by `src`). False if it is sick or immune already.
 	function C:_infect(o: number, src: number, ticks: number): boolean
 		if o <= 0 or self.o_alive[o] ~= 1 or self.o_tiles[o] <= 0 then
+			return false
+		end
+		-- (a new player never catches it)
+		if self.o_rookie[o] == 1 then
 			return false
 		end
 		local tick = self.tick

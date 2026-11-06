@@ -251,6 +251,8 @@ function GameState.new(world: any?)
 	self.nukes = {} :: { [number]: NukeInfo }
 	--- (Empires Front 2026-11-06) the plague on each sick nation: { until_tick, source, severity 0..1 }
 	self.plague = {} :: { [number]: { until_tick: number, source: number, severity: number } }
+	--- (Empires Front 2026-11-06) the new players (Rules.ROOKIE_MATCHES): safe from the siege weapons
+	self.rookies = {} :: { [number]: boolean }
 	--- owner id -> the tick its next Reinforcements call is ready (Ev.REINFORCE; absent: now)
 	self.reinforce_ready = {} :: { [number]: number }
 	self.attacks = {} :: { [number]: AttackInfo }
@@ -1016,6 +1018,9 @@ function GameState.load_snapshot(self: GameState, snap: { [string]: any })
 	for _, row in snap.plague or {} do
 		self:_set_plague(row, 0)
 	end
+	for _, id in snap.rookies or {} do
+		self.rookies[tonumber(id) or 0] = true
+	end
 	self.loaded = true
 	self.snapshot_loaded:Fire()
 end
@@ -1377,6 +1382,16 @@ end
 HANDLERS[Ev.PLAGUE] = function(self, e)
 	self:_set_plague(e, 1)
 	self.plague_changed:Fire(e[2])
+end
+
+HANDLERS[Ev.ROOKIE] = function(self, e)
+	local id = tonumber(e[2]) or 0
+	self.rookies[id] = if e[3] == 1 then true else nil
+end
+
+--- Whether `id` is a new player (safe from the siege weapons).
+function GameState.is_rookie(self: GameState, id: number): boolean
+	return self.rookies[id] == true
 end
 
 HANDLERS[Ev.BLAZE] = function(self, e)

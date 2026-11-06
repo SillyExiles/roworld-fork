@@ -791,6 +791,41 @@ end
 -- (2026-11-06: the Watchtower and the Siege Workshop have no levels)
 UIRules.UPGRADABLE = { "city", "port", "factory" }
 
+--- (Empires Front 2026-11-06) A new player's build bar grows with the match: in their first matches
+--- after the tutorial (Telemetry.matches_before: ROOKIE_PACE) only the first stage's buildings show,
+--- the next ones join `at` seconds into their nation's life (x the pace), the bar telling them
+--- (CommandBar.rookie_unlocked). The radial menu and the hotkeys follow. The tutorial's match (the
+--- first) shows them all: the tutorial teaches them one by one.
+UIRules.ROOKIE_STAGES = {
+	{ at = 0, kinds = { "city", "farm", "mine", "defense", "port" } },
+	{ at = 90, kinds = { "market", "factory", "temple", "wall" } },
+	{ at = 180, kinds = { "barracks", "forge", "warship", "palace", "university", "sam", "silo" } },
+}
+--- matches before this one -> the share of the stages' waits it keeps (none listed: the whole bar)
+UIRules.ROOKIE_PACE = { [1] = 1.0, [2] = 0.5 }
+
+local rookie_stage: { [string]: number } = {}
+for i, st in UIRules.ROOKIE_STAGES do
+	for _, k in st.kinds do
+		rookie_stage[k] = i
+	end
+end
+
+--- Whether build kind `kind` waits yet in a new player's bar (see ROOKIE_STAGES).
+function UIRules.rookie_hidden(self: any, kind: string): boolean
+	local i = rookie_stage[kind]
+	local tel = self.ctx.telemetry
+	if i == nil or tel == nil then
+		return false
+	end
+	local pace = UIRules.ROOKIE_PACE[tel:matches_before()]
+	if pace == nil then
+		return false
+	end
+	local at = UIRules.ROOKIE_STAGES[i].at * pace
+	return at > 0 and self.ctx:alive_seconds() < at
+end
+
 --- Bulk menus (four fixed slots: x1, two steps, then the most the
 --- player can do right now): structure upgrades x1 / x5 / x10 / xMax, atom bombs x1 / x2 / x5 / xMax
 --- (xMax capped by gold, and for bombs by loaded silo missiles; Protocol.MAX_INTENT_AMOUNT 50). User
@@ -1203,6 +1238,11 @@ function UIRules._placement_exact(self: any, kind: string, tile: number): { [str
 				out.reason = "That is your teammate's land"
 				return out
 			end
+			-- (2026-11-06) a new player is safe from them (Core/SimNukes)
+			if own ~= 0 and s.is_rookie ~= nil and s:is_rookie(own) then
+				out.reason = s:owner_name(own) .. " is new: safe from siege weapons"
+				return out
+			end
 			if not self:in_reach(Defs.S_SILO, Defs.nuke_kind_from_name(kind), tile) then
 				out.reason = "Out of your Siege Workshop's reach"
 				return out
@@ -1604,6 +1644,10 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 			end
 		end
 		for _, k in build_kinds do
+			-- (a new player's bar shows its buildings a few at a time: ROOKIE_STAGES)
+			if self:rookie_hidden(k) then
+				continue
+			end
 			local av = self:availability(k)
 			local pl = self:placement(k, tile)
 			local ok = av.ok and pl.ok

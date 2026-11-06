@@ -272,10 +272,27 @@ end
 
 --- (Empires Front 2026-11-03) `id` is a new player (their first Rules.ROOKIE_MATCHES matches): the AI
 --- leaves them alone longer and fewer of it fight them at once (SimAI._may_attack_human).
+--- (2026-11-06: and no siege weapon may hit them, nor the plague take them: Core/SimNukes; told to the
+--- clients, Ev.ROOKIE, so the aiming says so.)
 function Sim.set_rookie(self: any, id: number, on: boolean)
 	if id > 0 and self.o_rookie ~= nil then
-		self.o_rookie[id] = if on then 1 else 0
+		local v = if on then 1 else 0
+		if self.o_rookie[id] ~= v then
+			self.o_rookie[id] = v
+			self:ev({ Ev.ROOKIE, id, v })
+		end
 	end
+end
+
+--- The new players in this match (snapshot rows).
+function Sim.rookie_rows(self: any): { number }
+	local out = {}
+	for o = 1, self.owner_total do
+		if self.o_rookie[o] == 1 then
+			table.insert(out, o)
+		end
+	end
+	return out
 end
 
 --- A novice bot player (weaker troop numbers).
@@ -573,6 +590,8 @@ function Sim.snapshot(self: any): { [string]: any }
 		rebels = self:rebel_rows(),
 		-- (2026-11-06) the plague: {owner, until_tick, source, severity x100}
 		plague = self:plague_rows(),
+		-- (2026-11-06) the new players: safe from the siege weapons
+		rookies = self:rookie_rows(),
 	}
 end
 

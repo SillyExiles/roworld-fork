@@ -1769,7 +1769,14 @@ function UIInteract._on_key(self: any, key: Enum.KeyCode, echo: boolean): boolea
 		end
 	else
 		local idx = HOTKEY_INDEX[key]
-		if idx ~= nil and ui:screen() == "play" and self.enabled then
+		-- (a new player's bar holds some buildings back for a while: UIRules.ROOKIE_STAGES)
+		local held = idx ~= nil
+			and self.ctx.rules ~= nil
+			and self.ctx.rules.rookie_hidden ~= nil
+			and self.ctx.rules:rookie_hidden(UIRules.ACTIONS[idx])
+		if held then
+			-- (nothing: the key is the building's once it joins the bar)
+		elseif idx ~= nil and ui:screen() == "play" and self.enabled then
 			self:select_action(UIRules.ACTIONS[idx])
 		else
 			handled = false

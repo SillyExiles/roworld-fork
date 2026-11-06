@@ -864,6 +864,16 @@ function UIRoot._build(self)
 	bar.cancel_placement:Connect(function()
 		self.interact:cancel_aim()
 	end)
+	-- (Empires Front 2026-11-06) buildings joined a new player's bar: say which
+	bar.rookie_unlocked:Connect(function(kinds: { string })
+		local names = {}
+		for _, k in kinds do
+			table.insert(names, UIRules.TITLES[k] or k)
+		end
+		if #names > 0 and self.feed ~= nil then
+			self.feed:toast(Defs.MSG_GOOD, "New buildings: " .. table.concat(names, ", "), kinds[1], 7.0)
+		end
+	end)
 	bar.footprint_changed:Connect(function()
 		self:_request_relayout()
 		-- The open tray takes the bottom of the screen: cards placed above the bar step aside.

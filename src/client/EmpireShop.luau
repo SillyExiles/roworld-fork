@@ -26,6 +26,33 @@ local PixelIcons = require(UI:WaitForChild("PixelIcons")) :: any
 
 local Shop = {}
 
+-- (Empires Front 2026-11-06) The player's own country's flag comes first in the Stars tab, marked YOUR
+-- COUNTRY (Roblox's country of the account: LocalizationService). A new player's first match pays
+-- Data/Stars.FIRST_BONUS, a common flag's price, and the result screen points here.
+--- Country (ISO 3166 alpha-2) -> Empire Shop flag key.
+Shop.COUNTRY_FLAG = {
+	BR = "brazil", PT = "portugal", IT = "italy", FR = "france", DE = "germany", JP = "japan", GR = "greece",
+	TR = "turkey", US = "usa", MX = "mexico", AR = "argentina", ES = "spain", IN = "india", CA = "canada",
+	SE = "sweden", NO = "norway", PL = "poland", UA = "ukraine", CO = "colombia", CH = "switzerland",
+	NL = "netherlands", BE = "belgium", IE = "ireland", AT = "austria", HU = "hungary", RO = "romania",
+	BG = "bulgaria", LT = "lithuania", EE = "estonia", DK = "denmark", FI = "finland", IS = "iceland",
+	PE = "peru", CL = "chile", BO = "bolivia", VE = "venezuela", PH = "philippines", TH = "thailand",
+	NG = "nigeria", GH = "ghana", ID = "indonesia", BD = "bangladesh", VN = "vietnam", CN = "china",
+	KR = "south_korea", PK = "pakistan", MA = "morocco", DZ = "algeria", KE = "kenya", EG = "egypt",
+	ZA = "south_africa", AU = "australia", NZ = "new_zealand", JM = "jamaica", CU = "cuba", UY = "uruguay",
+	CZ = "czechia", HR = "croatia", LV = "latvia", AM = "armenia", GE = "georgia", RU = "russia",
+	KZ = "kazakhstan", MN = "mongolia", GB = "britain", ET = "ethiopia",
+}
+local country_key: string? = nil
+task.spawn(function()
+	local ok, code = pcall(function()
+		return game:GetService("LocalizationService"):GetCountryRegionForPlayerAsync(Players.LocalPlayer)
+	end)
+	if ok and type(code) == "string" then
+		country_key = Shop.COUNTRY_FLAG[string.upper(code)]
+	end
+end)
+
 local FONT = Font.fromId(12187365977, Enum.FontWeight.Bold)
 local FONT_HEAVY = Font.fromId(12187365977, Enum.FontWeight.Heavy)
 local FONT_MED = Font.fromId(12187365977, Enum.FontWeight.Medium)
@@ -372,11 +399,12 @@ local function flag_card(it: any, order: number)
 		ZIndex = 2,
 	}, body)
 	local tier = EmpireShopData.TIERS[it.rarity]
+	local mine = it.key ~= nil and it.key == country_key
 	make("TextLabel", {
 		Name = "Tier",
 		BackgroundTransparency = 1,
 		FontFace = FONT_HEAVY,
-		Text = string.upper(if tier then tier.name else it.rarity),
+		Text = (if mine then "YOUR COUNTRY · " else "") .. string.upper(if tier then tier.name else it.rarity),
 		TextSize = 10,
 		TextColor3 = tier_color(it.rarity),
 		Position = UDim2.fromOffset(8, 106),
@@ -520,6 +548,11 @@ local function fill()
 		end
 	end
 	table.sort(list, function(a, b)
+		-- (the player's own country's flag first)
+		local ma, mb = a.key == country_key, b.key == country_key
+		if ma ~= mb then
+			return ma
+		end
 		local ta = (EmpireShopData.TIERS[a.rarity] or { order = 0 }).order
 		local tb = (EmpireShopData.TIERS[b.rarity] or { order = 0 }).order
 		if ta ~= tb then

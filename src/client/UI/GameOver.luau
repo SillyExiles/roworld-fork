@@ -92,6 +92,14 @@ function GameOver.new(c: any)
 	self._sub = UITheme.label("", 18, 500, UITheme.TEXT)
 	self._sub:set_alignment(W.ALIGN_CENTER)
 	self._center:add_child(self._sub)
+	-- (Empires Front 2026-11-06) ELIMINATED in a player's first matches: why, and what to do next time
+	self._tip = UITheme.label("", 14, 600, UITheme.GOLD)
+	self._tip:set_alignment(W.ALIGN_CENTER)
+	self._tip:set_autowrap(true)
+	self._tip.size_flags_horizontal = W.SHRINK_CENTER
+	self._tip:set_visible(false)
+	self._tip_text = ""
+	self._center:add_child(self._tip)
 	self._center:add_child(spacer(14))
 
 	self._winner = W.Panel.new()
@@ -703,6 +711,44 @@ function GameOver.cancel_auto(self)
 	end
 end
 
+--- (Empires Front 2026-11-06) Players eliminated in their first TIP_MATCHES matches are told why, in a
+--- line, and what to do next time (half the new players who fought were gone in 3 minutes).
+GameOver.TIP_MATCHES = 5
+--- Under this many seconds a fall is "early": the army was spent, not outbuilt.
+GameOver.TIP_EARLY_S = 240
+
+--- The tip for a new player eliminated by `killer` after `secs` seconds ("" for a veteran).
+function GameOver.defeat_tip(ctx: any, killer: number, secs: number): string
+	local tel = ctx.telemetry
+	if tel == nil or tel:matches_before() >= GameOver.TIP_MATCHES then
+		return ""
+	end
+	local s = ctx.state
+	local k = if s ~= nil and killer ~= 0 then s:get_owner(killer) else nil
+	local name = if k ~= nil then s:owner_name(killer) else ""
+	if k ~= nil and (tonumber(k.rebel_of) or 0) ~= 0 then
+		return "Tip: your far provinces revolted. Temples calm them, and the land near your Palace stays loyal."
+	elseif k ~= nil and k.kind == Defs.KIND_HUMAN then
+		return string.format(
+			"Tip: %s outgrew you. Build Farms and Mines early for a bigger army, and Defense Posts on your border.",
+			name
+		)
+	elseif k ~= nil and k.kind == Defs.KIND_TRIBE then
+		return "Tip: keep some troops at home when you attack: an empty army can't hold your land."
+	elseif k ~= nil and secs < GameOver.TIP_EARLY_S then
+		return string.format(
+			"Tip: %s struck while your army was low. Let your troops refill between attacks, and keep some at home.",
+			name
+		)
+	elseif k ~= nil then
+		return string.format(
+			"Tip: %s broke through. Defense Posts and Walls on the border slow them down, and an ally can help.",
+			name
+		)
+	end
+	return "Tip: let your troops refill between attacks, and keep some at home to defend."
+end
+
 --- kind: "victory", "defeat", "eliminated" or "result" (the match ended while you were not in it).
 --- reason: Defs.OVER_* (ignored for "eliminated"). stats: {peak_share, max_troops, kills, duration_s}
 function GameOver.open(self, kind: string, winner: number, killer: number, stats: any, reason: number?)
@@ -729,6 +775,11 @@ function GameOver.open(self, kind: string, winner: number, killer: number, stats
 	self._kicker:set_text(copy.kicker)
 	self._title:set_text(copy.title)
 	self._sub:set_text(copy.sub)
+	self._tip_text = if kind == "eliminated"
+		then GameOver.defeat_tip(ctx, killer, tonumber(stats.duration_s) or 0.0)
+		else ""
+	self._tip:set_text(self._tip_text)
+	self._tip:set_visible(self._tip_text ~= "")
 	self._title:set_colors(copy.top, copy.bottom)
 	-- Winner pill: a real winner gets the crown; otherwise it reads "Current leader".
 	local real_winner = (kind == "victory" or kind == "defeat" or kind == "result")
@@ -1292,6 +1343,8 @@ function GameOver.apply_layout(self)
 	self._title.spacing = if compact then 6 else 10
 	self._title:update_minimum_size()
 	self._sub:set_font_size(if compact then 14 else 18)
+	self._tip:set_font_size(if compact then 12 else 14)
+	self._tip:set_min_size(Vector2.new(math.min(ctx.vp.X * 0.86, if compact then 340 else 520), 0))
 	self._kicker:set_font_size(if compact then 11 else 14)
 	for _, b in ipairs({ self._again, self._spec, self._home }) do
 		b:set_min_size(Vector2.new(if compact then 150 else 200, if compact then 44 else 52))
@@ -1311,6 +1364,8 @@ function GameOver.apply_layout(self)
 	self._offers:set_visible(offers)
 	self._gap_offers:set_visible(offers)
 	self._sub:set_visible(true)
+	-- (the tip: not beside the takeover offer, which names the way back already)
+	self._tip:set_visible(self._tip_text ~= "" and not self._take.visible)
 	self._gap_next:set_visible(self._next.visible)
 	if take then
 		self:_size_take()
@@ -1388,6 +1443,11 @@ function GameOver.apply_layout(self)
 		if take and sz.Y > area.Height - 8.0 and self._take_chips.visible then
 			self._take_chips:set_visible(false)
 			self._take_line:set_visible(true)
+			sz = self._center:get_combined_minimum_size()
+		end
+		-- (and last, the new player's tip)
+		if sz.Y > area.Height - 8.0 and self._tip.visible then
+			self._tip:set_visible(false)
 			sz = self._center:get_combined_minimum_size()
 		end
 	else
