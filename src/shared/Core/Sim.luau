@@ -592,6 +592,7 @@ function Sim.snapshot(self: any): { [string]: any }
 		plague = self:plague_rows(),
 		-- (2026-11-06) the new players: safe from the siege weapons
 		rookies = self:rookie_rows(),
+		plague_uses = self:plague_use_rows(),
 	}
 end
 

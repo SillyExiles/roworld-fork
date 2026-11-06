@@ -31,6 +31,7 @@ local Coop = require("../Net/Coop")
 local Ev = require("./Ev")
 local Rules = require("./Rules")
 local SimState = require("./SimState")
+local SimRevolts = require("./SimRevolts")
 
 local readu8 = buffer.readu8
 local writeu8 = buffer.writeu8
@@ -142,6 +143,27 @@ function SimNukes.install(C)
 		self.plague_list = {} :: { number }
 		-- (2026-11-06) until when the sick raise no new troops (Rules.PLAGUE_HALT_TICKS; Sim's growth)
 		self.o_plague_halt = filled(MAXO, 0)
+		-- (2026-11-06) how many times each player sent the plague (Rules.PLAGUE_MAX_USES), and the land
+		-- breaking away where it struck (_blights_tick)
+		self.o_plague_used = filled(MAXO, 0)
+		self.blights = {} :: { any }
+	end
+
+	--- (2026-11-06) How many times `id` sent the plague this match (its price doubles each time).
+	function C:plague_uses(id: number): number
+		return self.o_plague_used[id] or 0
+	end
+
+	--- Snapshot rows: { owner, plague uses } of those who sent it.
+	function C:plague_use_rows(): { { number } }
+		local out = {}
+		for id = 1, self.owner_total do
+			local n = self.o_plague_used[id]
+			if n > 0 then
+				table.insert(out, { id, n })
+			end
+		end
+		return out
 	end
 
 	-- =========================================================================================
@@ -192,6 +214,11 @@ function SimNukes.install(C)
 			self:msg(id, Defs.MSG_INFO, "Aim the plague at a nation's land")
 			return false
 		end
+		-- (2026-11-06) the plague: Rules.PLAGUE_MAX_USES a player a match
+		if kind == N_PLAGUE and self.o_plague_used[id] >= Rules.PLAGUE_MAX_USES then
+			self:msg(id, Defs.MSG_INFO, string.format("You have sent the plague %d times: no more this match", Rules.PLAGUE_MAX_USES))
+			return false
+		end
 		-- (2026-11-06) a new player (their first Rules.ROOKIE_MATCHES matches) is safe from them
 		if siege and tg > 0 and self.o_rookie[tg] == 1 then
 			self:msg(id, Defs.MSG_INFO, string.format("%s is new to war: siege weapons can't hit them yet", self:name_of(tg)))
@@ -222,7 +249,9 @@ function SimNukes.install(C)
 			end
 		end
 		-- (Empires Front 2026-11-06: a siege weapon costs a big empire more, Rules.siege_cost)
-		local cost = if siege then Rules.siege_cost(kind_name, self:land_share(id)) else Rules.nuke_cost(kind_name, self.mirvs_launched)
+		local cost = if siege
+			then Rules.siege_cost(kind_name, self:land_share(id), self.o_plague_used[id])
+			else Rules.nuke_cost(kind_name, self.mirvs_launched)
 		if self.o_gold[id] < cost then
 			self:msg(id, Defs.MSG_INFO, string.format("Not enough gold for %s", a_an(nuke_title(kind))))
 			return false
@@ -267,6 +296,10 @@ function SimNukes.install(C)
 		end
 		local tick = self.tick
 		self.o_gold[id] -= cost
+		if kind == N_PLAGUE then
+			self.o_plague_used[id] += 1
+			self:ev({ Ev.PLAGUE_USES, id, self.o_plague_used[id] })
+		end
 		table.insert(silo.shots, self:shot_stamp(silo, if siege then kind else nil))
 		self:ev({ Ev.STRUCT_SHOTS, silo.sid, table.clone(silo.shots) })
 		local arc = self.R.munition_arc(self.W, self.H, silo.tile, t, kind)
@@ -1115,8 +1148,10 @@ function SimNukes.install(C)
 			self:msg(n.owner, Defs.MSG_INFO, "The plague found no one to strike")
 			return
 		end
-		if self:_infect(victim, n.owner, Rules.PLAGUE_TICKS) then
-			self:msg(victim, Defs.MSG_ALERT, string.format("%s struck your land with the plague!", o_name[n.owner]))
+		-- (2026-11-06: a direct hit always takes, sick or immune; the land it spreads over breaks away)
+		if self:_infect(victim, n.owner, Rules.PLAGUE_TICKS, 1.0, true) then
+			self:_blight_start(victim, to, n.owner)
+			self:msg(victim, Defs.MSG_ALERT, string.format("%s struck your land with the plague! It is spreading: the land it reaches breaks away", o_name[n.owner]))
 			self:msg(n.owner, Defs.MSG_INFO, string.format("The plague took hold in %s", o_name[victim]))
 			for _, h in self.humans do
 				if h ~= victim and h ~= n.owner then
@@ -1128,8 +1163,10 @@ function SimNukes.install(C)
 		end
 	end
 
-	--- Makes `o` sick with the plague for `ticks` (sent by `src`). False if it is sick or immune already.
-	function C:_infect(o: number, src: number, ticks: number): boolean
+	--- Makes `o` sick with the plague for `ticks` (sent by `src`). False if it is sick or immune already
+	--- (unless `force`: a direct hit). (2026-11-06: nothing eases it; `sev` 1 for a hit, the contagion's
+	--- Rules.PLAGUE_SPREAD_SEV.)
+	function C:_infect(o: number, src: number, ticks: number, sev0: number?, force: boolean?): boolean
 		if o <= 0 or self.o_alive[o] ~= 1 or self.o_tiles[o] <= 0 then
 			return false
 		end
@@ -1138,11 +1175,12 @@ function SimNukes.install(C)
 			return false
 		end
 		local tick = self.tick
-		if self.o_plague_until[o] > tick or self.o_plague_imm[o] > tick then
+		local sick = self.o_plague_until[o] > tick
+		if not force and (sick or self.o_plague_imm[o] > tick) then
 			return false
 		end
-		local sev = Rules.plague_severity(self:_temples_of(o))
-		local u = tick + ticks
+		local sev = math.max(sev0 or Rules.PLAGUE_SPREAD_SEV, if sick then self.o_plague_sev[o] else 0)
+		local u = math.max(tick + ticks, self.o_plague_until[o])
 		self.o_plague_until[o] = u
 		self.o_plague_from[o] = tick
 		self.o_plague_src[o] = src
@@ -1154,9 +1192,135 @@ function SimNukes.install(C)
 		if halt > 0 then
 			self:msg(o, Defs.MSG_BAD, string.format("The plague stops your army from growing for %d s", math.ceil(halt / Rules.TICK_RATE)))
 		end
-		table.insert(self.plague_list, o)
+		if not sick then
+			table.insert(self.plague_list, o)
+		end
 		self:ev({ Ev.PLAGUE, o, u, src, math.floor(sev * 100 + 0.5) })
 		return true
+	end
+
+	--- (2026-11-06) The plague spreading over `victim`'s land from tile `t` (sent by `src`): over
+	--- Rules.PLAGUE_TICKS the land it reaches (its connected land, nearest first, up to PLAGUE_LAND_SHARE
+	--- of it) breaks away as an independent nation (_blights_tick).
+	function C:_blight_start(victim: number, t: number, src: number)
+		if readi32(self.owner, t * 4) ~= victim then
+			return
+		end
+		local budget = math.max(Rules.PLAGUE_LAND_MIN, math.floor(self.o_tiles[victim] * Rules.PLAGUE_LAND_SHARE))
+		local steps = math.max(1, Rules.PLAGUE_TICKS // 5)
+		table.insert(self.blights, {
+			victim = victim,
+			src = src,
+			at = t,
+			rid = 0,
+			queue = { t },
+			head = 1,
+			seen = { [t] = true },
+			budget = budget,
+			per_step = math.max(1, math.ceil(budget / steps)),
+			taken = 0,
+			until_tick = self.tick + Rules.PLAGUE_TICKS,
+		})
+	end
+
+	--- The independent nation the plague's land becomes: "Free <province>", in a shade of the old
+	--- empire's colour, an AI nation (SimRevolts.FREE_SKILL).
+	function C:_blight_nation(b: any): number
+		local victim = b.victim
+		local pname = self:_province_name(victim, b.at)
+		local base = "Free " .. pname
+		local name = base
+		local n = 1
+		local function worn(nm: string): boolean
+			for o = 1, self.owner_total do
+				if self.o_alive[o] == 1 and self.o_name[o] == nm then
+					return true
+				end
+			end
+			return false
+		end
+		while worn(name) do
+			n += 1
+			name = string.format("%s %d", base, n)
+		end
+		local rid = self:add_owner(name, SimRevolts.rebel_color(self.o_color[victim]), Defs.KIND_NATION)
+		if rid <= 0 then
+			return 0
+		end
+		self.o_ai[rid] = 1
+		self.o_skill[rid] = SimRevolts.FREE_SKILL
+		self.o_spawned[rid] = 1
+		self.o_spawn_tile[rid] = b.at
+		-- (it rose out of the plague: it won't catch it again for a while)
+		self.o_plague_imm[rid] = self.tick + Rules.PLAGUE_IMMUNE_TICKS
+		self:ev({ Ev.SPAWNED, rid, b.at })
+		self:msg(victim, Defs.MSG_BAD, string.format("The plague-struck %s breaks away: %s is independent", pname, name))
+		self:msg_others(victim, Defs.MSG_INFO, string.format("The plague tears %s from %s", name, self.o_name[victim]))
+		return rid
+	end
+
+	--- Each 5 ticks, the plague takes the next tiles of its struck land (breadth-first from where it
+	--- landed, through the victim's land only) for the free nation; done when its time is up, its share
+	--- is taken or the land around it is gone.
+	function C:_blights_tick()
+		local list = self.blights
+		if #list == 0 or self.tick % 5 ~= 0 then
+			return
+		end
+		local owner = self.owner
+		local W = self.W
+		local NW = self.N - W
+		local tick = self.tick
+		local i = 1
+		while i <= #list do
+			local b = list[i]
+			local victim = b.victim
+			local q = b.queue
+			local took = 0
+			while took < b.per_step and b.taken < b.budget and b.head <= #q and self.o_alive[victim] == 1 do
+				local t = q[b.head]
+				b.head += 1
+				if readi32(owner, t * 4) ~= victim then
+					continue
+				end
+				if b.rid == 0 then
+					b.rid = self:_blight_nation(b)
+					if b.rid == 0 then
+						b.head = #q + 1
+						break
+					end
+				end
+				self:set_owner(t, b.rid)
+				took += 1
+				b.taken += 1
+				local x = t % W
+				local function push(u: number)
+					if not b.seen[u] and readi32(owner, u * 4) == victim then
+						b.seen[u] = true
+						q[#q + 1] = u
+					end
+				end
+				if x > 0 then push(t - 1) end
+				if x < W - 1 then push(t + 1) end
+				if t >= W then push(t - W) end
+				if t < NW then push(t + W) end
+			end
+			local rid = b.rid
+			if rid > 0 and self.o_alive[rid] == 1 then
+				-- a free nation's army: half a nation's cap for the land it holds
+				local levy = 0.5 * self.R.max_troops(Defs.KIND_NATION, self.o_tiles[rid], 0, SimRevolts.FREE_SKILL)
+				self.o_troops[rid] = math.max(self.o_troops[rid], levy)
+			end
+			if tick >= b.until_tick or b.taken >= b.budget or b.head > #q or self.o_alive[victim] ~= 1 then
+				list[i] = list[#list]
+				list[#list] = nil
+				if rid > 0 and b.taken > 0 then
+					self:msg(victim, Defs.MSG_BAD, string.format("The plague took %d tiles of your land", b.taken))
+				end
+				continue
+			end
+			i += 1
+		end
 	end
 
 	--- The owners whose land touches `o`'s (walks its border list).
@@ -1195,6 +1359,7 @@ function SimNukes.install(C)
 
 	--- The sick lose troops; the plague passes to their neighbours; it ends when its time is up.
 	function C:_plague_tick()
+		self:_blights_tick()
 		local list = self.plague_list
 		local tick = self.tick
 		local o_troops = self.o_troops
@@ -1229,8 +1394,9 @@ function SimNukes.install(C)
 				if self.o_plague_until[q] > tick or self.o_plague_imm[q] > tick then
 					continue
 				end
-				local p = Rules.PLAGUE_SPREAD_P * Rules.plague_severity(self:_temples_of(q))
-				if rng:randf() < p and self:_infect(q, self.o_plague_src[o], Rules.PLAGUE_SPREAD_TICKS) then
+				-- (2026-11-06: nothing eases it: the contagion's own severity, Rules.PLAGUE_SPREAD_SEV)
+				local p = Rules.PLAGUE_SPREAD_P
+				if rng:randf() < p and self:_infect(q, self.o_plague_src[o], Rules.PLAGUE_SPREAD_TICKS, Rules.PLAGUE_SPREAD_SEV) then
 					self:msg(q, Defs.MSG_ALERT, string.format("The plague spread to your land from %s", o_name[o]))
 				end
 			end

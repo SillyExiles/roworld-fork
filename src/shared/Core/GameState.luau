@@ -253,6 +253,8 @@ function GameState.new(world: any?)
 	self.plague = {} :: { [number]: { until_tick: number, source: number, severity: number } }
 	--- (Empires Front 2026-11-06) the new players (Rules.ROOKIE_MATCHES): safe from the siege weapons
 	self.rookies = {} :: { [number]: boolean }
+	--- (Empires Front 2026-11-06) how many times each player sent the plague (its price doubles each time)
+	self.plague_used = {} :: { [number]: number }
 	--- owner id -> the tick its next Reinforcements call is ready (Ev.REINFORCE; absent: now)
 	self.reinforce_ready = {} :: { [number]: number }
 	self.attacks = {} :: { [number]: AttackInfo }
@@ -1021,6 +1023,9 @@ function GameState.load_snapshot(self: GameState, snap: { [string]: any })
 	for _, id in snap.rookies or {} do
 		self.rookies[tonumber(id) or 0] = true
 	end
+	for _, row in snap.plague_uses or {} do
+		self.plague_used[tonumber(row[1]) or 0] = tonumber(row[2]) or 0
+	end
 	self.loaded = true
 	self.snapshot_loaded:Fire()
 end
@@ -1387,6 +1392,15 @@ end
 HANDLERS[Ev.ROOKIE] = function(self, e)
 	local id = tonumber(e[2]) or 0
 	self.rookies[id] = if e[3] == 1 then true else nil
+end
+
+HANDLERS[Ev.PLAGUE_USES] = function(self, e)
+	self.plague_used[tonumber(e[2]) or 0] = tonumber(e[3]) or 0
+end
+
+--- How many times `id` sent the plague this match (Rules.plague_cost doubles with each).
+function GameState.plague_uses(self: GameState, id: number): number
+	return self.plague_used[id] or 0
 end
 
 --- Whether `id` is a new player (safe from the siege weapons).

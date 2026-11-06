@@ -62,6 +62,9 @@ Ev.BLAZE = 40 -- uid, owner, tile, radius_tiles, start_tick, spread_ticks  (fire
 --- (Empires Front 2026-11-06) a new player (Rules.ROOKIE_MATCHES): safe from the siege weapons, the AI
 --- gentler with them (Sim.set_rookie).
 Ev.ROOKIE = 41 -- id, on (1 / 0)
-Ev.COUNT = 42
+--- (Empires Front 2026-11-06) how many times a player sent the plague (its price doubles each time,
+--- Rules.PLAGUE_MAX_USES a match).
+Ev.PLAGUE_USES = 42 -- id, uses
+Ev.COUNT = 43
 
 return Ev

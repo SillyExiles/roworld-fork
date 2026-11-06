@@ -948,24 +948,24 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 		return
 	end
 	-- (Empires Front 2026-11-06: a weapon one of its workshops has loaded (each reloads on its own) and
-	-- it can pay for: fire on a big empire; the plague on a big army that isn't sick or immune, when it
-	-- doesn't border them or has Temples; else the bombard. No MIRV.)
+	-- it can pay for: fire on a big empire; the plague (twice a match, Rules.PLAGUE_MAX_USES) on a big
+	-- nation with a big army that isn't sick or immune; else the bombard. No MIRV.)
 	local tick = sim.tick
 	local big = sim.o_tiles[best] > 2500 * LA
 	local function can(k: number, spare: number): boolean
-		return gold >= Rules.siege_cost(Defs.NUKE_NAMES[k], share) * spare and sim:siege_loaded(id, k)
+		return gold >= Rules.siege_cost(Defs.NUKE_NAMES[k], share, sim:plague_uses(id)) * spare and sim:siege_loaded(id, k)
 	end
 	local kind = -1
-	if big and can(Defs.N_HYDROGEN, 1.5) then
-		kind = Defs.N_HYDROGEN
-	elseif
+	if
 		sim.o_troops[best] > sim.o_troops[id] * 0.4
 		and sim.o_plague_until[best] <= tick
-		and sim.o_plague_imm[best] <= tick
-		and (sim.sc_count[best] == 0 or sim:_temples_of(id) >= 2)
+		and sim:plague_uses(id) < Rules.PLAGUE_MAX_USES
+		and sim.o_tiles[best] > 1500 * LA
 		and can(Defs.N_PLAGUE, 1.5)
 	then
 		kind = Defs.N_PLAGUE
+	elseif big and can(Defs.N_HYDROGEN, 1.5) then
+		kind = Defs.N_HYDROGEN
 	elseif can(Defs.N_ATOM, 1.0) then
 		kind = Defs.N_ATOM
 	end

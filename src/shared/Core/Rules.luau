@@ -291,9 +291,9 @@ local function build(K_LIN: number, into: any?): any
 		[Defs.S_MINE] = 8,
 		[Defs.S_MARKET] = 3,
 		[Defs.S_FARM] = 6,
-		-- (2026-11-06) the siege weapons' workshops (each reloads on its own), and the towers that shoot
-		-- their shots down
-		[Defs.S_SILO] = 5,
+		-- (2026-11-06) the siege weapons' workshops (each reloads on its own; 15 a player), and the towers
+		-- that shoot their shots down
+		[Defs.S_SILO] = 15,
 		[Defs.S_SAM] = 4,
 	}
 	Rules.LEVEL_LIMITS = {
@@ -701,7 +701,8 @@ local function build(K_LIN: number, into: any?): any
 		if nk >= 0 then
 			-- (Empires Front 2026-11-06: a siege weapon costs a big empire more, siege_cost)
 			if Defs.SIEGE_KINDS[nk] and state.land_share ~= nil then
-				return Rules.siege_cost(kind_name, state:land_share(id))
+				local uses = if state.plague_uses ~= nil then state:plague_uses(id) else 0
+				return Rules.siege_cost(kind_name, state:land_share(id), uses)
 			end
 			return Rules.nuke_cost(kind_name, state.mirvs_launched)
 		end
@@ -1138,18 +1139,36 @@ local function build(K_LIN: number, into: any?): any
 	--- PLAGUE_MIN_SEVERITY.
 	--- (2026-11-06, balance: no Watchtower stops it now, so it is milder: about 29% of the troops over its
 	--- 75 s, was about 42% over 90 s, and a little less catching)
-	Rules.PLAGUE_TICKS = 750
-	Rules.PLAGUE_SPREAD_TICKS = 500
-	Rules.PLAGUE_LOSS_PER_S = 0.0045
+	--- (2026-11-06, the plague made deadly: nothing eases it (no Temple, no immunity against a direct hit);
+	--- the struck nation loses 2.5% of its troops a second for 30 s (about 53%), raises none for a minute,
+	--- and the land it spreads over breaks away as a free nation (PLAGUE_LAND_*). It costs a fortune that
+	--- doubles with each use, PLAGUE_MAX_USES a player a match. Its neighbours catch it at
+	--- PLAGUE_SPREAD_SEV, troops only.)
+	Rules.PLAGUE_TICKS = 300
+	Rules.PLAGUE_SPREAD_TICKS = 200
+	Rules.PLAGUE_LOSS_PER_S = 0.025
 	Rules.PLAGUE_SPREAD_GAP = 100
 	Rules.PLAGUE_SPREAD_AFTER = 100
 	Rules.PLAGUE_SPREAD_P = 0.25
-	--- (2026-11-06) A nation the plague takes raises no new troops for PLAGUE_HALT_TICKS from then (x its
-	--- severity: Temples shorten it).
-	Rules.PLAGUE_HALT_TICKS = 450
+	Rules.PLAGUE_SPREAD_SEV = 0.5
+	--- A nation the plague takes raises no new troops for PLAGUE_HALT_TICKS from then (x its severity).
+	Rules.PLAGUE_HALT_TICKS = 600
 	Rules.PLAGUE_IMMUNE_TICKS = 1800
-	Rules.PLAGUE_TEMPLE_CUT = 0.25
-	Rules.PLAGUE_MIN_SEVERITY = 0.25
+	Rules.PLAGUE_TEMPLE_CUT = 0.0
+	Rules.PLAGUE_MIN_SEVERITY = 1.0
+	--- The struck nation's land the plague spreads over from where it landed (in PLAGUE_TICKS, its
+	--- connected land only) and that breaks away as an independent nation: this share of its land, at
+	--- least PLAGUE_LAND_MIN tiles.
+	Rules.PLAGUE_LAND_SHARE = 0.35
+	Rules.PLAGUE_LAND_MIN = 30
+	--- Each player may send the plague this many times a match; each costs PLAGUE_COST_GROWTH x the last.
+	Rules.PLAGUE_MAX_USES = 2
+	Rules.PLAGUE_COST_GROWTH = 2
+
+	--- (2026-11-06) The plague's price after `uses` of it by the player: the era's, doubled each time.
+	function Rules.plague_cost(uses: number?): number
+		return math.floor(Rules.nuke_cost("plague") * Rules.PLAGUE_COST_GROWTH ^ math.max(0, uses or 0))
+	end
 
 	--- (2026-11-06) Each Siege Workshop reloads each weapon on its own: a bombard fired leaves its fire
 	--- and its plague loaded. SIEGE_RELOAD ticks per weapon (index Defs.N_*): the bombard 40 s, fire
@@ -1197,11 +1216,15 @@ local function build(K_LIN: number, into: any?): any
 	--- the launcher's share of the map), rounded to 1k: x1.25 at 10%, x1.75 at 30%, x2.25 at 50%. Gold
 	--- piled up by a runaway leader pays for its wars; a small nation fires at the base price.
 	Rules.SIEGE_SHARE_COST = 2.5
-	function Rules.siege_cost(kind_name: string, share: number?): number
+	--- (The plague isn't scaled: it doubles with each of the player's `plague_uses`, plague_cost.)
+	function Rules.siege_cost(kind_name: string, share: number?, plague_uses: number?): number
 		local base = Rules.nuke_cost(kind_name)
 		local k = Defs.nuke_kind_from_name(kind_name)
 		if base <= 0 or not Defs.SIEGE_KINDS[k] then
 			return base
+		end
+		if k == Defs.N_PLAGUE then
+			return Rules.plague_cost(plague_uses)
 		end
 		-- (the share in whole percents, so the price shown and the price paid agree while borders move)
 		local pct = math.floor(math.clamp(tonumber(share) or 0, 0, 1) * 100)
@@ -1575,8 +1598,8 @@ local function build(K_LIN: number, into: any?): any
 		if er.mirv_spread_full then
 			Rules.MIRV_SPREAD = trunc(er.mirv_spread_full / K_LIN)
 		end
-		-- (2026-11-06: a Siege Workshop always has a reach: the era's, else 350 full-size tiles)
-		local silo_r = er.silo_range_full or 350
+		-- (2026-11-06: a Siege Workshop always has a reach: the era's, else 650 full-size tiles)
+		local silo_r = er.silo_range_full or 650
 		local air_r = er.airstrike_range_full or 156.0
 		local art_r = er.artillery_range_full or 45.0
 		local rail_r = er.railgun_range_full or 0

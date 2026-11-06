@@ -129,11 +129,11 @@ UIRules.BLURBS = {
 	wall = "Raises stone walls along your frontier within {wall_r} tiles: taking a walled tile costs {wall_mag}x the troops and {wall_cost}x the time. The stones follow the frontier and fall with the tile.",
 	barracks = "Trains troops: each level makes your army grow {bar_pct}% faster (up to {bar_max} levels). Your troop cap stays the same. At most 4 Barracks per player: build near one to upgrade it.",
 	sam = "Shoots down Hydrogen Bombs that pass within {sam_r} tiles. Atom Bombs and the Plague can't be stopped. At most 4, no upgrades.",
-	silo = "Fires your siege weapons at land within {silo_r} tiles, from {siege_at} of war on. Each weapon reloads on its own in each workshop: more workshops, more shots in a row. At most 5 per player.",
+	silo = "Fires your siege weapons at land within {silo_r} tiles, from {siege_at} of war on. Each weapon reloads on its own in each workshop: more workshops, more shots in a row. At most 15 per player.",
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
 	atom = "Razes a {atom_r}-tile circle: troops, land and buildings. The land stays scorched for {scorch_s} s. No SAM can stop it; Walls and Fortresses halve the damage. Reloads in {atom_cd} s.",
 	hydrogen = "Fire that spreads over {fire_r} tiles in {fire_s} s, burning land and buildings as it goes. SAMs can shoot it down; Walls and Fortresses halve the damage. Reloads in {fire_cd} s.",
-	plague = "Sickens the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s and passes it to its neighbours (yours too, if you border them), and its army stops growing for {plague_halt} s. No SAM can stop it; each Temple eases it. Reloads in {plague_cd} s.",
+	plague = "Strikes the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s, raises none for {plague_halt} s, and the land the plague spreads over ({plague_land}% of theirs) breaks away as an independent nation. Their neighbours may catch it too (yours, if you border them). Nothing stops or eases it. Twice a match at most: its price doubles each time. Reloads in {plague_cd} s.",
 	mirv = "Splits into up to {mirv_n} warheads that rain over one nation.",
 	artillery = "Shells every enemy within {art_r} tiles on its own: their troops, and the structures it reaches.",
 	airfield = "Flies Air Strikes on any spot within {air_r} tiles. Rearms in {air_s} s.",
@@ -239,6 +239,7 @@ function UIRules._blurb(kind: string): string
 		fire_cd = tostring(R.siege_reload(Defs.N_HYDROGEN) // Defs.TICK_RATE),
 		plague_cd = tostring(R.siege_reload(Defs.N_PLAGUE) // Defs.TICK_RATE),
 		plague_halt = tostring((R.PLAGUE_HALT_TICKS or 0) // Defs.TICK_RATE),
+		plague_land = tostring(math.floor((R.PLAGUE_LAND_SHARE or 0) * 100 + 0.5)),
 		share_pct = tostring(math.floor((R.SIEGE_SHARE_COST or 0) * 10 + 0.5)),
 	})
 end
@@ -712,6 +713,12 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 			local left = Rules().siege_unlock_left(s.playing_since, s.tick)
 			if left > 0 then
 				out.reason = "Siege weapons in " .. T().fmt_time(math.ceil(left / Defs.TICK_RATE))
+				out.locked = true
+				return out
+			end
+			-- (the plague: Rules.PLAGUE_MAX_USES a player a match)
+			if kind == "plague" and s.plague_uses ~= nil and s:plague_uses(o.id) >= (Rules().PLAGUE_MAX_USES or math.huge) then
+				out.reason = string.format("Sent %d times: no more this match", Rules().PLAGUE_MAX_USES)
 				out.locked = true
 				return out
 			end

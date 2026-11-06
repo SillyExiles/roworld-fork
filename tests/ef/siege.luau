@@ -1,4 +1,4 @@
--- Empires Front (2026-11-06): the siege weapons. The Siege Workshop (up to five a player, each weapon reloading on its own,
+-- Empires Front (2026-11-06): the siege weapons. The Siege Workshop (up to fifteen a player, each weapon reloading on its own,
 -- none before the war is SIEGE_UNLOCK_TICKS old), the bombard (scorched land that clears), fire that
 -- spreads, the plague (it spreads; Temples ease it), the Watchtower, and betraying an ally.
 -- usage: luau tests/ef/siege.luau (from tests/ef)
@@ -33,7 +33,7 @@ sim.step = function(self: any, ...)
 	return base_step(self, ...)
 end
 expect(Defs.NUKE_NAMES[Defs.N_PLAGUE] == "plague" and Defs.NUKE_KIND_COUNT == 10, "the plague is a munition")
-expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 5 and Rules.UPGRADABLE[Defs.S_SILO] == 0, "Siege Workshops: five at most, no levels")
+expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 15 and Rules.UPGRADABLE[Defs.S_SILO] == 0, "Siege Workshops: fifteen at most, no levels")
 expect(R.launch_range(Defs.N_ATOM) > 0, "the bombard has a reach (" .. math.floor(R.launch_range(Defs.N_ATOM)) .. " tiles)")
 
 -- the workshop: a site in A's land with an enemy within reach
@@ -46,7 +46,8 @@ for t = 0, sim.N - 1, 7 do
 			local o = buffer.readi32(sim.owner, u * 4)
 			if o > 0 and o ~= A and sim.o_kind[o] == Defs.KIND_NATION and not sim:allied(A, o) then
 				local d = math.sqrt(sim.range_d2(t, u))
-				if d > 25 and d < reach - 10 then
+				-- (a near enemy: the reach is long, the map's other end would be out of the plague's way)
+				if d > 25 and d < math.min(reach - 10, 120) then
 					site, target, B = t, u, o
 					break
 				end
@@ -63,7 +64,7 @@ for t = 0, sim.N - 1, 5 do
 	if buffer.readi32(sim.owner, t * 4) == A and t ~= site and sim:valid_site(A, Defs.S_SILO, t) and sim.range_d2(t, site) > 400 then other = t break end
 end
 expect(other >= 0 and sim:try_build(A, "silo", other), "a second one goes up (up to Rules.STRUCT_LIMITS)")
-expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 5, "five a player at most")
+expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 15, "fifteen a player at most")
 local silo = sim:structs_of(A, Defs.S_SILO)[1]
 expect(silo ~= nil and silo.active, "the workshop is finished")
 
@@ -146,13 +147,27 @@ end
 P = buffer.readi32(sim.owner, target * 4)
 expect(P > 0 and P ~= A, "a nation to strike with the plague")
 sim.o_troops[P] = math.max(sim.o_troops[P], 50000)
+local land0 = sim.o_tiles[P]
+local owners0 = sim.owner_total
+-- (what the plague's land came to when it stopped spreading)
+local blight_taken = 0
+local bt_real = sim._blights_tick
+sim._blights_tick = function(self2)
+	for _, b in self2.blights do blight_taken = math.max(blight_taken, b.taken) end
+	bt_real(self2)
+end
+sim.o_gold[A] += 100000000
+local g0 = sim.o_gold[A]
+expect(sim:plague_uses(A) == 0 and Rules.plague_cost(0) == Rules.nuke_cost("plague") and Rules.plague_cost(1) == 2 * Rules.nuke_cost("plague"), "the plague's price doubles with each use")
 expect(sim:launch_nuke(A, "plague", target), "the plague flies")
+expect(g0 - sim.o_gold[A] == Rules.plague_cost(0) and sim:plague_uses(A) == 1, "at its first price (" .. (g0 - sim.o_gold[A]) .. ")")
 local sick_at = -1
 for _ = 1, 300 do
 	sim:step()
 	if sim.o_plague_until[P] > sim.tick then sick_at = sim.tick break end
 end
 expect(sick_at > 0, "it took hold")
+expect(sim.o_plague_sev[P] == 1 and Rules.plague_severity(9) == 1, "at full strength: nothing eases it")
 local halt_to = sim.o_plague_halt[P]
 expect(halt_to == sick_at + math.floor(Rules.PLAGUE_HALT_TICKS * sim.o_plague_sev[P] + 0.5) and halt_to > sim.tick, "its army stops growing for a while (" .. (halt_to - sim.tick) .. " ticks)")
 -- (the sickness's own losses aside, and room below the cap: only the growth is watched)
@@ -172,7 +187,7 @@ local tr0 = sim.o_troops[P]
 local dead0 = sim.dbg_flow[P * 5 + 3]
 local before_spread = #sim.plague_list
 local spread = false
--- (spreading is a chance a neighbour's Temples cut: made sure here)
+-- (spreading is a chance: made sure here)
 local p_spread = Rules.PLAGUE_SPREAD_P
 Rules.PLAGUE_SPREAD_P = 10
 for _ = 1, 700 do
@@ -185,8 +200,42 @@ expect(died > tr0 * 0.15, string.format("the sick lose troops (%d of %d died in 
 expect(spread, "it spread to a neighbour")
 for _ = 1, Rules.PLAGUE_TICKS do sim:step() end
 expect(sim.o_plague_until[P] == 0, "the plague ends")
-expect(not sim:_infect(P, A, 100), "and leaves the nation immune for a while")
-expect(Rules.plague_severity(0) == 1 and Rules.plague_severity(2) == 0.5 and Rules.plague_severity(9) == Rules.PLAGUE_MIN_SEVERITY, "Temples ease it")
+expect(not sim:_infect(P, A, 100), "and leaves the nation immune to contagion for a while")
+-- the land it spread over broke away as a free nation
+local free = 0
+for o = owners0 + 1, sim.owner_total do
+	if sim.o_alive[o] == 1 and string.sub(sim.o_name[o], 1, 5) == "Free " and sim.o_kind[o] == Defs.KIND_NATION then free = o end
+end
+expect(free > 0 and sim.o_tiles[free] >= Rules.PLAGUE_LAND_MIN, string.format("the land it spread over broke away as %s (%d tiles of %d)", if free > 0 then sim.o_name[free] else "?", if free > 0 then sim.o_tiles[free] else 0, land0))
+expect(blight_taken >= Rules.PLAGUE_LAND_MIN and blight_taken <= math.max(Rules.PLAGUE_LAND_MIN, land0 * Rules.PLAGUE_LAND_SHARE) + 1 and sim.o_ai[free] == 1 and sim.o_troops[free] > 0, string.format("its share of the land (%d of %d tiles), an AI nation with an army", blight_taken, land0))
+sim._blights_tick = bt_real
+-- (the free nation keeps still for the rest of the test)
+sim.o_ai[free] = 0
+expect(#sim.blights == 0, "and the plague stopped spreading")
+-- a direct hit takes even an immune nation; twice a match at most, the second at double the price
+local function ensure_plague()
+	for _, w in sim:structs_of(A, Defs.S_SILO) do w.shots = {} end
+end
+ensure_plague()
+local P2 = buffer.readi32(sim.owner, target * 4)
+if P2 <= 0 or P2 == A then
+	for u = 0, sim.N - 1, 7 do
+		local o = buffer.readi32(sim.owner, u * 4)
+		if o > 0 and o ~= A and sim.o_rookie[o] ~= 1 and not sim:allied(A, o) and sim:siege_loaded(A, Defs.N_PLAGUE, u) then target, P2 = u, o break end
+	end
+end
+local g1 = sim.o_gold[A]
+expect(sim:launch_nuke(A, "plague", target), "a second plague flies")
+expect(g1 - sim.o_gold[A] == Rules.plague_cost(1), "at double the price (" .. (g1 - sim.o_gold[A]) .. ")")
+local took2 = false
+for _ = 1, 300 do
+	sim:step()
+	if sim.o_plague_until[P2] > sim.tick then took2 = true break end
+end
+expect(took2, "and it takes, immune or not")
+ensure_plague()
+expect(not sim:launch_nuke(A, "plague", target) and sim:plague_uses(A) == 2, "no third plague this match")
+for _ = 1, Rules.PLAGUE_TICKS + 10 do sim:step() end
 
 -- (A's workshop may have fallen to a neighbour meanwhile: a new one)
 local function ensure_silo()
@@ -288,15 +337,27 @@ expect(not sim:_infect(Rk, A, 100), "the plague never takes a new player")
 local SimAI = require("../../src/shared/Core/SimAI")
 expect(SimAI._nuke_target(sim.ai, sim, A, Rk, Defs.N_ATOM) == -1, "the AI picks no target of theirs")
 -- a bombard and a fire landing on their land (as if a shot aimed next door went wide) spare it
-local rk_tiles0 = sim.o_tiles[Rk]
+-- (counted where the blast and the fire reach: wars elsewhere, as the plague's free nations wage, aside)
+local _, fire_r = R.nuke_radii(Defs.N_HYDROGEN)
+local disc = {}
+for _, c in sim:disk_tiles(rk_tile, math.ceil(fire_r), true) do
+	if buffer.readi32(sim.owner, c * 4) == Rk then table.insert(disc, c) end
+end
+local function rk_in_disc()
+	local n = 0
+	for _, c in disc do if buffer.readi32(sim.owner, c * 4) == Rk then n += 1 end end
+	return n
+end
+local rk_tiles0 = rk_in_disc()
 local rk_structs0 = 0
-for k = 0, Defs.STRUCT_KIND_COUNT - 1 do rk_structs0 += #sim:structs_of(Rk, k) end
+for _, s0 in sim:structs_in_box(rk_tile, math.ceil(fire_r), math.ceil(fire_r)) do if s0.owner == Rk and not s0.dead then rk_structs0 += 1 end end
 sim:_detonate({ uid = 990001, kind = Defs.N_ATOM, owner = A, to_tile = rk_tile, target_owner = Rk })
 sim:_ignite({ uid = 990002, kind = Defs.N_HYDROGEN, owner = A, to_tile = rk_tile, target_owner = Rk })
 for _ = 1, Rules.FIRE_SPREAD_TICKS + 5 do sim:step() end
 local rk_structs1 = 0
-for k = 0, Defs.STRUCT_KIND_COUNT - 1 do rk_structs1 += #sim:structs_of(Rk, k) end
-expect(sim.o_tiles[Rk] >= rk_tiles0 - 5, string.format("a blast on their land spared it (%d -> %d tiles)", rk_tiles0, sim.o_tiles[Rk]))
+for _, s0 in sim:structs_in_box(rk_tile, math.ceil(fire_r), math.ceil(fire_r)) do if s0.owner == Rk and not s0.dead then rk_structs1 += 1 end end
+local rk_tiles1 = rk_in_disc()
+expect(rk_tiles1 >= rk_tiles0 - 5, string.format("a blast on their land spared it (%d -> %d tiles)", rk_tiles0, rk_tiles1))
 expect(rk_structs1 >= rk_structs0, "and their buildings")
 expect(#sim:rookie_rows() >= 1, "the snapshot lists the new player")
 local _ = ps
