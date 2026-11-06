@@ -261,7 +261,8 @@ function CommandBar._build_sections(self)
 	self._builds2:set_alignment(W.ALIGN_CENTER)
 	self._tray_v = T.vbox(8)
 	local R = UIRules()
-	-- (the divider before the bombs; Empires Front has none in the bar: it stays hidden)
+	-- (the divider before the siege weapons, Empires Front 2026-11-06: they and it show once the player
+	-- has a Siege Workshop, _siege_shown)
 	do
 		self._nuke_div = T.vdivider(40.0)
 		local wrap: any = W.Margin.new()
@@ -271,12 +272,8 @@ function CommandBar._build_sections(self)
 		wrap:add_child(self._nuke_div)
 		self._nuke_wrap = wrap
 		self._builds:add_child(wrap)
-		local base_set = wrap.set_visible
-		wrap.set_visible = function(node: any, _on: boolean)
-			base_set(node, false)
-		end
-		wrap:set_visible(false)
 	end
+	self._siege_shown = false
 	for i, k in ipairs(R.ACTIONS) do
 		local b = BuildButton.new(ctx, k, R.HOTKEYS[i])
 		b.chosen:Connect(function(kind: string)
@@ -563,7 +560,11 @@ end
 --- Nuke slots live either at the end of the build row or on their own second row. The unlocked
 --- Arsenal kinds follow them, and the SHOP slot closes whichever row they are in.
 function CommandBar._arrange_slots(self, two_rows: boolean)
-	local nukes = { self.buttons["atom"], self.buttons["hydrogen"], self.buttons["mirv"] }
+	local R = UIRules()
+	local nukes = {}
+	for _, k in R.NUKE_KINDS do
+		table.insert(nukes, self.buttons[k])
+	end
 	for _, n in ipairs(nukes) do
 		self:_detach(n)
 	end
@@ -575,7 +576,12 @@ function CommandBar._arrange_slots(self, two_rows: boolean)
 	local unlocked = self:_unlocked_arsenal()
 	self._arsenal_sig = table.concat(unlocked, ",")
 	-- (2026-11-01: fifteen build slots; with two rows the second half of them goes to the second row)
-	local acts = UIRules().ACTIONS
+	local acts = {}
+	for _, k in UIRules().ACTIONS do
+		if not R.is_nuke(k) then
+			table.insert(acts, k)
+		end
+	end
 	local half = if two_rows and #acts > 10 then math.ceil(#acts / 2) else #acts
 	for i, k in ipairs(acts) do
 		local b = self.buttons[k]
@@ -591,11 +597,13 @@ function CommandBar._arrange_slots(self, two_rows: boolean)
 	local row = self._builds
 	if two_rows then
 		row = self._builds2
-	else
+	elseif self._siege_shown then
 		self._builds:add_child(self._nuke_wrap)
 	end
-	for _, n in ipairs(nukes) do
-		row:add_child(n)
+	if self._siege_shown then
+		for _, n in ipairs(nukes) do
+			row:add_child(n)
+		end
 	end
 	for _, k in ipairs(unlocked) do
 		row:add_child(self.buttons[k])
@@ -738,7 +746,8 @@ function CommandBar._reflow(self)
 		-- One row when it fits between the safe edges (the ten slots, the unlocked Arsenal kinds and
 		-- the SHOP button: the slots narrow a little first, then SHOP), else builds over nukes.
 		local avail = ctx.vp.X - ctx.insets.x - ctx.insets.z - 16.0
-		local fit = TrayFit.fit(avail, #UIRules().ACTIONS + #self:_unlocked_arsenal(), #self._shop:locked())
+		local slots = #UIRules().ACTIONS - (if self._siege_shown then 0 else #UIRules().NUKE_KINDS)
+		local fit = TrayFit.fit(avail, slots + #self:_unlocked_arsenal(), #self._shop:locked())
 		for _, b in pairs(self.buttons) do
 			b:set_slot_width(fit.slot_w)
 		end
@@ -853,6 +862,13 @@ function CommandBar._refresh_buttons_now(self)
 	-- an Arsenal kind was unlocked (or the inventory arrived): its slot joins the row, SHOP stops
 	-- showing it
 	local cards_changed = self._shop:refresh()
+	-- (Empires Front 2026-11-06) the siege weapons' slots join the row with the first Siege Workshop
+	local rules = self.ctx.rules
+	local siege = rules ~= nil and rules:struct_count(UITheme.core("Defs").S_SILO) > 0
+	if siege ~= self._siege_shown then
+		self._siege_shown = siege
+		cards_changed = true
+	end
 	if table.concat(self:_unlocked_arsenal(), ",") ~= self._arsenal_sig or cards_changed then
 		self._arsenal_sig = table.concat(self:_unlocked_arsenal(), ",")
 		self.slots_changed:Fire() -- (UIRoot lays the HUD out again: the row may need another flow)

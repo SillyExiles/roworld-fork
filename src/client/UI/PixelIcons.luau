@@ -315,8 +315,16 @@ local cache: { [string]: any } = {}
 for name, rows in require("./PixelBuildings") :: any do
 	PixelIcons.GLYPHS[name] = rows
 end
+-- (Empires Front 2026-11-06) the siege weapons (UI/SiegeGlyphs, tools/make_siege_art.py): the Siege
+-- Workshop ("silo"), the Watchtower ("sam"), the bombard ("atom"), fire ("hydrogen") and the plague,
+-- each map showing its period's (SIEGE_BY_MAP: icon -> map -> glyph).
+local SiegeGlyphs = require("./SiegeGlyphs") :: any
+for name, rows in SiegeGlyphs.glyphs do
+	PixelIcons.GLYPHS[name] = rows
+end
+PixelIcons.SIEGE_BY_MAP = SiegeGlyphs.by_map
 --- Icons drawn per map: "temple" shows temple_<the map in play> (temple_rome when the map has none).
-PixelIcons.PER_MAP = { temple = true, palace = true }
+PixelIcons.PER_MAP = { temple = true, palace = true, silo = true, sam = true, atom = true, hydrogen = true }
 PixelIcons.map_id = "rome"
 
 --- The map in play (StructureLayer sets it from the match's GameState): its Temple and Palace show.
@@ -329,6 +337,10 @@ end
 
 --- The glyph `name` stands for on this map.
 function PixelIcons.resolve(name: string): string
+	local siege = PixelIcons.SIEGE_BY_MAP[name]
+	if siege ~= nil then
+		return siege[PixelIcons.map_id] or siege.rome
+	end
 	if PixelIcons.PER_MAP[name] then
 		local own = name .. "_" .. PixelIcons.map_id
 		return if PixelIcons.GLYPHS[own] ~= nil then own else name .. "_rome"

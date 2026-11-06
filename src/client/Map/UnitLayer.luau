@@ -46,6 +46,11 @@ local FrameClock = require(script.Parent:WaitForChild("FrameClock")) :: any
 --- Empires Front: the eras' ships (Map/ShipArt), drawn instead of the base atlas' boats
 local ShipArt = require(script.Parent:WaitForChild("ShipArt")) :: any
 local SHIP_KIND = { [0] = "transport", [1] = "trade", [2] = "warship" }
+--- Empires Front (2026-11-06): the siege weapons in flight in their era's arms (Map/SiegeArt), drawn in
+--- their own colours; a munition sprite is passed as SIEGE + its kind
+local SiegeArt = require(script.Parent:WaitForChild("SiegeArt")) :: any
+local SIEGE = 300
+local WHITE = Color3.new(1, 1, 1)
 --- a ship sprite facing left is passed as its column + FLIP
 local FLIP = 100
 
@@ -114,7 +119,7 @@ local NUKE_COL = {
 --- Munitions drawn without a trail and a target ring (a battery's shells: there are many).
 local NUKE_PLAIN = { [Defs.N_SHELL] = true }
 --- Munitions drawn bigger than the others.
-local NUKE_SCALE = { [Defs.N_MEGA] = 1.5, [Defs.N_SHELL] = 0.75, [Defs.N_SLUG] = 1.2 }
+local NUKE_SCALE = { [Defs.N_MEGA] = 1.5, [Defs.N_SHELL] = 0.75, [Defs.N_SLUG] = 1.2, [Defs.N_ATOM] = 1.2, [Defs.N_HYDROGEN] = 1.3, [Defs.N_PLAGUE] = 1.3 }
 
 type Sprite = {
 	frame: ImageLabel,
@@ -301,8 +306,17 @@ function UnitLayer._sprite(
 	end
 	if s.col ~= col or (s.ship and s.era ~= ShipArt.style()) then
 		s.col = col
-		local ship = SHIP_KIND[col % FLIP]
+		local ship = if col < SIEGE then SHIP_KIND[col % FLIP] else nil
 		local content = if ship ~= nil then ShipArt.content(ship, col >= FLIP) else nil
+		-- (a siege weapon: its own colours, untinted)
+		local siege = col >= SIEGE
+		if siege then
+			content = SiegeArt.content(col - SIEGE)
+		end
+		if siege ~= (s.untinted == true) then
+			s.untinted = siege
+			s.owner = -1
+		end
 		if content ~= nil then
 			s.ship = true
 			s.era = ShipArt.style()
@@ -331,7 +345,7 @@ function UnitLayer._sprite(
 	end
 	if s.owner ~= owner then
 		s.owner = owner
-		local c = self._state:owner_color(owner)
+		local c = if s.untinted then WHITE else self._state:owner_color(owner)
 		s.fill.ImageColor3 = c
 		if s.rim ~= nil then
 			s.rim.ImageColor3 = border_of(c)
@@ -617,6 +631,10 @@ function UnitLayer.tick(self: any, _dt: number)
 	for uid, n in st.nukes do
 		local t = math.clamp((rt - n.launch_tick) / math.max(n.flight_ticks, 1), 0, 1)
 		local col = NUKE_COL[n.kind] or COL_ATOM
+		-- (Empires Front 2026-11-06: the era's bombard, fire and plague)
+		if Defs.SIEGE_KINDS ~= nil and Defs.SIEGE_KINDS[n.kind] and SiegeArt.content(n.kind) ~= nil then
+			col = SIEGE + n.kind
+		end
 		local npx = px * (NUKE_SCALE[n.kind] or 1)
 		if NUKE_PLAIN[n.kind] then
 			local sx0, sy0 = cam:map_to_screen(UnitLayer.nuke_uv(st, n, t))

@@ -77,7 +77,8 @@ SimAIEconomy.FACTORY_COASTAL_MULT = 0.33
 SimAIEconomy.SAM_PER_CITY = zt({ f32(0.15), f32(0.2), f32(0.25) }) -- PackedFloat32Array
 SimAIEconomy.SILO_PER_CITY = 0.2
 SimAIEconomy.FIRST_SILO_PER_CITY = 0.4
-SimAIEconomy.MAX_SILOS = 3
+-- (Empires Front 2026-11-06: one Siege Workshop a player, Rules.STRUCT_LIMITS)
+SimAIEconomy.MAX_SILOS = 1
 -- Perceived cost increase per owned structure of the kind: city/port/factory/silo 1, SAM 0.3.
 SimAIEconomy.PERCEIVED_COST_STEP = zt({ 1.0, 1.0, 1.0, 0.0, f32(0.3), 1.0 }) -- PackedFloat32Array
 -- Upgrade density: with more than one structure per 1500 full-size tiles a nation upgrades an
@@ -88,7 +89,8 @@ SimAIEconomy.UPGRADE_DENSITY_FULL_TILES = 1500.0
 -- (2026-10-31: and the Barracks; Border Walls go up against a threat, like defense posts)
 -- (2026-11-01: and the ecosystem: Farms, a Palace, Temples, Universities; Fortresses go up against a
 -- threat, like defense posts)
-SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FARM, Defs.S_PALACE, Defs.S_TEMPLE, Defs.S_FORGE, Defs.S_BARRACKS, Defs.S_UNIVERSITY }
+-- (2026-11-06: the Watchtower and the Siege Workshop are back, after the rest)
+SimAIEconomy.BUILD_ORDER = { S_PORT, S_FACTORY, Defs.S_MINE, Defs.S_MARKET, Defs.S_FARM, Defs.S_PALACE, Defs.S_TEMPLE, Defs.S_FORGE, Defs.S_BARRACKS, Defs.S_UNIVERSITY, S_SAM, S_SILO }
 -- Border Walls a nation raises against a threatening neighbour: at most this many.
 SimAIEconomy.WALL_CAP = 3
 -- Crowded map: more nations than one per this many full-size land tiles.
@@ -274,7 +276,9 @@ function SimAIEconomy.install(C)
 			local mult = if sim.o_coast[id] > 0 then E.FACTORY_COASTAL_MULT else 1.0
 			return sim:struct_levels(id, S_FACTORY) < Defs.trunc(cities * E.FACTORY_PER_CITY * mult)
 		elseif kind == S_SAM then
-			return sim:struct_levels(id, S_SAM) < Defs.trunc(cities * SAM_PER_CITY[d]) and age > NATION_WAR_AGE
+			-- (2026-11-06: Watchtowers, Rules.STRUCT_LIMITS of them at most)
+			return sim:struct_levels(id, S_SAM) < math.min(Rules.STRUCT_LIMITS[S_SAM] or 4, Defs.trunc(cities * SAM_PER_CITY[d]))
+				and age > NATION_WAR_AGE
 		elseif kind == S_SILO then
 			local silos = sim:struct_count(id, S_SILO)
 			return silos < E.MAX_SILOS

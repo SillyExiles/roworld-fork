@@ -401,6 +401,12 @@ function MapView.bind_state(self: any, state: any)
 	self:_connect(state.nuke_detonated, function(uid, kind, tile, radius, _owner)
 		self:_on_nuke_detonated(uid, kind, tile, radius)
 	end)
+	-- (Empires Front 2026-11-06) fire spreading from where it landed
+	if state.blaze_started ~= nil then
+		self:_connect(state.blaze_started, function(uid, _owner, tile, radius, _start, ticks)
+			call(self.layers.fx, "blaze", tile, radius, (tonumber(ticks) or 60) / Defs.TICK_RATE, uid)
+		end)
+	end
 	self:_connect(state.unit_removed, function(uid, reason)
 		self:_on_unit_removed(uid, reason)
 	end)

@@ -940,14 +940,9 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 	if best <= 0 then
 		return
 	end
+	-- (Empires Front 2026-11-06: the era's bombard, or fire on a big empire; no MIRV)
 	local kind = Defs.N_ATOM
-	if
-		gold >= Rules.nuke_cost("mirv", sim.mirvs_launched)
-		and (best == self.leader or best == self.runaway_human)
-		and sim:land_share(best) >= 0.35
-	then
-		kind = Defs.N_MIRV
-	elseif gold >= Rules.NUKE_COST[Defs.N_HYDROGEN] and sim.o_tiles[best] > 2500 * LA then
+	if gold >= Rules.NUKE_COST[Defs.N_HYDROGEN] * 1.5 and sim.o_tiles[best] > 2500 * LA then
 		kind = Defs.N_HYDROGEN
 	end
 	local target = self:_nuke_target(sim, id, best, kind)
@@ -982,6 +977,24 @@ function SimAI:_nuke_target(sim, id: number, p: number, kind: number): number
 	local st = sim.o_spawn_tile[p]
 	if st >= 0 and readi32(sim.owner, st * 4) == p then
 		table.insert(cands, st)
+	end
+	-- (Empires Front 2026-11-06) a Siege Workshop reaches only so far: the targets within its reach
+	local reach = sim.R.launch_range(kind)
+	if reach > 0 then
+		local r2 = reach * reach
+		local near = {}
+		for _, c in cands do
+			for _, w in sim:structs_of(id, Defs.S_SILO) do
+				if w.active and not w.dead and sim.range_d2(w.tile, c) <= r2 then
+					table.insert(near, c)
+					break
+				end
+			end
+		end
+		cands = near
+		if #cands == 0 then
+			return -1
+		end
 	end
 	-- MIRV warheads only ever land on the target's own land.
 	local radius = sim.R.NUKE_RADIUS[kind]

@@ -91,9 +91,8 @@ Defs.STRUCT_NAMES = {
 	"university",
 }
 --- Empires Front: structure kinds kept in the code but not built (2026-10-31: no SAMs, silos, Arsenal, farms)
+--- (2026-11-06: the SAM and the silo are back as the Watchtower and the Siege Workshop)
 Defs.DISABLED_STRUCT = {
-	[Defs.S_SAM] = true,
-	[Defs.S_SILO] = true,
 	[Defs.S_ARTILLERY] = true,
 	[Defs.S_AIRFIELD] = true,
 	[Defs.S_RAILGUN] = true,
@@ -165,8 +164,15 @@ Defs.N_SCATTER = 5
 Defs.N_SHELL = 6
 Defs.N_AIRSTRIKE = 7
 Defs.N_SLUG = 8
-Defs.NUKE_KIND_COUNT = 9
-Defs.NUKE_NAMES = { [0] = "atom", "hydrogen", "mirv", "warhead", "mega", "scatter", "shell", "airstrike", "slug" }
+-- Empires Front (2026-11-06): the siege weapons. The Siege Workshop (the silo) fires three: the atom
+-- bomb is the era's siege bombard (Onager, Catapult, Orban's Bombard, Fire Rocket, Big Bertha...),
+-- the hydrogen bomb is fire that spreads (Greek fire, fire arrows...), and the plague
+-- (a new kind) sickens the nation it lands on and spreads to its neighbours (Core/SimNukes).
+Defs.N_PLAGUE = 9
+Defs.NUKE_KIND_COUNT = 10
+Defs.NUKE_NAMES = { [0] = "atom", "hydrogen", "mirv", "warhead", "mega", "scatter", "shell", "airstrike", "slug", "plague" }
+--- The munitions a Siege Workshop fires (the rest stay in the code, out of the game).
+Defs.SIEGE_KINDS = { [Defs.N_ATOM] = true, [Defs.N_HYDROGEN] = true, [Defs.N_PLAGUE] = true }
 Defs.NUKE_TITLES = {
 	[0] = "Atom Bomb",
 	"Hydrogen Bomb",
@@ -177,6 +183,7 @@ Defs.NUKE_TITLES = {
 	"Artillery Shell",
 	"Air Strike",
 	"Railgun Slug",
+	"Plague",
 }
 
 -- Arsenal unlocks an owner holds (Sim.o_unlock bit mask; Data/Arsenal names them). Without its bit
@@ -193,7 +200,7 @@ Defs.UNLOCK = {
 Defs.UNLOCK_ALL = 127
 --- The unlock a structure kind (Defs.S_*) / a munition (Defs.N_*) needs: 0 = none.
 Defs.STRUCT_UNLOCK = { [0] = 0, 0, 0, 0, 0, 0, 8, 16, 32, 0, 0, 0, 0, 0, 0 }
-Defs.NUKE_UNLOCK = { [0] = 0, 0, 0, 0, 1, 2, 8, 16, 32 }
+Defs.NUKE_UNLOCK = { [0] = 0, 0, 0, 0, 1, 2, 8, 16, 32, 0 }
 
 -- Tile flags (GameState.flags / delta "flags")
 Defs.F_FALLOUT = 1

@@ -44,6 +44,7 @@ local MapFx = require(Airfront:WaitForChild("Assets"):WaitForChild("MapFx")) :: 
 local FrameClock = require(script.Parent:WaitForChild("FrameClock")) :: any
 -- (Empires Front 2026-11-06: the atlas drawn by the client; the uploaded one is not this experience's)
 local MapFxImage = require(script.Parent:WaitForChild("MapFxImage")) :: any
+local WHITE = Color3.new(1, 1, 1)
 local PixelIcons = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild("PixelIcons")) :: any
 
 local FxLayer = {}
@@ -115,6 +116,17 @@ FxLayer.BURSTS = {
 --- MIRV warhead; the Arsenal's Mega Nuke (a blast between the two) 120, a Scatter
 --- bomb an atom's.
 FxLayer.NUKE_FX_RADIUS = { [0] = 70, [1] = 160, [3] = 70, [4] = 120, [5] = 70 }
+--- (Empires Front 2026-11-06) The siege weapons: a bombard's look is SIEGE_LOOK x its outer radius; fire
+--- burns out over FIRE_S once its front passed (FIRE_DENSITY flames a tile of radius, FIRE_SMOKE of
+--- them smoky); the plague's cloud is PLAGUE_GREEN, PLAGUE_PUFFS puffs, and a sick nation's capital
+--- smokes green every PLAGUE_EVERY_S.
+FxLayer.SIEGE_LOOK = 2.4
+FxLayer.FIRE_S = 5.0
+FxLayer.FIRE_DENSITY = 2.2
+FxLayer.FIRE_SMOKE = 0.3
+FxLayer.PLAGUE_GREEN = Color3.fromRGB(150, 235, 100)
+FxLayer.PLAGUE_PUFFS = 10
+FxLayer.PLAGUE_EVERY_S = 1.4
 --- The debris a nuke leaves: the sprite, how far out (of the radius) and how many (radius x density)
 FxLayer.DEBRIS_PLAN = {
 	{ kind = "fire", factor = 1.0, density = 1 / 25 },
@@ -189,8 +201,18 @@ type PopGui = {
 	width: number,
 	stroke_t: number,
 }
---- (`life`, `fade_in`, `fade_out`: debris only; a burst ends with its last frame)
-type Burst = { u: number, v: number, t0: number, row: any, life: number?, fade_in: number?, fade_out: number? }
+--- (`life`, `fade_in`, `fade_out`: debris only; a burst ends with its last frame. `col`: a tint (the
+--- plague's green); a `t0` still to come: not drawn yet)
+type Burst = {
+	u: number,
+	v: number,
+	t0: number,
+	row: any,
+	life: number?,
+	fade_in: number?,
+	fade_out: number?,
+	col: Color3?,
+}
 type BurstGui = {
 	img: ImageLabel,
 	vis: boolean,
@@ -203,6 +225,7 @@ type BurstGui = {
 	ox: number,
 	oy: number,
 	img_t: number,
+	col: Color3?,
 }
 type Bonus = { u: number, v: number, t0: number, text: string }
 type BonusGui = {
@@ -421,7 +444,22 @@ function FxLayer.nuke(self: any, kind: number, tile: number, radius: number)
 	end
 	local st = self._state
 	local k = tonumber(st and st.map and st.map.k_lin) or Rules.K_LIN
+	-- (Empires Front 2026-11-06) the plague: a green cloud; fire: a flash, its front does the rest
+	-- (FxLayer.blaze); a bombard: a blast its own size
+	if kind == Defs.N_PLAGUE then
+		self:plague_cloud(tile, FxLayer.PLAGUE_PUFFS, 6.0)
+		add(self, tile, 0, 10 / k, 0.9, FxLayer.PLAGUE_GREEN, false)
+		return
+	elseif kind == Defs.N_HYDROGEN then
+		add(self, tile, 0, math.max(r, 4) * 0.6, 0.6, Color3.new(1, 0.6, 0.25), false)
+		local W = if st ~= nil then st.map.W or Defs.W else Defs.W
+		self:burst("nuke", tile % W + 0.5, tile // W + 0.5)
+		return
+	end
 	local look = FxLayer.NUKE_FX_RADIUS[kind]
+	if kind == Defs.N_ATOM then
+		look = r * k * FxLayer.SIEGE_LOOK
+	end
 	-- (a warhead's ring without the flash: 350 flashes a look radius
 	-- wide whiten the screen)
 	add(
@@ -458,7 +496,89 @@ function FxLayer.nuke(self: any, kind: number, tile: number, radius: number)
 	local cam = self.view.rig
 	local x, y = cam:tile_to_screen(tile)
 	if cam:on_screen(x, y, 200) then
-		cam:add_shake(if kind == Defs.N_HYDROGEN or kind == Defs.N_MEGA then 0.9 else 0.5)
+		cam:add_shake(if kind == Defs.N_HYDROGEN or kind == Defs.N_MEGA then 0.9 elseif kind == Defs.N_ATOM then 0.35 else 0.5)
+	end
+end
+
+--- (Empires Front 2026-11-06) Fire spreading from `tile` to `radius` tiles over `spread_s`: flames
+--- light up where its front passes and burn for FIRE_S.
+function FxLayer.blaze(self: any, tile: number, radius: number, spread_s: number, uid: number)
+	local st = self._state
+	if st == nil or tile < 0 then
+		return
+	end
+	local W = st.map.W or Defs.W
+	local u0, v0 = tile % W + 0.5, tile // W + 0.5
+	local now = FrameClock.now()
+	local count = math.floor(radius * FxLayer.FIRE_DENSITY) + 6
+	for i = 1, count do
+		if #self._debris >= FxLayer.DEBRIS_MAX then
+			break
+		end
+		local seed = uid * 7919 + i
+		local ang = FxLayer.seeded_random(seed) * math.pi * 2
+		local d = math.sqrt(FxLayer.seeded_random(seed + 0x10000)) * radius
+		local smoky = FxLayer.seeded_random(seed + 0x20000) < FxLayer.FIRE_SMOKE
+		table.insert(self._debris, {
+			u = u0 + math.cos(ang) * d,
+			v = v0 + math.sin(ang) * d,
+			t0 = now + spread_s * d / math.max(radius, 1),
+			row = FxLayer.BURSTS[if smoky then "smoke_fire" else "fire"],
+			life = FxLayer.FIRE_S,
+			fade_in = 0.08,
+			fade_out = 0.7,
+		})
+	end
+end
+
+--- (Empires Front 2026-11-06) `n` puffs of the plague's green cloud around `tile`, for `life` seconds.
+function FxLayer.plague_cloud(self: any, tile: number, n: number, life: number)
+	local st = self._state
+	if st == nil or tile < 0 then
+		return
+	end
+	local W = st.map.W or Defs.W
+	local u0, v0 = tile % W + 0.5, tile // W + 0.5
+	local now = FrameClock.now()
+	self._plague_seq = (self._plague_seq or 0) + 1
+	for i = 1, n do
+		if #self._debris >= FxLayer.DEBRIS_MAX then
+			break
+		end
+		local seed = self._plague_seq * 104729 + i
+		local ang = FxLayer.seeded_random(seed) * math.pi * 2
+		local d = FxLayer.seeded_random(seed + 0x10000) * 7
+		table.insert(self._debris, {
+			u = u0 + math.cos(ang) * d,
+			v = v0 + math.sin(ang) * d,
+			t0 = now + FxLayer.seeded_random(seed + 0x30000) * 0.8,
+			row = FxLayer.BURSTS[if i % 3 == 0 then "smoke" else "big_smoke"],
+			life = life,
+			fade_in = 0.15,
+			fade_out = 0.6,
+			col = FxLayer.PLAGUE_GREEN,
+		})
+	end
+end
+
+--- (Empires Front 2026-11-06) The sick nations' capitals give off the plague's green, now and then.
+function FxLayer._plague_tick(self: any, now: number)
+	local st = self._state
+	if st == nil or st.plague == nil or next(st.plague) == nil then
+		return
+	end
+	if now - (self._plague_at or 0) < FxLayer.PLAGUE_EVERY_S then
+		return
+	end
+	self._plague_at = now
+	for id, p in st.plague do
+		if p.until_tick > st.tick then
+			local o = st:get_owner(id)
+			local t = if o ~= nil then tonumber(o.spawn_tile) or -1 else -1
+			if t >= 0 and st:tile_owner(t) == id then
+				self:plague_cloud(t, 2, 3.5)
+			end
+		end
 	end
 end
 
@@ -1041,6 +1161,12 @@ local function bursts_step(self: any, cam: any, now: number, list: { Burst }, po
 		local b = list[i]
 		local row = b.row
 		local el = now - b.t0
+		if el < 0 then
+			-- (Empires Front: a spreading fire's flames, not reached yet)
+			keep += 1
+			list[keep] = b
+			continue
+		end
 		local frame = math.floor(el / row.frame_s)
 		local a = 1.0
 		if b.life ~= nil then
@@ -1121,6 +1247,11 @@ local function bursts_step(self: any, cam: any, now: number, list: { Burst }, po
 			g.img_t = img_t
 			img.ImageTransparency = img_t
 		end
+		local col = b.col or WHITE
+		if g.col ~= col then
+			g.col = col
+			img.ImageColor3 = col
+		end
 	end
 	truncate(list, keep)
 	for j = n + 1, #pool do
@@ -1135,6 +1266,7 @@ end
 function FxLayer.tick(self: any, _dt: number)
 	local cam = self.view.rig
 	local now = FrameClock.now()
+	self:_plague_tick(now)
 	local n = 0
 	local list = self._fx
 	local keep = 0

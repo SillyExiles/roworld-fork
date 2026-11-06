@@ -234,7 +234,8 @@ local function build(K_LIN: number, into: any?): any
 	Rules.DEFENSE_RADIUS = math.ceil(30.0 / K_LIN)
 	--- SAMCooldown / SiloCooldown: 90 ticks per missile; a SAM or silo holds `level` missiles.
 	Rules.SAM_COOLDOWN_TICKS = 90
-	Rules.SILO_COOLDOWN_TICKS = 90
+	--- (Empires Front 2026-11-06: a Siege Workshop reloads for SIEGE_RELOAD_TICKS: see below)
+	Rules.SILO_COOLDOWN_TICKS = 600
 	--- samUpgradeDuration (SAMCooldown / 2): after an upgrade the SAM's range grows to the new level's
 	--- over this many ticks.
 	Rules.SAM_UPGRADE_TICKS = 45
@@ -248,7 +249,8 @@ local function build(K_LIN: number, into: any?): any
 	--- Upgradable: city, port, factory, SAM and silo gain levels; defense posts don't (nor
 	--- the Arsenal's structures). (Empires Front 2026-11-01: nor the Temple, Palace, Fortress and
 	--- University: one building, one level, so their caps are real caps.)
-	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0 })
+	--- (2026-11-06: nor the Watchtower and the Siege Workshop: capped, one level each)
+	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0 })
 	--- Empires Front (2026-10-31) Border Wall: when finished it raises stones on every tile of the
 	--- owner's frontier (own land next to someone else's land) within WALL_RADIUS_FULL full-size tiles
 	--- (Defs.F_WALL). Taking a walled tile costs the attacker WALL_MAG x the troops and WALL_COST x
@@ -289,6 +291,9 @@ local function build(K_LIN: number, into: any?): any
 		[Defs.S_MINE] = 8,
 		[Defs.S_MARKET] = 3,
 		[Defs.S_FARM] = 6,
+		-- (2026-11-06) the siege weapons' workshop, and the towers that shoot their shots down
+		[Defs.S_SILO] = 1,
+		[Defs.S_SAM] = 4,
 	}
 	Rules.LEVEL_LIMITS = {
 		[Defs.S_MINE] = 16,
@@ -469,7 +474,8 @@ local function build(K_LIN: number, into: any?): any
 		elseif kind_name == "defense" then
 			return math.min(250000, 50000 * (n + 1))
 		elseif kind_name == "sam" then
-			return math.min(3000000, 1500000 * (n + 1))
+			-- (Empires Front 2026-11-06: the Watchtower, 500k a tower more each, 2M at most)
+			return math.min(2000000, 500000 * (n + 1))
 		elseif kind_name == "silo" then
 			return 1000000
 		elseif kind_name == "warship" then
@@ -1057,13 +1063,14 @@ local function build(K_LIN: number, into: any?): any
 	--- Atom 750k, hydrogen 5M, MIRV 25M (+15M per MIRV launched in the match; see nuke_cost()).
 	--- (Arsenal: mega 2.5M, scattershot 3.75M; a shell, an air strike and a railgun slug are free —
 	--- their battery, airfield or railgun is the price.)
-	Rules.NUKE_COST = zt({ 750000, 5000000, 25000000, 0, 2500000, 3750000, 0, 0, 0 })
+	Rules.NUKE_COST = zt({ 750000, 5000000, 25000000, 0, 2500000, 3750000, 0, 0, 0, 1200000 })
 	Rules.MIRV_COST_STEP = 15000000
 	--- nukeMagnitudes (full-size tiles): atom 12/30, hydrogen 80/100, warhead 12/18 (inner / outer).
 	--- (Arsenal: mega = twice an atom bomb's radii, four times its ground; scattershot's own crater is
 	--- an atom bomb's; a shell, an air strike and a slug have one blast disc and take no land.)
-	Rules.NUKE_INNER_FULL = f32t({ 12.0, 80.0, 0.0, 12.0, 24.0, 12.0, 0.0, 0.0, 0.0 })
-	Rules.NUKE_OUTER_FULL = f32t({ 30.0, 100.0, 0.0, 18.0, 60.0, 30.0, 1.5, 15.0, 5.0 })
+	--- (the plague: no blast; its outer radius is only the target ring)
+	Rules.NUKE_INNER_FULL = f32t({ 12.0, 80.0, 0.0, 12.0, 24.0, 12.0, 0.0, 0.0, 0.0, 0.0 })
+	Rules.NUKE_OUTER_FULL = f32t({ 30.0, 100.0, 0.0, 18.0, 60.0, 30.0, 1.5, 15.0, 5.0, 4.0 })
 	--- Outer blast radius in our tiles (UI displays trunc(NUKE_RADIUS[kind])).
 	Rules.NUKE_RADIUS = f32t({
 		30.0 / K_LIN,
@@ -1075,22 +1082,72 @@ local function build(K_LIN: number, into: any?): any
 		1.5 / K_LIN,
 		15.0 / K_LIN,
 		5.0 / K_LIN,
+		4.0 / K_LIN,
 	})
 	--- SAMs always hit what they can reach; the MIRV carrier itself can't be intercepted (nor can a
 	--- shell, an air strike or a slug).
-	Rules.NUKE_INTERCEPT_P = f32t({ 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0 })
+	Rules.NUKE_INTERCEPT_P = f32t({ 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0 })
 	--- defaultSamMissileSpeed 12 full-size tiles/tick (manhattan time to reach); a bomb or warhead can be
 	--- targeted only within defaultNukeTargetableRange (150 full-size tiles) of its target or of its launch point.
 	Rules.SAM_MISSILE_SPEED_FULL = 12.0
 	Rules.NUKE_TARGETABLE_FULL = 150.0
 	--- nukeSpeed (full-size tiles per tick): atom / hydrogen 10, MIRV 15, warhead 22.
 	--- (Arsenal: mega / scattershot 10 like the bombs; shell 6, air strike 8, slug 80.)
-	Rules.NUKE_SPEED_FULL = f32t({ 10.0, 10.0, 15.0, 22.0, 10.0, 10.0, 6.0, 8.0, 80.0 })
+	Rules.NUKE_SPEED_FULL = f32t({ 10.0, 10.0, 15.0, 22.0, 10.0, 10.0, 6.0, 8.0, 80.0, 6.0 })
 	--- MIRV: 350 warheads within 1500 full-size tiles of the aim, on the target's land.
 	Rules.MIRV_WARHEADS = 350
 	Rules.MIRV_SPREAD = trunc(1500.0 / K_LIN)
 	--- nukeAllianceBreakThreshold: 100 weighted full-size tiles (inner 1, outer 0.5) of an ally's land.
 	Rules.NUKE_ALLIANCE_BREAK_FULL = 100.0
+
+	-- ---------------------------------------------------------------------------------------------
+	-- Empires Front (2026-11-06): the siege weapons (Core/SimNukes). The Siege Workshop (the silo:
+	-- one per player, a shot a minute) fires the era's bombard (atom), fire (hydrogen) and the plague.
+	-- ---------------------------------------------------------------------------------------------
+	--- None flies before SIEGE_UNLOCK_TICKS of war (from the start of PLAYING).
+	Rules.SIEGE_UNLOCK_TICKS = 3600
+	--- Land a bombard or a fire scorches is free and scorched for SCORCH_TICKS (attacks into it are slow,
+	--- Rules.fallout_modifier), then it is plain free land again.
+	Rules.SCORCH_TICKS = 1200
+	--- Fire: it spreads from where it lands to its outer radius over FIRE_SPREAD_TICKS; a tile within the
+	--- inner radius burns with FIRE_BURN_INNER, one beyond it with FIRE_BURN_OUTER (a bombard razes the
+	--- inner radius and half of the ring at once).
+	Rules.FIRE_SPREAD_TICKS = 60
+	Rules.FIRE_BURN_INNER = 0.8
+	Rules.FIRE_BURN_OUTER = 0.4
+	--- Walls and Fortresses: a tile behind a Border Wall's stones or within its owner's Fortress's reach
+	--- burns / is razed with PROTECT_MULT of the chance, and a building there survives with PROTECT_SAVE.
+	Rules.PROTECT_MULT = 0.5
+	Rules.PROTECT_SAVE = 0.5
+	--- The plague: the nation it lands on is sick for PLAGUE_TICKS and loses PLAGUE_LOSS_PER_S of its
+	--- troops a second (x its severity). Every PLAGUE_SPREAD_GAP ticks a nation sick for at least
+	--- PLAGUE_SPREAD_AFTER passes it to each neighbour with PLAGUE_SPREAD_P (x the neighbour's severity),
+	--- for PLAGUE_SPREAD_TICKS; the launcher too, if it borders the sick. A nation that had it is immune
+	--- for PLAGUE_IMMUNE_TICKS after. Each Temple cuts the severity by PLAGUE_TEMPLE_CUT, down to
+	--- PLAGUE_MIN_SEVERITY.
+	Rules.PLAGUE_TICKS = 900
+	Rules.PLAGUE_SPREAD_TICKS = 600
+	Rules.PLAGUE_LOSS_PER_S = 0.006
+	Rules.PLAGUE_SPREAD_GAP = 100
+	Rules.PLAGUE_SPREAD_AFTER = 100
+	Rules.PLAGUE_SPREAD_P = 0.3
+	Rules.PLAGUE_IMMUNE_TICKS = 1800
+	Rules.PLAGUE_TEMPLE_CUT = 0.25
+	Rules.PLAGUE_MIN_SEVERITY = 0.25
+
+	--- The plague's severity on a nation with `temples` finished Temples.
+	function Rules.plague_severity(temples: number): number
+		return math.max(Rules.PLAGUE_MIN_SEVERITY, 1.0 - Rules.PLAGUE_TEMPLE_CUT * math.max(temples, 0))
+	end
+
+	--- Ticks until the siege weapons may fly (0: they may), from when PLAYING began.
+	function Rules.siege_unlock_left(playing_since: number?, tick: number): number
+		local ps = tonumber(playing_since) or -1
+		if ps < 0 then
+			return Rules.SIEGE_UNLOCK_TICKS
+		end
+		return math.max(0, ps + Rules.SIEGE_UNLOCK_TICKS - tick)
+	end
 
 	--- (inner, outer) blast radii in OUR tiles for nuke kind `kind`; MIRV: (0, spread).
 	--- (GDScript returned Vector2(inner, outer).)
@@ -1193,7 +1250,7 @@ local function build(K_LIN: number, into: any?): any
 	-- ---------------------------------------------------------------------------------------------
 	--- Munitions that fly a straight line (a shell, a bomber's run, a railgun slug); the others fly
 	--- the nuke arc (nuke_arc).
-	Rules.NUKE_FLAT = zt({ false, false, false, false, false, false, true, true, true })
+	Rules.NUKE_FLAT = zt({ false, false, false, false, false, false, true, true, true, false })
 	--- The structure a munition leaves from (Defs.S_*): bombs a silo, an air strike an airfield, a slug
 	--- a railgun. (Shells are fired by the battery itself; warheads come off a MIRV or a scattershot.)
 	Rules.NUKE_LAUNCHER = zt({
@@ -1206,11 +1263,13 @@ local function build(K_LIN: number, into: any?): any
 		Defs.S_ARTILLERY,
 		Defs.S_AIRFIELD,
 		Defs.S_RAILGUN,
+		Defs.S_SILO,
 	})
 	--- A structure that fires reloads for this long per shot (index Defs.S_*; 0: it doesn't fire).
 	--- SAMCooldown / SiloCooldown 90; an airfield rearms for 30 s, a railgun reloads for 25 s. A battery
 	--- rolls its own gap per shot (ARTILLERY_GAP_*).
-	Rules.RELOAD_TICKS = zt({ 0, 0, 0, 0, 90, 90, 0, 300, 250, 0, 0, 0, 0 })
+	--- (Empires Front 2026-11-06: a Siege Workshop reloads for a minute between shots)
+	Rules.RELOAD_TICKS = zt({ 0, 0, 0, 0, 90, 600, 0, 300, 250, 0, 0, 0, 0 })
 	--- What the Rapid Reload unlock makes of every reload of its owner's.
 	Rules.RAPID_RELOAD_MULT = 0.5
 	--- Artillery: a battery shells whatever isn't its owner's or an ally's within 45 tiles, every 4 to
@@ -1235,7 +1294,7 @@ local function build(K_LIN: number, into: any?): any
 	Rules.SLUG_KILL_PER_TILE = 150.0
 	Rules.SLUG_KILL_FRAC = 0.04
 	--- Damage a munition does to each structure in its disc (index Defs.N_*).
-	Rules.STRIKE_DAMAGE = zt({ 0, 0, 0, 0, 0, 0, 150, 600, 1000 })
+	Rules.STRIKE_DAMAGE = zt({ 0, 0, 0, 0, 0, 0, 150, 600, 1000, 0 })
 	--- Health of a structure (index Defs.S_*), only ever lowered by a shell, an air strike or a slug:
 	--- at 0 it loses a level and is whole again, or is destroyed at level 1.
 	Rules.STRUCT_HP = zt({ 1000, 1000, 1000, 600, 1000, 1000, 600, 800, 1000, 800, 800, 1000, 1000 })
@@ -1442,7 +1501,8 @@ local function build(K_LIN: number, into: any?): any
 		if er.mirv_spread_full then
 			Rules.MIRV_SPREAD = trunc(er.mirv_spread_full / K_LIN)
 		end
-		local silo_r = er.silo_range_full or 0
+		-- (2026-11-06: a Siege Workshop always has a reach: the era's, else 160 full-size tiles)
+		local silo_r = er.silo_range_full or 160
 		local air_r = er.airstrike_range_full or 156.0
 		local art_r = er.artillery_range_full or 45.0
 		local rail_r = er.railgun_range_full or 0
@@ -1480,7 +1540,7 @@ local function build(K_LIN: number, into: any?): any
 		local bs = er.boat_speed or 1.0
 		Rules.TRANSPORT_TPT_X100 = math.max(1, trunc(100.0 * K_LIN * bs))
 		Rules.TRADE_TPT_X100 = math.max(1, trunc(100.0 * K_LIN * bs))
-		local sk = er.sam_range or 1.0
+		local sk = er.sam_range or 0.6
 		function Rules.sam_range(level: number?): number
 			local l = level or 1
 			return sk * (150.0 - 480.0 / (math.max(l, 1) + 5)) / K_LIN

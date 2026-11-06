@@ -77,6 +77,8 @@ local SIGNALS = {
 	"pinged", -- (from, tile, kind) Empires Front Ev.PING: a teammate's or ally's Signal (1 attack here, 2 help here)
 	"unrest_changed", -- (id) Empires Front Ev.UNREST: a player's unrest, its province and warning (OwnerInfo.unrest*)
 	"rebels_changed", -- (rid, state) Empires Front Ev.REBEL: rebels rose, were crushed / bought back, went free
+	"plague_changed", -- (id) Empires Front Ev.PLAGUE: a nation fell sick or got well (GameState.plague)
+	"blaze_started", -- (uid, owner, tile, radius, start_tick, spread_ticks) Empires Front Ev.BLAZE: fire spreads
 }
 GameState.SIGNAL_NAMES = SIGNALS
 
@@ -247,6 +249,8 @@ function GameState.new(world: any?)
 	self.roads = {} :: { [number]: RoadInfo }
 	self.units = {} :: { [number]: UnitInfo }
 	self.nukes = {} :: { [number]: NukeInfo }
+	--- (Empires Front 2026-11-06) the plague on each sick nation: { until_tick, source, severity 0..1 }
+	self.plague = {} :: { [number]: { until_tick: number, source: number, severity: number } }
 	--- owner id -> the tick its next Reinforcements call is ready (Ev.REINFORCE; absent: now)
 	self.reinforce_ready = {} :: { [number]: number }
 	self.attacks = {} :: { [number]: AttackInfo }
@@ -1009,6 +1013,9 @@ function GameState.load_snapshot(self: GameState, snap: { [string]: any })
 	for _, row in snap.rebels or {} do
 		self:_set_rebel(row, 0)
 	end
+	for _, row in snap.plague or {} do
+		self:_set_plague(row, 0)
+	end
 	self.loaded = true
 	self.snapshot_loaded:Fire()
 end
@@ -1344,6 +1351,36 @@ HANDLERS[Ev.NUKE] = function(self, e)
 	end
 	self:_add_nuke(e, 1)
 	self.nuke_launched:Fire(e[2])
+end
+
+--- (Empires Front 2026-11-06) the plague on nation row[o + 1]: until row[o + 2] (0: over), sent by
+--- row[o + 3], severity row[o + 4] / 100.
+function GameState._set_plague(self: GameState, row: { any }, o: number)
+	local id = tonumber(row[o + 1]) or 0
+	local u = tonumber(row[o + 2]) or 0
+	if id <= 0 then
+		return
+	end
+	if u <= 0 then
+		self.plague[id] = nil
+	else
+		self.plague[id] = { until_tick = u, source = tonumber(row[o + 3]) or 0, severity = (tonumber(row[o + 4]) or 100) / 100 }
+	end
+end
+
+--- Whether nation `id` has the plague now.
+function GameState.has_plague(self: GameState, id: number): boolean
+	local p = self.plague[id]
+	return p ~= nil and p.until_tick > self.tick
+end
+
+HANDLERS[Ev.PLAGUE] = function(self, e)
+	self:_set_plague(e, 1)
+	self.plague_changed:Fire(e[2])
+end
+
+HANDLERS[Ev.BLAZE] = function(self, e)
+	self.blaze_started:Fire(e[2], e[3], e[4], e[5], e[6], e[7])
 end
 
 HANDLERS[Ev.BOOM] = function(self, e)

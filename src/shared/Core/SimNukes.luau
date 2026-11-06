@@ -2,6 +2,18 @@
 -- Port of scripts/core/sim_nukes.gd (SimNukes, mixin of the flattened Sim class).
 -- Atom bombs, hydrogen bombs and MIRVs: silo launch, SAM interception, blasts and fallout.
 --
+-- Empires Front (2026-11-06): the siege weapons. The silo is the Siege Workshop (one a player, a shot
+-- a minute, none before Rules.SIEGE_UNLOCK_TICKS of war) and the SAM the Watchtower; they fire
+--   * the bombard (the atom bomb, in each era's arms: Onager, Catapult, Orban's Bombard, Fire Rocket,
+--     Big Bertha...): it razes a small disc at once, kills troops and destroys the buildings there;
+--   * fire (the hydrogen bomb: Greek fire, fire arrows, naphtha...): it spreads from where it lands
+--     to its radius over Rules.FIRE_SPREAD_TICKS, burning land and buildings as it goes (_blazes_tick);
+--   * the plague (Defs.N_PLAGUE): the nation it lands on sickens and loses troops while it lasts, and
+--     passes it to its neighbours, the launcher too if it borders them; Temples ease it (_plague_tick).
+-- The land a bombard or a fire takes is scorched only for Rules.SCORCH_TICKS (then free land again),
+-- and a tile behind a Border Wall or within its owner's Fortress's reach suffers less (_shielded).
+-- Every launch is told to every player; aiming at an ally breaks the alliance, as a traitor.
+--
 -- Event conventions (see DESIGN.md §4): a NUKE event announces every missile (MIRV warheads
 -- included). BOOM with radius > 0 is a detonation; radius 0 means the missile was shot down
 -- mid-air at that tile; radius -1 means a MIRV bus split into warheads at that tile. SAM_LAUNCH
@@ -25,6 +37,8 @@ local readi32 = buffer.readi32
 
 local a_an = SimState.a_an
 local cap_first = SimState.cap_first
+local filled = SimState.filled
+local MAXO = Defs.MAX_OWNERS
 
 local S_SAM = Defs.S_SAM
 local S_SILO = Defs.S_SILO
@@ -35,7 +49,10 @@ local N_MIRV = Defs.N_MIRV
 local N_WARHEAD = Defs.N_WARHEAD
 local N_SCATTER = Defs.N_SCATTER
 local N_SHELL = Defs.N_SHELL
+local N_PLAGUE = Defs.N_PLAGUE
 local F_FALLOUT = Defs.F_FALLOUT
+local F_WALL = Defs.F_WALL
+local S_TEMPLE = Defs.S_TEMPLE
 
 local SimNukes = {}
 
@@ -108,6 +125,20 @@ function SimNukes.install(C)
 		self.nukes_launched = 0
 		-- MIRVs launched this match (each one raises the next MIRV's price by Rules.MIRV_COST_STEP).
 		self.mirvs_launched = 0
+		-- (Empires Front 2026-11-06) fires spreading; scorched land in the order it clears (tiles and
+		-- when) and each tile's latest clearing tick; the plague on each owner (until when, since when,
+		-- who sent it, its severity), when each may catch it again, and the sick in a list
+		self.blazes = {} :: { any }
+		self.scorch_t = {} :: { number }
+		self.scorch_e = {} :: { number }
+		self.scorch_head = 1
+		self.scorch_until = {} :: { [number]: number }
+		self.o_plague_until = filled(MAXO, 0)
+		self.o_plague_from = filled(MAXO, 0)
+		self.o_plague_src = filled(MAXO, 0)
+		self.o_plague_sev = filled(MAXO, 0.0)
+		self.o_plague_imm = filled(MAXO, 0)
+		self.plague_list = {} :: { number }
 	end
 
 	-- =========================================================================================
@@ -127,6 +158,24 @@ function SimNukes.install(C)
 		end
 		-- a strike (air strike, slug) leaves its own structure, takes no land and costs nothing
 		local strike = Rules.NUKE_FLAT[kind] == true
+		-- (Empires Front 2026-11-06) the Siege Workshop fires the bombard, fire and the plague only, and
+		-- none of them before Rules.SIEGE_UNLOCK_TICKS of war
+		local siege = Rules.NUKE_LAUNCHER[kind] == S_SILO
+		if siege and not Defs.SIEGE_KINDS[kind] then
+			return false
+		end
+		if siege then
+			local left = Rules.siege_unlock_left(self.playing_since, self.tick)
+			if left > 0 then
+				local secs = math.ceil(left / Rules.TICK_RATE)
+				self:msg(
+					id,
+					Defs.MSG_INFO,
+					string.format("Siege weapons can be used in %d:%02d", secs // 60, secs % 60)
+				)
+				return false
+			end
+		end
 		local tg = readi32(self.owner, t * 4)
 		if tg == id then
 			self:msg(
@@ -136,7 +185,12 @@ function SimNukes.install(C)
 			)
 			return false
 		end
-		if tg ~= 0 and self:allied(id, tg) then
+		if kind == N_PLAGUE and tg <= 0 then
+			self:msg(id, Defs.MSG_INFO, "Aim the plague at a nation's land")
+			return false
+		end
+		-- (a siege weapon aimed at an ally breaks the alliance, as a traitor: below. A teammate, never.)
+		if tg ~= 0 and self:allied(id, tg) and not (siege and not self:same_team(id, tg)) then
 			self:msg(
 				id,
 				Defs.MSG_INFO,
@@ -218,13 +272,18 @@ function SimNukes.install(C)
 			self:_scatter_warheads(id, silo.tile, t, n.flight)
 		end
 		local o_name = self.o_name
+		-- (2026-11-06) aimed at an ally: the alliance is over, and the launcher a traitor
+		if tg > 0 and siege and self:has_alliance(id, tg) then
+			self:end_alliance(id, tg, id)
+		end
 		if tg ~= 0 then
 			self:add_grudge(tg, id, Rules.NUKE_GRUDGE_TICKS)
 			self.o_attacked_tick[tg] = tick
 			self:msg(tg, Defs.MSG_ALERT, string.format("%s launched %s at you!", o_name[id], a_an(nuke_title(kind))))
 		end
 		self:msg(id, Defs.MSG_INFO, string.format("%s launched at %s", nuke_title(kind), self:name_of(tg)))
-		if kind ~= N_ATOM then
+		-- (Empires Front 2026-11-06: every launch is told to every player, the bombard's too)
+		if kind ~= N_ATOM or siege then
 			for _, h in self.humans do
 				if h ~= tg and h ~= id then
 					self:msg(
@@ -235,7 +294,7 @@ function SimNukes.install(C)
 				end
 			end
 		end
-		if kind ~= N_MIRV then
+		if kind ~= N_MIRV and kind ~= N_PLAGUE then
 			self:_break_nuked_alliances(id, t, kind)
 		end
 		self:_on_nuke_launched(id, tg, kind)
@@ -318,6 +377,10 @@ function SimNukes.install(C)
 					self:_split_mirv(n)
 				elseif Rules.NUKE_FLAT[n.kind] then
 					self:_strike(n) -- (a shell, an air strike, a slug: SimArsenal)
+				elseif n.kind == N_PLAGUE then
+					self:_plague_land(n)
+				elseif n.kind == N_HYDROGEN then
+					self:_ignite(n)
 				else
 					self:_detonate(n)
 				end
@@ -335,6 +398,16 @@ function SimNukes.install(C)
 		end
 		for i = m, w + 1, -1 do
 			list[i] = nil
+		end
+		-- (Empires Front 2026-11-06) fire spreading, scorched land clearing, the plague
+		if #self.blazes > 0 then
+			self:_blazes_tick()
+		end
+		if self.scorch_head <= #self.scorch_t then
+			self:_scorch_tick()
+		end
+		if #self.plague_list > 0 then
+			self:_plague_tick()
 		end
 	end
 
@@ -623,8 +696,6 @@ function SimNukes.install(C)
 		local before = {}
 		local order = {}
 		local owner = self.owner
-		local flags = self.flags
-		local d_flags = self.d_flags
 		local o_tiles = self.o_tiles
 		local rng = self.rng
 		for _, t in tiles do
@@ -632,6 +703,10 @@ function SimNukes.install(C)
 				continue
 			end
 			local o = readi32(owner, t * 4)
+			-- (Empires Front: behind a wall or within a Fortress's reach, half as likely)
+			if o > 0 and self:_shielded(t, o) and rng:randf() >= Rules.PROTECT_MULT then
+				continue
+			end
 			if o ~= 0 then
 				if before[o] == nil then
 					before[o] = o_tiles[o]
@@ -641,13 +716,8 @@ function SimNukes.install(C)
 				lost[o] += 1
 				self:set_owner(t, 0)
 			end
-			local f = readu8(flags, t)
-			if bit32.band(f, F_FALLOUT) == 0 then
-				f = bit32.bor(f, F_FALLOUT)
-				writeu8(flags, t, f)
-				table.insert(d_flags, t * 256 + f)
-				self.fallout_count += 1
-			end
+			-- (Empires Front: scorched for Rules.SCORCH_TICKS only)
+			self:_scorch(t)
 		end
 		local o_killer = self.o_killer
 		for _, o in order do
@@ -666,6 +736,10 @@ function SimNukes.install(C)
 		for _, s in self:structs_in_box(to, self.geo_span(to, radius), r) do
 			if not s.dead and range_d2(to, s.tile) <= r2 then
 				local so = s.owner
+				-- (Empires Front: a building behind a wall or within a Fortress's reach may stand)
+				if self:_shielded(s.tile, so) and rng:randf() < Rules.PROTECT_SAVE then
+					continue
+				end
 				self:destroy_struct(s)
 				if so ~= n.owner then
 					self:msg(
@@ -746,6 +820,358 @@ function SimNukes.install(C)
 				end
 			end
 		end
+	end
+
+	-- =========================================================================================
+	-- Empires Front (2026-11-06): scorched land, walls and Fortresses, fire, the plague
+	-- =========================================================================================
+
+	--- Whether `owner`'s tile `t` is behind a Border Wall's stones or within its Fortress's reach.
+	function C:_shielded(t: number, o: number): boolean
+		if o <= 0 then
+			return false
+		end
+		if bit32.band(readu8(self.flags, t), F_WALL) ~= 0 then
+			return true
+		end
+		return readu8(self.def_cover, t) > 0 and self:_cover_strength(t, o) == 2
+	end
+
+	--- Scorches tile `t` (Defs.F_FALLOUT) until Rules.SCORCH_TICKS from now (a later scorch extends it).
+	function C:_scorch(t: number)
+		local flags = self.flags
+		local f = readu8(flags, t)
+		if bit32.band(f, F_FALLOUT) == 0 then
+			f = bit32.bor(f, F_FALLOUT)
+			writeu8(flags, t, f)
+			table.insert(self.d_flags, t * 256 + f)
+			self.fallout_count += 1
+		end
+		local e = self.tick + Rules.SCORCH_TICKS
+		self.scorch_until[t] = e
+		local q = self.scorch_t
+		q[#q + 1] = t
+		self.scorch_e[#q] = e
+	end
+
+	--- Scorched land whose time is up is plain free land again (taken meanwhile, it already is).
+	function C:_scorch_tick()
+		local q, qe = self.scorch_t, self.scorch_e
+		local h = self.scorch_head
+		local n = #q
+		local tick = self.tick
+		local until_ = self.scorch_until
+		local flags = self.flags
+		local owner = self.owner
+		while h <= n and qe[h] <= tick do
+			local t = q[h]
+			if until_[t] == qe[h] then
+				until_[t] = nil
+				local f = readu8(flags, t)
+				if bit32.band(f, F_FALLOUT) ~= 0 and readi32(owner, t * 4) == 0 then
+					f = bit32.band(f, bit32.bnot(F_FALLOUT))
+					writeu8(flags, t, f)
+					table.insert(self.d_flags, t * 256 + f)
+					self.fallout_count -= 1
+				end
+			end
+			h += 1
+		end
+		if h > n then
+			table.clear(q)
+			table.clear(qe)
+			h = 1
+		elseif h > 4096 then
+			self.scorch_t = table.move(q, h, n, 1, {})
+			self.scorch_e = table.move(qe, h, n, 1, {})
+			h = 1
+		end
+		self.scorch_head = h
+	end
+
+	--- Fire landing: it spreads from its tile over Rules.FIRE_SPREAD_TICKS (_blazes_tick).
+	function C:_ignite(n: Nuke)
+		local inner, outer = self.R.nuke_radii(n.kind)
+		local to = n.to_tile
+		local range_d2 = self.range_d2
+		local tiles = self:disk_tiles(to, outer, true)
+		local d2s = {}
+		for _, t in tiles do
+			d2s[t] = range_d2(to, t)
+		end
+		table.sort(tiles, function(a, b)
+			local da, db = d2s[a], d2s[b]
+			if da ~= db then
+				return da < db
+			end
+			return a < b
+		end)
+		local r2 = outer * outer
+		local ss = {}
+		for _, s in self:structs_in_box(to, self.geo_span(to, outer), math.ceil(outer)) do
+			if not s.dead then
+				local d = range_d2(to, s.tile)
+				if d <= r2 then
+					table.insert(ss, { s = s, d = d })
+				end
+			end
+		end
+		table.sort(ss, function(a, b)
+			if a.d ~= b.d then
+				return a.d < b.d
+			end
+			return a.s.sid < b.s.sid
+		end)
+		local dur = Rules.FIRE_SPREAD_TICKS
+		table.insert(self.blazes, {
+			uid = n.uid,
+			kind = n.kind,
+			owner = n.owner,
+			to = to,
+			inner2 = inner * inner,
+			outer = outer,
+			tiles = tiles,
+			d2s = d2s,
+			i = 1,
+			structs = ss,
+			si = 1,
+			start = self.tick,
+			dur = dur,
+		})
+		self:ev({ Ev.BLAZE, n.uid, n.owner, to, math.ceil(outer), self.tick, dur })
+		self:ev({ Ev.BOOM, n.uid, n.kind, to, math.ceil(outer), n.owner })
+		local victim = n.target_owner
+		local o_name = self.o_name
+		if victim > 0 then
+			self:msg(
+				victim,
+				Defs.MSG_BAD,
+				string.format("%s from %s set your land on fire", cap_first(a_an(nuke_title(n.kind))), o_name[n.owner])
+			)
+		end
+		self:msg_others(victim, Defs.MSG_INFO, string.format("Fire spreads over %s", self:name_of(victim)))
+	end
+
+	--- Each fire's front moves out: the land it reaches burns (Rules.FIRE_BURN_*: free and scorched),
+	--- the buildings it reaches are destroyed, and their armies lose troops as their land does.
+	function C:_blazes_tick()
+		local list = self.blazes
+		local tick = self.tick
+		local owner = self.owner
+		local o_tiles = self.o_tiles
+		local rng = self.rng
+		local w = 0
+		for i = 1, #list do
+			local b = list[i]
+			local frac = math.min(1.0, (tick - b.start + 1) / b.dur)
+			local r = b.outer * frac
+			local r2 = r * r
+			local lost, before, order = {}, {}, {}
+			local tiles, d2s = b.tiles, b.d2s
+			while b.i <= #tiles do
+				local t = tiles[b.i]
+				local d = d2s[t]
+				if d > r2 then
+					break
+				end
+				b.i += 1
+				local p = if d <= b.inner2 then Rules.FIRE_BURN_INNER else Rules.FIRE_BURN_OUTER
+				local o = readi32(owner, t * 4)
+				if o > 0 and self:_shielded(t, o) then
+					p *= Rules.PROTECT_MULT
+				end
+				if rng:randf() >= p then
+					continue
+				end
+				if o ~= 0 then
+					if before[o] == nil then
+						before[o] = o_tiles[o]
+						lost[o] = 0
+						table.insert(order, o)
+					end
+					lost[o] += 1
+					self:set_owner(t, 0)
+				end
+				self:_scorch(t)
+			end
+			local ss = b.structs
+			while b.si <= #ss and ss[b.si].d <= r2 do
+				local s = ss[b.si].s
+				b.si += 1
+				if s.dead then
+					continue
+				end
+				local so = s.owner
+				if self:_shielded(s.tile, so) and rng:randf() < Rules.PROTECT_SAVE then
+					continue
+				end
+				self:destroy_struct(s)
+				if so ~= b.owner then
+					self:msg(so, Defs.MSG_BAD, string.format("Fire destroyed your %s", Defs.STRUCT_TITLES[s.kind]))
+				end
+			end
+			for _, o in order do
+				self:_nuke_troops(o, b.kind, lost[o], before[o])
+				if o_tiles[o] <= 0 then
+					self.o_killer[o] = b.owner
+				end
+				if o ~= b.owner then
+					self:add_grudge(o, b.owner, Rules.NUKE_GRUDGE_TICKS)
+				end
+			end
+			if frac < 1.0 or b.i <= #tiles then
+				w += 1
+				list[w] = b
+			end
+		end
+		for i = #list, w + 1, -1 do
+			list[i] = nil
+		end
+	end
+
+	--- How many finished Temples `o` holds (they ease the plague).
+	function C:_temples_of(o: number): number
+		local n = 0
+		for _, s in self:structs_of(o, S_TEMPLE) do
+			if s.active and not s.dead then
+				n += 1
+			end
+		end
+		return n
+	end
+
+	--- The plague landing: the nation whose land it hit sickens (unless it is sick or immune already).
+	function C:_plague_land(n: Nuke)
+		local to = n.to_tile
+		local victim = readi32(self.owner, to * 4)
+		self:ev({ Ev.BOOM, n.uid, n.kind, to, 2, n.owner })
+		local o_name = self.o_name
+		if victim <= 0 or victim == n.owner then
+			self:msg(n.owner, Defs.MSG_INFO, "The plague found no one to strike")
+			return
+		end
+		if self:_infect(victim, n.owner, Rules.PLAGUE_TICKS) then
+			self:msg(victim, Defs.MSG_ALERT, string.format("%s struck your land with the plague!", o_name[n.owner]))
+			self:msg(n.owner, Defs.MSG_INFO, string.format("The plague took hold in %s", o_name[victim]))
+			for _, h in self.humans do
+				if h ~= victim and h ~= n.owner then
+					self:msg(h, Defs.MSG_INFO, string.format("The plague breaks out in %s", o_name[victim]))
+				end
+			end
+		else
+			self:msg(n.owner, Defs.MSG_INFO, string.format("%s resists the plague for now", o_name[victim]))
+		end
+	end
+
+	--- Makes `o` sick with the plague for `ticks` (sent by `src`). False if it is sick or immune already.
+	function C:_infect(o: number, src: number, ticks: number): boolean
+		if o <= 0 or self.o_alive[o] ~= 1 or self.o_tiles[o] <= 0 then
+			return false
+		end
+		local tick = self.tick
+		if self.o_plague_until[o] > tick or self.o_plague_imm[o] > tick then
+			return false
+		end
+		local sev = Rules.plague_severity(self:_temples_of(o))
+		local u = tick + ticks
+		self.o_plague_until[o] = u
+		self.o_plague_from[o] = tick
+		self.o_plague_src[o] = src
+		self.o_plague_sev[o] = sev
+		self.o_plague_imm[o] = u + Rules.PLAGUE_IMMUNE_TICKS
+		table.insert(self.plague_list, o)
+		self:ev({ Ev.PLAGUE, o, u, src, math.floor(sev * 100 + 0.5) })
+		return true
+	end
+
+	--- The owners whose land touches `o`'s (walks its border list).
+	function C:_neighbor_owners(o: number): { number }
+		local out, seen = {}, {}
+		local owner = self.owner
+		local bnext = self.bnext
+		local W = self.W
+		local NW = self.N - W
+		local t = self.bhead[o]
+		local function see(q: number)
+			if q > 0 and q ~= o and not seen[q] then
+				seen[q] = true
+				table.insert(out, q)
+			end
+		end
+		while t ~= -1 do
+			local x = t % W
+			if x > 0 then
+				see(readi32(owner, (t - 1) * 4))
+			end
+			if x < W - 1 then
+				see(readi32(owner, (t + 1) * 4))
+			end
+			if t >= W then
+				see(readi32(owner, (t - W) * 4))
+			end
+			if t < NW then
+				see(readi32(owner, (t + W) * 4))
+			end
+			t = readi32(bnext, t * 4)
+		end
+		table.sort(out)
+		return out
+	end
+
+	--- The sick lose troops; the plague passes to their neighbours; it ends when its time is up.
+	function C:_plague_tick()
+		local list = self.plague_list
+		local tick = self.tick
+		local o_troops = self.o_troops
+		local o_name = self.o_name
+		local i = 1
+		while i <= #list do
+			local o = list[i]
+			if tick >= self.o_plague_until[o] or self.o_alive[o] ~= 1 then
+				self.o_plague_until[o] = 0
+				list[i] = list[#list]
+				list[#list] = nil
+				self:ev({ Ev.PLAGUE, o, 0, 0, 0 })
+				if self.o_alive[o] == 1 then
+					self:msg(o, Defs.MSG_GOOD, "The plague has left your land")
+				end
+				continue
+			end
+			local loss = o_troops[o] * Rules.PLAGUE_LOSS_PER_S * self.o_plague_sev[o] / Rules.TICK_RATE
+			self.dbg_flow[o * 5 + 3] += loss
+			o_troops[o] -= loss
+			i += 1
+		end
+		if tick % Rules.PLAGUE_SPREAD_GAP ~= 0 then
+			return
+		end
+		local rng = self.rng
+		for _, o in table.clone(list) do
+			if tick - self.o_plague_from[o] < Rules.PLAGUE_SPREAD_AFTER then
+				continue
+			end
+			for _, q in self:_neighbor_owners(o) do
+				if self.o_plague_until[q] > tick or self.o_plague_imm[q] > tick then
+					continue
+				end
+				local p = Rules.PLAGUE_SPREAD_P * Rules.plague_severity(self:_temples_of(q))
+				if rng:randf() < p and self:_infect(q, self.o_plague_src[o], Rules.PLAGUE_SPREAD_TICKS) then
+					self:msg(q, Defs.MSG_ALERT, string.format("The plague spread to your land from %s", o_name[o]))
+				end
+			end
+		end
+	end
+
+	--- Snapshot rows of the sick: { owner, until_tick, source, severity x100 }.
+	function C:plague_rows(): { { number } }
+		local out = {}
+		for _, o in self.plague_list do
+			table.insert(out, { o, self.o_plague_until[o], self.o_plague_src[o], math.floor(self.o_plague_sev[o] * 100 + 0.5) })
+		end
+		table.sort(out, function(a, b)
+			return a[1] < b[1]
+		end)
+		return out
 	end
 
 	function C:nuke_rows(): { { number } }

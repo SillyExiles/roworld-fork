@@ -278,6 +278,12 @@ HelpOverlay.SECTIONS = {
 		text = "Farms feed a bigger army (troop cap; best on plains). Temples calm the provinces around them and bless their Farms (x1.5). One Palace: +30% land taxes, and the provinces near it never revolt; lose it and the enemy loots a quarter of your gold. Universities raise your gold income, more near a Temple and most near the Palace. A Defense Post on the hills, built on again, rises into a Fortress: a great Defense Post whose garrison keeps the peace. Build them together: Palace at the heart, Universities around it, Temples over the farmland, Fortresses on the frontier heights.",
 	},
 	{
+		icon = "atom",
+		color = "red",
+		title = "Siege weapons",
+		text = "Build one Siege Workshop and, from minute 6 of the war, fire your era's weapons at land within its reach, one shot a minute. The bombard (an Onager, a Catapult, Orban's Bombard, a Fire Rocket, Big Bertha...) razes a small circle: troops, land and buildings, and the land stays scorched for a while. Fire spreads over a wider circle for a few seconds, burning as it goes. The plague sickens a nation: it loses troops while it lasts and passes it to its neighbours, yours too if you border them; Temples ease it. Watchtowers shoot siege shots down as they pass, and Walls and Fortresses halve the damage. Everyone hears of every shot, and hitting an ally breaks the alliance: you become a traitor.",
+	},
+	{
 		icon = "ping",
 		color = "cyan",
 		title = "Signals",

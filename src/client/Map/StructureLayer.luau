@@ -47,6 +47,10 @@ local EXTRA_KINDS = {
 	[Defs.S_PALACE] = { plate = 8, glyph = "palace" },
 	[Defs.S_FORTRESS] = { plate = 6, glyph = "fortress" },
 	[Defs.S_UNIVERSITY] = { plate = 5, glyph = "university" },
+	-- (2026-11-06) the Siege Workshop on the Factory's plate, the Watchtower on the Defense Post's,
+	-- each in its period's pixel art (UI/SiegeGlyphs)
+	[Defs.S_SILO] = { plate = 2, glyph = "silo" },
+	[Defs.S_SAM] = { plate = 3, glyph = "sam" },
 }
 -- (the Farm moves from the Port's disc to the field)
 EXTRA_KINDS[Defs.S_FARM] = { plate = 7, glyph = "farm" }
@@ -82,7 +86,7 @@ for _ = 1, 6 do
 	table.insert(StructureLayer.ICON_FILL, 0.72)
 end
 -- (2026-11-01) the Temple, Palace, Fortress and University: their plate's own size, a pixel glyph
-for _, k in { Defs.S_TEMPLE, Defs.S_PALACE, Defs.S_FORTRESS, Defs.S_UNIVERSITY } do
+for _, k in { Defs.S_TEMPLE, Defs.S_PALACE, Defs.S_FORTRESS, Defs.S_UNIVERSITY, Defs.S_SILO, Defs.S_SAM } do
 	local col = EXTRA_KINDS[k].plate
 	StructureLayer.SHAPE_SCALE[k + 1] = Sprites.shape_scale[col + 1] or 1.1
 	StructureLayer.ICON_FILL[k + 1] = 0.7

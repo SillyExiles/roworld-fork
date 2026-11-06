@@ -571,6 +571,8 @@ function Sim.snapshot(self: any): { [string]: any }
 		-- (Empires Front) the players' unrest and the rebel bands (Core/SimRevolts)
 		unrest = self:unrest_rows(),
 		rebels = self:rebel_rows(),
+		-- (2026-11-06) the plague: {owner, until_tick, source, severity x100}
+		plague = self:plague_rows(),
 	}
 end
 

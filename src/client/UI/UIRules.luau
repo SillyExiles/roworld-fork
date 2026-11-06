@@ -36,11 +36,13 @@ UIRules.__index = UIRules
 -- (Empires Front: no SAMs, silos, bombs or Arsenal; no farms: 2026-10-31)
 -- (Empires Front 2026-10-31: the Border Wall and the Barracks)
 -- (2026-11-01: the empire's ecosystem: Farm, Temple, Palace, Fortress, University)
-UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university" }
-UIRules.NUKE_KINDS = {}
+-- (2026-11-06: the siege weapons: the Watchtower and the Siege Workshop, which fires the era's
+-- bombard, fire and the plague; the weapons' slots show once the player has a workshop: CommandBar)
+UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university", "sam", "silo" }
+UIRules.NUKE_KINDS = { "atom", "hydrogen", "plague" }
 --- Hotkeys 1..9, 0 in this order.
-UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university" }
-UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]", "\\" }
+UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university", "sam", "silo", "atom", "hydrogen", "plague" }
+UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]", "\\", ";", "'", ",", "." }
 --- The Arsenal's kinds (Data/Arsenal: unlocked with Stars or Robux), in the order of its tray:
 --- structures, munitions launched like a nuke (the last two from their own structure: strikes), and
 --- the Reinforcements call. A locked one is offered in the Arsenal instead of doing anything.
@@ -68,6 +70,7 @@ UIRules.TITLES = {
 	warship = "Warship",
 	atom = "Atom Bomb",
 	hydrogen = "Hydrogen Bomb",
+	plague = "Plague",
 	mirv = "MIRV",
 	artillery = "Artillery",
 	airfield = "Airfield",
@@ -96,8 +99,10 @@ UIRules.SHORT = {
 	sam = "SAM",
 	silo = "Silo",
 	warship = "Warship",
-	atom = "Atom",
-	hydrogen = "H-Bomb",
+	-- (2026-11-06: the siege weapons' short names: the era's words translate the long ones)
+	atom = "Bombard",
+	hydrogen = "Fire",
+	plague = "Plague",
 	mirv = "MIRV",
 	artillery = "Artillery",
 	airfield = "Airfield",
@@ -123,11 +128,12 @@ UIRules.BLURBS = {
 	market = "Sells up to {mkt_ore} spare Ore a second for each level at the match's Ore price (it keeps what your next Forge level needs). Each trade pact raises what it gets by 20%. On the roads: sells 50% more.",
 	wall = "Raises stone walls along your frontier within {wall_r} tiles: taking a walled tile costs {wall_mag}x the troops and {wall_cost}x the time. The stones follow the frontier and fall with the tile.",
 	barracks = "Trains troops: each level makes your army grow {bar_pct}% faster (up to {bar_max} levels). Your troop cap stays the same. At most 4 Barracks per player: build near one to upgrade it.",
-	sam = "Shoots down bombs aimed within {sam_r} tiles. MIRV warheads can't be stopped.",
-	silo = "Required to launch nuclear weapons.",
+	sam = "Shoots down siege shots that pass within {sam_r} tiles. At most 4, no upgrades.",
+	silo = "Fires your siege weapons at land within {silo_r} tiles: one shot a minute, from {siege_at} of war on. Only one.",
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
-	atom = "Small blast that wipes troops and structures, leaving fallout.",
-	hydrogen = "Massive blast. Anything inside is erased.",
+	atom = "Razes a {atom_r}-tile circle: troops, land and buildings. The land stays scorched for {scorch_s} s. Walls and Fortresses halve the damage.",
+	hydrogen = "Fire that spreads over {fire_r} tiles in {fire_s} s, burning land and buildings as it goes. Walls and Fortresses halve the damage.",
+	plague = "Sickens the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s and passes it to its neighbours (yours too, if you border them). Each Temple eases it.",
 	mirv = "Splits into up to {mirv_n} warheads that rain over one nation.",
 	artillery = "Shells every enemy within {art_r} tiles on its own: their troops, and the structures it reaches.",
 	airfield = "Flies Air Strikes on any spot within {air_r} tiles. Rearms in {air_s} s.",
@@ -220,6 +226,15 @@ function UIRules._blurb(kind: string): string
 		uni_palace = tostring(R.UNI_NEAR_PALACE),
 		uni_max = tostring(math.floor(R.UNI_MAX * 100 + 0.5)),
 		uni_lim = tostring(R.UNIVERSITY_LIMIT),
+		-- (2026-11-06) the siege weapons
+		silo_r = tostring(Defs.round(R.launch_range(Defs.N_ATOM))),
+		siege_at = T().fmt_time((R.SIEGE_UNLOCK_TICKS or 0) // Defs.TICK_RATE),
+		atom_r = tostring(Defs.round(R.NUKE_RADIUS[Defs.N_ATOM])),
+		fire_r = tostring(Defs.round(R.NUKE_RADIUS[Defs.N_HYDROGEN])),
+		fire_s = tostring((R.FIRE_SPREAD_TICKS or 60) // Defs.TICK_RATE),
+		scorch_s = tostring((R.SCORCH_TICKS or 1200) // Defs.TICK_RATE),
+		plague_pct = string.format("%.1f", (R.PLAGUE_LOSS_PER_S or 0) * 100),
+		plague_s = tostring((R.PLAGUE_TICKS or 900) // Defs.TICK_RATE),
 	})
 end
 
@@ -300,6 +315,7 @@ end
 function UIRules.is_nuke(kind: string): boolean
 	return kind == "atom"
 		or kind == "hydrogen"
+		or kind == "plague"
 		or kind == "mirv"
 		or kind == "mega"
 		or kind == "scatter"
@@ -690,6 +706,21 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 			out.locked = true
 			return out
 		end
+		-- (Empires Front 2026-11-06) the siege weapons: none before SIEGE_UNLOCK_TICKS of war, then a
+		-- shot a minute
+		if lk == Defs.S_SILO then
+			local left = Rules().siege_unlock_left(s.playing_since, s.tick)
+			if left > 0 then
+				out.reason = "Siege weapons in " .. T().fmt_time(math.ceil(left / Defs.TICK_RATE))
+				out.locked = true
+				return out
+			end
+			local ready, wait = self:ready_launchers(lk)
+			if ready == 0 then
+				out.reason = "Silo reloading · ready in " .. T().fmt_time(math.ceil(wait))
+				return out
+			end
+		end
 		if UIRules.is_strike(kind) then
 			local ready, wait = self:ready_launchers(lk)
 			if ready == 0 then
@@ -757,7 +788,8 @@ end
 
 --- Structure kinds an own structure of the same kind upgrades instead of a new build (defense posts
 --- are not upgradable).
-UIRules.UPGRADABLE = { "city", "port", "factory", "sam", "silo" }
+-- (2026-11-06: the Watchtower and the Siege Workshop have no levels)
+UIRules.UPGRADABLE = { "city", "port", "factory" }
 
 --- Bulk menus (four fixed slots: x1, two steps, then the most the
 --- player can do right now): structure upgrades x1 / x5 / x10 / xMax, atom bombs x1 / x2 / x5 / xMax
@@ -1159,6 +1191,22 @@ function UIRules._placement_exact(self: any, kind: string, tile: number): { [str
 		if kind == "mirv" and own == 0 then
 			out.reason = "Target a nation"
 			return out
+		end
+		-- (Empires Front 2026-11-06) the siege weapons: within the workshop's reach; the plague on a
+		-- nation; never a teammate
+		if UIRules.launcher(kind) == Defs.S_SILO and not UIRules.is_strike(kind) then
+			if kind == "plague" and own == 0 then
+				out.reason = "Aim the plague at a nation"
+				return out
+			end
+			if own ~= 0 and s:same_team(me, own) and s:is_team_game() then
+				out.reason = "That is your teammate's land"
+				return out
+			end
+			if not self:in_reach(Defs.S_SILO, Defs.nuke_kind_from_name(kind), tile) then
+				out.reason = "Out of your Siege Workshop's reach"
+				return out
+			end
 		end
 		if UIRules.is_strike(kind) then
 			-- a strike never hits an ally, and an air strike needs a ready airfield within reach
@@ -1608,8 +1656,8 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				reason = if not av2.ok then tostring(av2.reason) else tostring(pl2.reason),
 				danger = true,
 				cost = av2.cost,
-				-- atom bombs stack (x2 against a SAM): a bulk launch
-				sub = if ok2 and k2 == "atom" then self:bulk_ring("nuke", k2) else nil,
+				-- (Empires Front: one workshop, a shot a minute: no bulk launch)
+				sub = nil,
 			})
 		end
 		local only_strikes = self:struct_count(Defs.S_SILO) == 0

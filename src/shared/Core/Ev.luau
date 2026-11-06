@@ -55,7 +55,10 @@ Ev.UNREST = 37 -- id, unrest 0..100, province tile (-1), warned until tick (0: n
 Ev.REBEL = 38 -- rid, parent, born_tick, state (0 rising, 1 crushed, 2 bought back, 3 free nation, 4 gone),
 --   then while rising what the province is worth (its price): total, land, troops, buildings
 
+Ev.PLAGUE = 39 -- id, until_tick (0: over), source_id, severity x100 (Core/SimNukes: the plague on a nation)
+Ev.BLAZE = 40 -- uid, owner, tile, radius_tiles, start_tick, spread_ticks  (fire spreading from `tile`)
+
 --- Number of event ids (ids are 0..COUNT-1).
-Ev.COUNT = 39
+Ev.COUNT = 41
 
 return Ev

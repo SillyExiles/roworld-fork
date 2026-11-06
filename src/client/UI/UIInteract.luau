@@ -1697,6 +1697,11 @@ if UICtx.IS_ROBLOX then
 		[K.LeftBracket] = 13,
 		[K.RightBracket] = 14,
 		[K.BackSlash] = 15,
+		-- (Empires Front 2026-11-06: the Watchtower, the Siege Workshop and its three weapons)
+		[K.Semicolon] = 16,
+		[K.Quote] = 17,
+		[K.Comma] = 18,
+		[K.Period] = 19,
 		[K.Seven] = 7,
 		[K.KeypadSeven] = 7,
 		[K.Eight] = 8,

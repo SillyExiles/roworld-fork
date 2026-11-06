@@ -321,7 +321,7 @@ Eras.list = {
 			{ "Truck", "Llama Caravan" },
 			{ "Train", "Chasqui Relay" },
 			{ "Atom Bomb", "Sling Barrage" },
-			{ "Hydrogen Bomb", "Rockslide" },
+			{ "Hydrogen Bomb", "Fire Slings", "Fire Slings" },
 			{ "H-Bomb", "Rockslide" },
 			{ "MIRV Storm", "Stone Storm" },
 			{ "MIRV", "Stone Storm" },
@@ -542,6 +542,17 @@ Eras.list = {
 		name = "Mongol Empire",
 		period = "1279 · The Great Khans",
 		words = {
+			-- (2026-11-06) the siege weapons: the Siege Workshop, the Watchtower and what they fire
+			{ "Missile Silo", "Siege Camp" },
+			{ "SAM Launcher", "Watchtower" },
+			{ "Atom Bomb", "Trebuchet Volley" },
+			{ "Hydrogen Bomb", "Naphtha Pots", "Naphtha Pots" },
+			{ "Plague", "Black Death", "Black Death" },
+			{ "plague", "Black Death", "Black Death" },
+			{ "Silo", "Siege Camp" },
+			{ "SAM", "Watchtower" },
+			{ "Nuke", "Barrage" },
+			{ "nuke", "bombard", "bombards" },
 			-- (2026-11-01) the ecosystem's buildings
 			{ "Temple", "Monastery", "Monasteries" },
 			{ "Palace", "Great Ger" },
@@ -585,6 +596,15 @@ Eras.list = {
 		name = "Ottoman Empire",
 		period = "1566 · The Magnificent Century",
 		words = {
+			-- (2026-11-06) the siege weapons: the Siege Workshop, the Watchtower and what they fire
+			{ "Missile Silo", "Cannon Foundry", "Cannon Foundries" },
+			{ "SAM Launcher", "Watchtower" },
+			{ "Atom Bomb", "Orban's Bombard" },
+			{ "Hydrogen Bomb", "Fire Pots", "Fire Pots" },
+			{ "Silo", "Cannon Foundry", "Cannon Foundries" },
+			{ "SAM", "Watchtower" },
+			{ "Nuke", "Bombard" },
+			{ "nuke", "bombard", "bombards" },
 			-- (2026-11-01) the ecosystem's buildings
 			{ "Temple", "Mosque" },
 			{ "Palace", "Saray" },
@@ -628,6 +648,15 @@ Eras.list = {
 		name = "Ancient Greece",
 		period = "431 BC · The Classical Age",
 		words = {
+			-- (2026-11-06) the siege weapons: the Siege Workshop, the Watchtower and what they fire
+			{ "Missile Silo", "Siege Workshop" },
+			{ "SAM Launcher", "Watchtower" },
+			{ "Atom Bomb", "Lithobolos Volley" },
+			{ "Hydrogen Bomb", "Greek Fire", "Greek Fire" },
+			{ "Silo", "Siege Workshop" },
+			{ "SAM", "Watchtower" },
+			{ "Nuke", "Barrage" },
+			{ "nuke", "bombard", "bombards" },
 			-- (2026-11-01) the ecosystem's buildings
 			{ "Palace", "Megaron" },
 			{ "Fortress", "Citadel" },
@@ -667,6 +696,15 @@ Eras.list = {
 		name = "Sengoku Japan",
 		period = "1560 · The Warring States",
 		words = {
+			-- (2026-11-06) the siege weapons: the Siege Workshop, the Watchtower and what they fire
+			{ "Missile Silo", "Siege Workshop" },
+			{ "SAM Launcher", "Yagura Tower" },
+			{ "Atom Bomb", "Ozutsu Cannon" },
+			{ "Hydrogen Bomb", "Fire Arrows", "Fire Arrows" },
+			{ "Silo", "Siege Workshop" },
+			{ "SAM", "Yagura Tower" },
+			{ "Nuke", "Volley" },
+			{ "nuke", "volley", "volleys" },
 			-- (2026-11-01) the ecosystem's buildings
 			{ "Temple", "Shrine" },
 			{ "Palace", "Castle" },
@@ -726,7 +764,7 @@ Eras.list = {
 			{ "Warship", "Ironclad" },
 			{ "Truck", "Train" },
 			{ "Atom Bomb", "Congreve Rocket" },
-			{ "Hydrogen Bomb", "Siege Mortar" },
+			{ "Hydrogen Bomb", "Incendiary Rockets", "Incendiary Rockets" },
 			{ "H-Bomb", "Mortar" },
 			{ "MIRV Storm", "Hale Rocket Storm" },
 			{ "MIRV", "Hale Rocket Salvo" },
@@ -809,8 +847,8 @@ Eras.list = {
 			{ "Transport", "Troopship" },
 			{ "Warship", "Dreadnought" },
 			{ "Truck", "Train" },
-			{ "Atom Bomb", "Heavy Shell" },
-			{ "Hydrogen Bomb", "Super-Heavy Shell" },
+			{ "Atom Bomb", "Big Bertha Shell" },
+			{ "Hydrogen Bomb", "Incendiary Shells", "Incendiary Shells" },
 			{ "H-Bomb", "Super-Heavy" },
 			{ "MIRV Storm", "Creeping Barrage" },
 			{ "MIRV", "Barrage" },
@@ -897,6 +935,62 @@ do
 			forge = ru.forge,
 		})
 	end
+end
+
+-- Empires Front (2026-11-06): the siege weapons' balance by the period's style (Core/Rules reads
+-- `nuke` = { inner, outer, speed, cost } in full-size tiles, `silo_range_full` the Siege Workshop's
+-- reach and `sam_range` the Watchtower's x the base range). A bombard is small and near; fire is wider
+-- and spreads; the plague has no blast (its ring is only for aiming).
+Eras.SIEGE = {
+	ancient = {
+		nuke = {
+			atom = { 6, 14, 6, 400000 },
+			hydrogen = { 10, 20, 5, 1500000 },
+			plague = { 0, 4, 5, 1200000 },
+		},
+		silo_range_full = 140,
+		sam_range = 0.5,
+	},
+	gunpowder = {
+		nuke = {
+			atom = { 8, 17, 8, 500000 },
+			hydrogen = { 11, 22, 6, 1800000 },
+			plague = { 0, 4, 6, 1300000 },
+		},
+		silo_range_full = 180,
+		sam_range = 0.6,
+	},
+	modern = {
+		nuke = {
+			atom = { 10, 20, 10, 600000 },
+			hydrogen = { 13, 26, 8, 2200000 },
+			plague = { 0, 4, 8, 1500000 },
+		},
+		silo_range_full = 230,
+		sam_range = 0.75,
+	},
+}
+Eras.SIEGE_STYLE = {
+	rome = "ancient",
+	greece = "ancient",
+	persia = "ancient",
+	inca = "ancient",
+	aztec = "ancient",
+	mali = "ancient",
+	mongol = "ancient",
+	ottoman = "gunpowder",
+	japan = "gunpowder",
+	china = "gunpowder",
+	russia = "modern",
+	britain = "modern",
+	nations = "modern",
+}
+for _, e in Eras.list do
+	local st = Eras.SIEGE[Eras.SIEGE_STYLE[e.id] or "ancient"]
+	e.rules = if e.rules ~= nil then table.clone(e.rules) else {}
+	e.rules.nuke = st.nuke
+	e.rules.silo_range_full = st.silo_range_full
+	e.rules.sam_range = st.sam_range
 end
 
 local by_id: { [string]: any } = {}
