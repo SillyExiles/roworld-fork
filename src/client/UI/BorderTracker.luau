@@ -6,6 +6,8 @@
 -- Flat maps: the grid size comes from the bound state's map; tiles on an edge simply have
 -- fewer neighbours (nothing wraps).
 local F_FALLOUT = 1
+--- Defs.S_PORT
+local S_PORT = 1
 
 local BorderTracker = {}
 BorderTracker.__index = BorderTracker
@@ -279,7 +281,65 @@ function BorderTracker.can_reach_by_sea(self: any, tile: number): boolean
 	end
 	self:_refresh()
 	local map = s.map
-	return u8(map.coastal, tile) == 1 and self._bodies[coast_body_of(map, tile)] == true
+	if u8(map.coastal, tile) ~= 1 then
+		return false
+	end
+	local body = coast_body_of(map, tile)
+	if self._bodies[body] == true then
+		return true
+	end
+	-- (Empires Front 2026-11-06) a teammate's or an access-pact ally's finished port on that sea: the
+	-- transport sails from it (SimNaval._partner_port)
+	if not self:_any_passage() then
+		return false
+	end
+	local tick = tonumber(s.tick) or 0
+	for _, st in s.structures do
+		if
+			st.kind == S_PORT
+			and (st.active_tick or 0) <= tick
+			and coast_body_of(map, st.tile) == body
+			and self:passage_ok(st.owner)
+		then
+			return true
+		end
+	end
+	return false
+end
+
+--- (Empires Front 2026-11-06) May our troops march through `o`'s land and sail from its ports? A
+--- teammate, or an ally that signed Military Access with us (the Sim's SimAttacks._passage_ok).
+function BorderTracker.passage_ok(self: any, o: number): boolean
+	local s = self.state
+	local me = self.me
+	if s == nil or me <= 0 or o <= 0 or o == me then
+		return false
+	end
+	local info = s:get_owner(o)
+	if info == nil or info.alive == false then
+		return false
+	end
+	if s:same_team(me, o) and s:are_allies(me, o) then
+		return true
+	end
+	return s:has_alliance(me, o) and s.has_pact ~= nil and s:has_pact(me, o, 3)
+end
+
+--- Anyone whose land or ports we may pass through (a team game, or an ally with Military Access).
+function BorderTracker._any_passage(self: any): boolean
+	local s = self.state
+	if s == nil or self.me <= 0 then
+		return false
+	end
+	if s.is_team_game ~= nil and s:is_team_game() then
+		return true
+	end
+	for _, o in s:allies_of(self.me) do
+		if self:passage_ok(o) then
+			return true
+		end
+	end
+	return false
 end
 
 --- Flood-fills the clicked owner's region from `tile` (bounded) to see whether it touches us
@@ -325,12 +385,13 @@ function BorderTracker.region_touches_me(self: any, tile: number, budget: number
 end
 
 --- Team games (Empires Front, 2026-10-31): can our troops reach the clicked owner's region through a
---- teammate's land? Flood-fills that region from `tile` (bounded) looking for a teammate's tile next to
---- it. 1 = a teammate touches it, 0 = region fully explored without one, -1 = budget exhausted.
+--- teammate's land (since 2026-11-06 also an ally's that signed Military Access, in any game)?
+--- Flood-fills that region from `tile` (bounded) looking for such a friend's tile next to it.
+--- 1 = a friend touches it, 0 = region fully explored without one, -1 = budget exhausted.
 --- (The Sim picks the way itself: SimAttacks passage_tile.)
 function BorderTracker.mate_touches(self: any, tile: number, budget: number?): number
 	local s = self.state
-	if s == nil or self.me <= 0 or tile < 0 or s.is_team_game == nil or not s:is_team_game() then
+	if s == nil or self.me <= 0 or tile < 0 or not self:_any_passage() then
 		return 0
 	end
 	local lim = budget or 6000
@@ -360,7 +421,7 @@ function BorderTracker.mate_touches(self: any, tile: number, budget: number?): n
 			if o ~= 0 and o ~= me and o ~= target then
 				local m = mate[o]
 				if m == nil then
-					m = s:same_team(me, o) and s:are_allies(me, o)
+					m = self:passage_ok(o)
 					mate[o] = m
 				end
 				if m then

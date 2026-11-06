@@ -1370,7 +1370,8 @@ function UIRules._primary(self: any, tile: number): { [string]: any }
 	end
 	-- Empires Front (2026-10-31): team games: march through a teammate's land (the Sim finds the way:
 	-- SimAttacks passage_tile). Before a boat: a land route through friends is the natural one.
-	local via_mate = if s:is_team_game() then ctx.borders:mate_touches(tile) else 0
+	-- (2026-11-06: also through an ally that signed Military Access, in any game)
+	local via_mate = ctx.borders:mate_touches(tile)
 	if via_mate == 1 then
 		out.type = if own == 0 then "expand" else "attack"
 		out.ok = true
