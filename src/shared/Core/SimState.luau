@@ -903,9 +903,13 @@ function SimState.install(C: any)
 		return (self.grudge[victim * 1024 + offender] or 0) > self.tick
 	end
 
-	function C.form_alliance(self: any, a: number, b: number)
+	function C.form_alliance(self: any, a: number, b: number): boolean
 		if self:has_alliance(a, b) then
-			return
+			return false
+		end
+		-- (Empires Front 2026-11-05) at most Rules.ALLY_MAX alliances each
+		if Rules.ally_full(self.o_ally_count[a]) or Rules.ally_full(self.o_ally_count[b]) then
+			return false
 		end
 		local key = pair_key(a, b)
 		self.alliances[key] = true
@@ -923,6 +927,7 @@ function SimState.install(C: any)
 		self:msg(a, Defs.MSG_ALLIANCE, "You are now allied with " .. self.o_name[b])
 		self:msg(b, Defs.MSG_ALLIANCE, "You are now allied with " .. self.o_name[a])
 		self:_on_alliance_formed(a, b)
+		return true
 	end
 
 	--- Overridden by SimAttacks to stop fighting between new allies.

@@ -1499,6 +1499,18 @@ function Sim.capitulate(self: any, loser: number, winner: number)
 	end
 end
 
+--- (Empires Front 2026-11-05) Why `id` can't ally with `target` now (Rules.ALLY_MAX), as told to
+--- `id`, or nil.
+function Sim._ally_full_text(self: any, id: number, target: number): string?
+	if Rules.ally_full(self.o_ally_count[id]) then
+		return string.format("You already have %d alliances, the most: let one end or break it first", Rules.ALLY_MAX)
+	end
+	if Rules.ally_full(self.o_ally_count[target]) then
+		return string.format("%s already has %d alliances, the most", self.o_name[target], Rules.ALLY_MAX)
+	end
+	return nil
+end
+
 --- Alliance request: an answer to a pending request
 --- from `target` accepts it; otherwise a new request, unless one is pending or the previous request
 --- to `target` was made less than ALLY_REQUEST_COOLDOWN_TICKS ago.
@@ -1507,6 +1519,12 @@ function Sim.ally_request(self: any, id: number, target: number): boolean
 		return false
 	end
 	if self:allied(id, target) or self:has_request(id, target) then
+		return false
+	end
+	-- (Empires Front 2026-11-05) at most Rules.ALLY_MAX alliances each
+	local full = self:_ally_full_text(id, target)
+	if full ~= nil then
+		self:msg(id, Defs.MSG_INFO, full)
 		return false
 	end
 	if self:has_request(target, id) then
@@ -1534,7 +1552,16 @@ function Sim.ally_reply(self: any, id: number, target: number, accept: boolean):
 	if target <= 0 or target > self.owner_total or not self:has_request(target, id) then
 		return false
 	end
-	if accept and self.o_alive[target] == 1 then
+	local full = if accept then self:_ally_full_text(id, target) else nil
+	if accept and full ~= nil then
+		-- (Empires Front 2026-11-05) at most Rules.ALLY_MAX alliances each
+		self:close_request(target, id)
+		self:msg(id, Defs.MSG_INFO, full)
+		local back = self:_ally_full_text(target, id)
+		if back ~= nil then
+			self:msg(target, Defs.MSG_INFO, back)
+		end
+	elseif accept and self.o_alive[target] == 1 then
 		self:close_request(target, id)
 		self:form_alliance(target, id)
 	else

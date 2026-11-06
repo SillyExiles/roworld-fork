@@ -223,15 +223,16 @@ function SimDiplomacy.install(C)
 
 	-- two AI nations that ally also trade (a human proposes pacts from the ally's menu)
 	local form_alliance = C.form_alliance
-	function C.form_alliance(self: any, a: number, b: number)
-		form_alliance(self, a, b)
-		if self.o_ai[a] == 1 and self.o_ai[b] == 1 and self:allied(a, b) and not self:has_pact(a, b, 1) then
+	function C.form_alliance(self: any, a: number, b: number): boolean
+		local formed = form_alliance(self, a, b)
+		if formed and self.o_ai[a] == 1 and self.o_ai[b] == 1 and self:allied(a, b) and not self:has_pact(a, b, 1) then
 			local k = key(a, b)
 			local p = self.pacts[k] or {}
 			p[1] = true
 			self.pacts[k] = p
 			self:ev({ Ev.PACT, a, b, 1, 1 })
 		end
+		return formed
 	end
 
 	-- a pact ends with its alliance

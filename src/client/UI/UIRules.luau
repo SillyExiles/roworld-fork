@@ -1005,6 +1005,18 @@ function UIRules.site_bonus(self: any, kind: string, tile: number): ({ { any } }
 	return rows, short
 end
 
+--- (Empires Front 2026-11-05) Why `me` can't ally with `own` now (Rules.ALLY_MAX alliances each), or "".
+function UIRules.ally_full_reason(s: any, me: number, own: number): string
+	local R = Rules()
+	if R.ally_full(s:alliance_count(me)) then
+		return string.format("You have %d allies (max)", R.ALLY_MAX)
+	end
+	if R.ally_full(s:alliance_count(own)) then
+		return string.format("They have %d allies (max)", R.ALLY_MAX)
+	end
+	return ""
+end
+
 --- Friendly copy for Rules.placement reasons.
 UIRules.PLACE_REASONS = {
 	not_own = "Build on your own land",
@@ -1689,9 +1701,10 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				)
 			end
 		elseif s:has_request(own, me) then
+			local full = UIRules.ally_full_reason(s, me, own)
 			table.insert(
 				items,
-				{ id = "ally_accept", label = "Accept", icon = "alliance", ok = true, reason = "", danger = false }
+				{ id = "ally_accept", label = "Accept", icon = "alliance", ok = full == "", reason = full, danger = false }
 			)
 		elseif s:has_request(me, own) then
 			table.insert(items, {
@@ -1705,12 +1718,13 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 		elseif target_info ~= nil and target_info.alive then
 			-- a new request waits 30 s after the previous one (Rules.ALLY_REQUEST_COOLDOWN_TICKS)
 			local wait = s:request_cooldown_left(me, own)
+			local full = UIRules.ally_full_reason(s, me, own)
 			table.insert(items, {
 				id = "ally_request",
 				label = "Ally",
 				icon = "alliance",
-				ok = wait <= 0,
-				reason = if wait > 0 then string.format("Wait %ds", math.ceil(wait / Defs.TICK_RATE)) else "",
+				ok = wait <= 0 and full == "",
+				reason = if full ~= "" then full elseif wait > 0 then string.format("Wait %ds", math.ceil(wait / Defs.TICK_RATE)) else "",
 				danger = false,
 			})
 		end

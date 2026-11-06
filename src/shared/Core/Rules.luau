@@ -1365,6 +1365,12 @@ local function build(K_LIN: number, into: any?): any
 	--- Nukes leave a much longer grudge.
 	Rules.NUKE_GRUDGE_TICKS = 3000
 	Rules.AI_MAX_ALLIES = 3
+	--- (Empires Front 2026-11-05) Every player and bot holds at most ALLY_MAX alliances at once
+	--- (teammates don't count): a request, an answer or a new alliance past it is refused.
+	Rules.ALLY_MAX = 3
+	function Rules.ally_full(count: number?): boolean
+		return (count or 0) >= Rules.ALLY_MAX
+	end
 	--- Win share: 80 % of the land that is not fallout.
 	Rules.WIN_SHARE = 0.8
 

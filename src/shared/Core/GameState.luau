@@ -487,6 +487,17 @@ function GameState.request_cooldown_left(self: GameState, from: number, to: numb
 	return math.max(0, last + Rules.ALLY_REQUEST_COOLDOWN_TICKS - self.tick)
 end
 
+--- (Empires Front 2026-11-05) How many alliances `id` holds (teammates don't count; Rules.ALLY_MAX).
+function GameState.alliance_count(self: GameState, id: number): number
+	local n = 0
+	for key in self.alliances do
+		if key // 1024 == id or key % 1024 == id then
+			n += 1
+		end
+	end
+	return n
+end
+
 --- Allies of `id` (1-based array) in alliance formation order.
 function GameState.allies_of(self: GameState, id: number): { number }
 	local keys = {}

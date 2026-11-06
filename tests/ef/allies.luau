@@ -23,7 +23,7 @@ end
 for _ = 1, 400 do sim:step() end
 local ais = {}
 for id = 1, sim.owner_total do
-	if sim.o_alive[id] == 1 and sim.o_kind[id] == Defs.KIND_NATION and sim.o_ai[id] == 1 and #ais < 3 then
+	if sim.o_alive[id] == 1 and sim.o_kind[id] == Defs.KIND_NATION and sim.o_ai[id] == 1 and #ais < 6 then
 		table.insert(ais, id)
 	end
 end
@@ -57,6 +57,36 @@ expect(w2 == h and g2 ~= nil and #g2 == 2 and table.find(g2, ais[2]) == nil, "H 
 sim:form_alliance(h, ais[2])
 local _, g3 = sim:_allied_victory(need)
 expect(g3 ~= nil and #g3 == 3, "all three allied with each other win together")
+-- (2026-11-05) at most Rules.ALLY_MAX = 3 alliances each, players and bots
+expect(#ais >= 6, "six AI nations to test with")
+expect(Rules.ALLY_MAX == 3, "3 alliances at most")
+expect(sim:form_alliance(h, ais[3]) == true and sim.o_ally_count[h] == 3, "the player's 3rd alliance forms")
+expect(sim:ally_request(h, ais[4]) == false and not sim:has_request(h, ais[4]), "a 4th request is refused")
+expect(sim:ally_request(ais[4], h) == false and not sim:has_request(ais[4], h), "a bot can't ask a full player")
+expect(sim:form_alliance(h, ais[4]) == false and not sim:allied(h, ais[4]), "a 4th alliance never forms")
+sim:form_alliance(ais[4], ais[5])
+sim:form_alliance(ais[4], ais[6])
+sim:form_alliance(ais[4], ais[2])
+expect(sim.o_ally_count[ais[4]] == 3 and sim.o_ally_count[ais[2]] == 3, "bots fill up to 3 too")
+expect(sim:form_alliance(ais[4], ais[3]) == false, "a bot's 4th alliance never forms")
+sim:end_alliance(h, ais[3], 0, true)
+expect(sim.o_ally_count[h] == 2, "an alliance ends: room again")
+expect(sim:ally_request(h, ais[4]) == false, "no request to a full bot")
+expect(sim:ally_request(h, ais[5]) == true and sim:has_request(h, ais[5]), "a request to a bot with room")
+sim:form_alliance(h, ais[6])
+expect(sim.o_ally_count[h] == 3, "the player fills up meanwhile")
+sim:ally_reply(ais[5], h, true)
+expect(not sim:allied(h, ais[5]) and not sim:has_request(h, ais[5]), "accepting past the cap is refused and the request closes")
+for id = 1, sim.owner_total do
+	if (sim.o_ally_count[id] or 0) > Rules.ALLY_MAX then
+		expect(false, "nobody past the cap: " .. id)
+	end
+end
+-- the AI plays on: no one ever goes past the cap
+for _ = 1, 3000 do sim:step() end
+local worst = 0
+for id = 1, sim.owner_total do worst = math.max(worst, sim.o_ally_count[id] or 0) end
+expect(worst <= Rules.ALLY_MAX, "after 3000 ticks of diplomacy the most alliances anyone holds is " .. worst)
 -- Stars' first match bonus is a Common flag's price
 local Flags = require("../../src/shared/Data/EmpireFlags")
 local cheapest = math.huge

@@ -677,8 +677,14 @@ function SimRevolts.install(C: any)
 		rebel_ev(self, rid, r)
 		local parent = r.parent
 		if recognized then
-			self:form_alliance(rid, parent)
-			self:msg(parent, Defs.MSG_GOOD, string.format("You recognized %s as an independent nation: it is your ally", name))
+			local allied = self:form_alliance(rid, parent)
+			self:msg(
+				parent,
+				Defs.MSG_GOOD,
+				if allied
+					then string.format("You recognized %s as an independent nation: it is your ally", name)
+					else string.format("You recognized %s as an independent nation (no room for a 4th alliance)", name)
+			)
 			self:msg_others(parent, Defs.MSG_INFO, string.format("%s recognized the independence of %s", self.o_name[parent], name))
 			return
 		end
@@ -693,8 +699,7 @@ function SimRevolts.install(C: any)
 		if enemy > 0 then
 			if self.o_kind[enemy] == Defs.KIND_HUMAN and self.o_bot[enemy] ~= 1 then
 				pcall(self.ally_request, self, rid, enemy)
-			else
-				self:form_alliance(rid, enemy)
+			elseif self:form_alliance(rid, enemy) then
 				self:msg(parent, Defs.MSG_BAD, string.format("%s allies with %s against you", name, self.o_name[enemy]))
 			end
 		end

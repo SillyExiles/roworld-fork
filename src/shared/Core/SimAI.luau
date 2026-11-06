@@ -993,7 +993,7 @@ function SimAI:_consider_diplomacy(sim, id: number, age: number)
 		if sim.o_kind[p] == KIND_TRIBE or sim:allied(id, p) or sim:hostile(id, p) or sim:has_request(id, p) then
 			continue
 		end
-		if sim:is_traitor(p) or sim.o_ally_count[p] >= Rules.AI_MAX_ALLIES + (if sim:is_human(p) then 2 else 0) then
+		if sim:is_traitor(p) or sim.o_ally_count[p] >= (if sim:is_human(p) then Rules.ALLY_MAX else Rules.AI_MAX_ALLIES) then
 			continue
 		end
 		if _great_powers(my_share, sim:land_share(p)) then
