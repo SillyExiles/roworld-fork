@@ -153,6 +153,21 @@ for _ = 1, 300 do
 	if sim.o_plague_until[P] > sim.tick then sick_at = sim.tick break end
 end
 expect(sick_at > 0, "it took hold")
+local halt_to = sim.o_plague_halt[P]
+expect(halt_to == sick_at + math.floor(Rules.PLAGUE_HALT_TICKS * sim.o_plague_sev[P] + 0.5) and halt_to > sim.tick, "its army stops growing for a while (" .. (halt_to - sim.tick) .. " ticks)")
+-- (the sickness's own losses aside, and room below the cap: only the growth is watched)
+local loss = Rules.PLAGUE_LOSS_PER_S
+Rules.PLAGUE_LOSS_PER_S = 0
+sim.o_troops[P] = sim.o_cap[P] * 0.5
+local grew = false
+local last = sim.o_troops[P]
+for _ = 1, 40 do
+	sim:step()
+	if sim.o_troops[P] > last + 0.5 then grew = true end
+	last = sim.o_troops[P]
+end
+Rules.PLAGUE_LOSS_PER_S = loss
+expect(not grew, "no new troops while it lasts")
 local tr0 = sim.o_troops[P]
 local dead0 = sim.dbg_flow[P * 5 + 3]
 local before_spread = #sim.plague_list

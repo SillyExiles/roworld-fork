@@ -1144,6 +1144,9 @@ local function build(K_LIN: number, into: any?): any
 	Rules.PLAGUE_SPREAD_GAP = 100
 	Rules.PLAGUE_SPREAD_AFTER = 100
 	Rules.PLAGUE_SPREAD_P = 0.25
+	--- (2026-11-06) A nation the plague takes raises no new troops for PLAGUE_HALT_TICKS from then (x its
+	--- severity: Temples shorten it).
+	Rules.PLAGUE_HALT_TICKS = 450
 	Rules.PLAGUE_IMMUNE_TICKS = 1800
 	Rules.PLAGUE_TEMPLE_CUT = 0.25
 	Rules.PLAGUE_MIN_SEVERITY = 0.25

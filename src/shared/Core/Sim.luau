@@ -1762,6 +1762,10 @@ function Sim._economy_tick(self: any)
 		-- + goldAdditionRate gold every tick, never during the spawn phase.
 		-- (Empires Front: the growth the army's food allows: SimEconomy)
 		local grow = troop_growth_applied(tkind, o_troops[id], cap, tdiff) * self.o_fed[id]
+		-- (Empires Front 2026-11-06: the plague stops the growth for a while, SimNukes._infect)
+		if grow > 0 and self.o_plague_halt ~= nil and self.o_plague_halt[id] > tick then
+			grow = 0
+		end
 		-- (Empires Front: finished Barracks levels raise the growth, never past the cap)
 		local bl = o_alevel[id * STRUCT_KINDS + S_BARRACKS]
 		if bl > 0 and grow > 0 then

@@ -140,6 +140,8 @@ function SimNukes.install(C)
 		self.o_plague_sev = filled(MAXO, 0.0)
 		self.o_plague_imm = filled(MAXO, 0)
 		self.plague_list = {} :: { number }
+		-- (2026-11-06) until when the sick raise no new troops (Rules.PLAGUE_HALT_TICKS; Sim's growth)
+		self.o_plague_halt = filled(MAXO, 0)
 	end
 
 	-- =========================================================================================
@@ -1146,6 +1148,12 @@ function SimNukes.install(C)
 		self.o_plague_src[o] = src
 		self.o_plague_sev[o] = sev
 		self.o_plague_imm[o] = u + Rules.PLAGUE_IMMUNE_TICKS
+		-- (2026-11-06) and its army stops growing for a while
+		local halt = math.floor(Rules.PLAGUE_HALT_TICKS * sev + 0.5)
+		self.o_plague_halt[o] = tick + halt
+		if halt > 0 then
+			self:msg(o, Defs.MSG_BAD, string.format("The plague stops your army from growing for %d s", math.ceil(halt / Rules.TICK_RATE)))
+		end
 		table.insert(self.plague_list, o)
 		self:ev({ Ev.PLAGUE, o, u, src, math.floor(sev * 100 + 0.5) })
 		return true
