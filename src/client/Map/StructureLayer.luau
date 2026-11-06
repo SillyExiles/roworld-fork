@@ -33,6 +33,10 @@ local PixelIcons = require(script.Parent.Parent:WaitForChild("UI"):WaitForChild(
 local EXTRA_KINDS = {
 	-- (the City and the road hub drawn in the eras' style: a temple, a wagon)
 	[Defs.S_CITY] = { plate = 0, glyph = "city" },
+	-- (2026-11-06) the Port and the Defense Post on their own plates: an era map's own glyph (UI/
+	-- EraBuildings), else the usual icon
+	[Defs.S_PORT] = { plate = Defs.S_PORT, glyph = "port" },
+	[Defs.S_DEFENSE] = { plate = Defs.S_DEFENSE, glyph = "defense" },
 	[Defs.S_FACTORY] = { plate = 2, glyph = "factory" },
 	[Defs.S_FORGE] = { plate = 3, glyph = "forge" },
 	[Defs.S_FARM] = { plate = 1, glyph = "farm" },
@@ -418,6 +422,10 @@ function StructureLayer._style(self: any, p: Plate, s: any, building: boolean)
 		p.glyph.Image = icons.id
 		p.glyph.ImageRectOffset = Vector2.new(gcol * ic, 0)
 		p.glyph.ImageRectSize = Vector2.new(ic, ic)
+		-- (a plate that showed a pixel glyph before: the uploaded icon is smooth)
+		pcall(function()
+			p.glyph.ResampleMode = Enum.ResamplerMode.Default
+		end)
 	end
 	-- the glyph spans ICON_FILL / SHAPE_SCALE of the plate
 	local g = ICON_FILL[k + 1] / SHAPE_SCALE[k + 1]

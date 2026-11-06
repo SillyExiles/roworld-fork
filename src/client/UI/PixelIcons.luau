@@ -1,7 +1,7 @@
 --!native
 -- Empires Front: pixel-art glyphs drawn at runtime (EditableImage, 16 x 16, white on clear: tint them
 -- like the other masks) for what has no uploaded art: the Forge, Farm, Mine and Market, Food, Ore and
--- the trade pact, the Border Wall, the Barracks and the Signals. PixelIcons.apply(label, name) shows one on an ImageLabel (crisp: Pixelated).
+-- the trade pact, the Border Wall, the Barracks and the Signals; and each era map's own buildings. PixelIcons.apply(label, name) shows one on an ImageLabel (crisp: Pixelated).
 local AssetService = game:GetService("AssetService")
 
 local PixelIcons = {}
@@ -323,15 +323,27 @@ for name, rows in SiegeGlyphs.glyphs do
 	PixelIcons.GLYPHS[name] = rows
 end
 PixelIcons.SIEGE_BY_MAP = SiegeGlyphs.by_map
+-- (Empires Front 2026-11-06) every era map's own buildings (UI/EraBuildings, tools/make_era_buildings.py):
+-- the City, Port, Defense Post, Factory, Mine, Market, Farm, Forge, Border Wall, Barracks, Fortress,
+-- University and the Warship as <kind>_<era>. Maps without an era of their own keep the usual icons.
+local EraBuildings = require("./EraBuildings") :: any
+for name, rows in EraBuildings.glyphs do
+	PixelIcons.GLYPHS[name] = rows
+end
+PixelIcons.ERA_BY_MAP = EraBuildings.by_map
+PixelIcons.ERA_KINDS = EraBuildings.kinds
 --- Icons drawn per map: "temple" shows temple_<the map in play> (temple_rome when the map has none).
 PixelIcons.PER_MAP = { temple = true, palace = true, silo = true, sam = true, atom = true, hydrogen = true }
 PixelIcons.map_id = "rome"
+--- The era whose buildings show (ERA_BY_MAP of the map in play; nil: the usual icons, also before a match).
+PixelIcons.era = nil :: string?
 
 --- The map in play (StructureLayer sets it from the match's GameState): its Temple and Palace show.
 function PixelIcons.set_map(id: string?)
 	if type(id) == "string" and id ~= "" then
 		-- ("world@80": a public match plays the map a bit smaller; same art)
 		PixelIcons.map_id = string.match(id, "^([^@]+)") or id
+		PixelIcons.era = PixelIcons.ERA_BY_MAP[PixelIcons.map_id]
 	end
 end
 
@@ -340,6 +352,13 @@ function PixelIcons.resolve(name: string): string
 	local siege = PixelIcons.SIEGE_BY_MAP[name]
 	if siege ~= nil then
 		return siege[PixelIcons.map_id] or siege.rome
+	end
+	local era = PixelIcons.era
+	if era ~= nil and PixelIcons.ERA_KINDS[name] then
+		local own = name .. "_" .. era
+		if PixelIcons.GLYPHS[own] ~= nil then
+			return own
+		end
 	end
 	if PixelIcons.PER_MAP[name] then
 		local own = name .. "_" .. PixelIcons.map_id
@@ -380,7 +399,14 @@ PixelIcons.ALIASES = {
 
 function PixelIcons.has(name: string?): boolean
 	return name ~= nil
-		and (PixelIcons.ALIASES[name] ~= nil or PixelIcons.GLYPHS[name] ~= nil or PixelIcons.PER_MAP[name] == true)
+		and (
+			PixelIcons.ALIASES[name] ~= nil
+			or PixelIcons.GLYPHS[name] ~= nil
+			or PixelIcons.PER_MAP[name] == true
+			-- (an era's own Port or Defense Post; on other maps PixelIcons.apply fails and the caller
+			-- falls back to the usual icon)
+			or (PixelIcons.era ~= nil and PixelIcons.ERA_KINDS[name] == true)
+		)
 end
 
 local function make(size: number, fill: (buffer) -> ()): any
