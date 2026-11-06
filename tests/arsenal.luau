@@ -302,7 +302,7 @@ do
 	local gold = sim.o_gold[A]
 	F.clear(sim)
 	expect(sim:launch_nuke(A, "mega", target) and sim.o_gold[A] == gold - 2500000, "launches from a silo")
-	expect(F.has_msg(sim, "Alpha launched a Mega Nuke at you!", B), "the target is warned")
+	expect(F.has_msg(sim, "Alpha attacks you with a Mega Nuke!", B), "the target is warned")
 	run_until(sim, function()
 		return #sim.nukes == 0
 	end, 600)

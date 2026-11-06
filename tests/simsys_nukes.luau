@@ -99,7 +99,7 @@ do
 	)
 	expect(sim:grudge_of(B, A) and sim.o_attacked_tick[B] == sim.tick, "grudge and attacked tick")
 	expect(
-		F.has_msg(sim, "Alpha launched an Atom Bomb at you!", B) and F.has_msg(sim, "Atom Bomb launched at Bravo", A),
+		F.has_msg(sim, "Alpha attacks you with an Atom Bomb!", B) and F.has_msg(sim, "Atom Bomb launched at Bravo", A),
 		"launch messages"
 	)
 	F.clear(sim)

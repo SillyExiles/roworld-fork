@@ -281,7 +281,7 @@ HelpOverlay.SECTIONS = {
 		icon = "atom",
 		color = "red",
 		title = "Siege weapons",
-		text = "Build Siege Workshops (up to 5) and, from minute 6 of the war, fire your era's weapons at land within their reach, one shot a minute from each. The bombard (an Onager, a Catapult, Orban's Bombard, a Fire Rocket, Big Bertha...) razes a small circle: troops, land and buildings, and the land stays scorched for a while. Fire spreads over a wider circle for a few seconds, burning as it goes. The plague sickens a nation: it loses troops while it lasts and passes it to its neighbours, yours too if you border them; Temples ease it. Watchtowers shoot siege shots down as they pass, and Walls and Fortresses halve the damage. Everyone hears of every shot, and hitting an ally breaks the alliance: you become a traitor. New players (their first 3 matches) are safe from them.",
+		text = "Build Siege Workshops (up to 5) and, from minute 6 of the war, fire your era's weapons at land within their reach, one shot a minute from each. The bombard (an Onager, a Catapult, Orban's Bombard, a Fire Rocket, Big Bertha...) razes a small circle: troops, land and buildings, and the land stays scorched for a while. Fire spreads over a wider circle for a few seconds, burning as it goes. The plague sickens a nation: it loses troops while it lasts and passes it to its neighbours, yours too if you border them; Temples ease it. Watchtowers shoot the fire down as it passes, but the bombard and the plague can't be stopped: Walls and Fortresses halve the damage, Temples ease the plague. Everyone hears of every shot, and hitting an ally breaks the alliance: you become a traitor. New players (their first 3 matches) are safe from them.",
 	},
 	{
 		icon = "ping",

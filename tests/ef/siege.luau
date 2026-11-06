@@ -207,11 +207,24 @@ if tower >= 0 and sim:try_build(D, "sam", tower) then
 	for u = 0, sim.N - 1 do
 		if buffer.readi32(sim.owner, u * 4) == D and sim.range_d2(u, tower) < 64 then target_tile = u break end
 	end
+	local downed = {}
+	local real = sim._sam_intercept
+	sim._sam_intercept = function(self2, n)
+		local ok = real(self2, n)
+		if ok then downed[n.kind] = (downed[n.kind] or 0) + 1 end
+		return ok
+	end
+	ensure_silo()
+	expect(sim:launch_nuke(A, "hydrogen", target_tile), "fire at the tower's land")
+	for _ = 1, 200 do sim:step() end
+	expect((downed[Defs.N_HYDROGEN] or 0) == 1, "the Watchtower shot the fire down")
 	ensure_silo()
 	local fo2 = sim.fallout_count
 	expect(sim:launch_nuke(A, "atom", target_tile), "a bombard at the tower's land")
 	for _ = 1, 200 do sim:step() end
-	expect(sim.fallout_count == fo2, "the Watchtower shot it down: nothing scorched")
+	expect(downed[Defs.N_ATOM] == nil and sim.fallout_count > fo2, "the bombard can't be stopped: it scorched the land")
+	expect(Rules.NUKE_INTERCEPT_P[Defs.N_PLAGUE] == 0 and Rules.NUKE_INTERCEPT_P[Defs.N_HYDROGEN] > 0, "nor can the plague; only the fire can")
+	sim._sam_intercept = real
 else
 	print("  (no Watchtower site: skipped)")
 end

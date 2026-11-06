@@ -2,6 +2,8 @@
 -- Port of scripts/ui/alert_banner.gd (UIAlertBanner)
 -- Red pulsing "INCOMING NUKE" banner shown while nukes aimed at your land are in flight; turns
 -- green ("INTERCEPTED!") for a moment when a SAM shoots the last one down.
+-- (Empires Front 2026-11-06: it reads as a siege, not a nuclear alert: "UNDER SIEGE!" / "PLAGUE!",
+-- the era's weapon by name (client/EraText), its own icon, and whether a Watchtower can stop it.)
 --
 -- Members: panel. Methods: apply_layout(y, right_x = -1), clear(), is_green(), track(uid) -> bool,
 -- resolve(uid, intercepted); per frame update(dt).
@@ -47,7 +49,7 @@ function AlertBanner.new(c: any)
 	row:add_child(self._disc)
 	local v = T.vbox(0)
 	v.size_flags_vertical = W.SHRINK_CENTER
-	self._title = T.label("INCOMING NUKE", 15, 800, RED_TITLE, 3)
+	self._title = T.label("UNDER SIEGE!", 15, 800, RED_TITLE, 3)
 	v:add_child(self._title)
 	self._detail = T.label("", 12, 500, Color3.new(1.0, 0.88, 0.88))
 	v:add_child(self._detail)
@@ -123,7 +125,7 @@ function AlertBanner._set_red(self)
 	self.panel:set_tint(RED_TINT)
 	self.panel:set_border(T.c(T.RED, 0.8))
 	self._disc:add_theme_stylebox_override("panel", T.flat(T.c(T.RED, 0.25), 17, T.RED, 1))
-	self._disc_icon:set_icon("atom")
+	self._disc_icon:set_icon(self._icon or "atom")
 	self._disc_icon:set_color(Color3.new(1.0, 0.85, 0.85))
 end
 
@@ -211,13 +213,20 @@ function AlertBanner._refresh(self)
 		return
 	end
 	local secs = math.max(0, math.ceil(soonest / Defs.TICK_RATE))
-	local what = (if kind >= 0 then Defs.NUKE_TITLES[kind] else nil) or "Nuke"
+	local what = (if kind >= 0 then Defs.NUKE_TITLES[kind] else nil) or "Siege shot"
+	local icon = if Defs.SIEGE_KINDS[kind] then Defs.NUKE_NAMES[kind] else "atom"
+	if icon ~= self._icon then
+		self._icon = icon
+		self._disc_icon:set_icon(icon)
+	end
 	if count > 1 then
-		self._title:set_text(string.format("INCOMING NUKES ×%d", count))
-		self._detail:set_text(string.format("First impact in %ds · from %s", secs, s:owner_name(from)))
+		self._title:set_text(string.format("UNDER SIEGE ×%d", count))
+		self._detail:set_text(string.format("%s from %s · first lands in %ds", what, s:owner_name(from), secs))
 	else
-		self._title:set_text("INCOMING NUKE")
-		self._detail:set_text(string.format("%s from %s · impact in %ds", what, s:owner_name(from), secs))
+		local p = UITheme.core("Rules").NUKE_INTERCEPT_P
+		local stop = if type(p) == "table" and (p[kind] or 1) <= 0 then " · can't be stopped" else ""
+		self._title:set_text(if kind == Defs.N_PLAGUE then "PLAGUE!" else "UNDER SIEGE!")
+		self._detail:set_text(string.format("%s from %s · lands in %ds%s", what, s:owner_name(from), secs, stop))
 	end
 	self.panel:reset_size()
 end

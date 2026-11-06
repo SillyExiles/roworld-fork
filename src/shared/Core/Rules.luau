@@ -1088,7 +1088,9 @@ local function build(K_LIN: number, into: any?): any
 	})
 	--- SAMs always hit what they can reach; the MIRV carrier itself can't be intercepted (nor can a
 	--- shell, an air strike or a slug).
-	Rules.NUKE_INTERCEPT_P = f32t({ 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 1.0 })
+	--- (Empires Front 2026-11-06: a Watchtower stops only the fire (the hydrogen kind); the bombard (the
+	--- atom kind) and the plague can't be stopped, only softened by Walls, Fortresses and Temples.)
+	Rules.NUKE_INTERCEPT_P = f32t({ 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0 })
 	--- defaultSamMissileSpeed 12 full-size tiles/tick (manhattan time to reach); a bomb or warhead can be
 	--- targeted only within defaultNukeTargetableRange (150 full-size tiles) of its target or of its launch point.
 	Rules.SAM_MISSILE_SPEED_FULL = 12.0

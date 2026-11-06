@@ -285,7 +285,7 @@ function SimNukes.install(C)
 		if tg ~= 0 then
 			self:add_grudge(tg, id, Rules.NUKE_GRUDGE_TICKS)
 			self.o_attacked_tick[tg] = tick
-			self:msg(tg, Defs.MSG_ALERT, string.format("%s launched %s at you!", o_name[id], a_an(nuke_title(kind))))
+			self:msg(tg, Defs.MSG_ALERT, string.format("%s attacks you with %s!", o_name[id], a_an(nuke_title(kind))))
 		end
 		self:msg(id, Defs.MSG_INFO, string.format("%s launched at %s", nuke_title(kind), self:name_of(tg)))
 		-- (Empires Front 2026-11-06: every launch is told to every player, the bombard's too)
@@ -295,7 +295,7 @@ function SimNukes.install(C)
 					self:msg(
 						h,
 						Defs.MSG_ALERT,
-						string.format("%s launched %s at %s", o_name[id], a_an(nuke_title(kind)), self:name_of(tg))
+						string.format("%s attacks %s with %s", o_name[id], self:name_of(tg), a_an(nuke_title(kind)))
 					)
 				end
 			end
