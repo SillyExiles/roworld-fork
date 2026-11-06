@@ -1,7 +1,8 @@
 --!native
 -- Empires Front (2026-11-06): the siege weapons in flight, in the arms of the era in play (Map/SiegeData:
--- 16 x 16 pixel art in colour, tools/make_siege_art.py): stones from onagers and slings, cannonballs,
--- fire rockets, Great War shells; fire pots, fire arrows and incendiary shells; plague bundles.
+-- 16 x 16 pixel art in colour, rows of palette letters, tools/make_siege_art.py): stones from onagers
+-- and slings, cannonballs, fire rockets, Great War shells; fire pots, fire arrows and incendiary
+-- shells; plague bundles.
 -- Drawn untinted (Map/UnitLayer): the trail behind them carries the owner's colour. EditableImages made
 -- once per sprite.
 local AssetService = game:GetService("AssetService")
@@ -12,32 +13,23 @@ local SiegeData = require(script.Parent:WaitForChild("SiegeData")) :: any
 
 local SiegeArt = {}
 
-local B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
-local INV: { [number]: number } = {}
-for i = 1, 64 do
-	INV[string.byte(B64, i)] = i - 1
-end
-local function unb64(s: string): buffer
-	local out = buffer.create(#s * 3 // 4)
-	local n = 0
-	for i = 1, #s, 4 do
-		local a, b, c, d = string.byte(s, i, i + 3)
-		local vc, vd = INV[c or 61], INV[d or 61]
-		local v = (INV[a] or 0) * 262144 + (INV[b] or 0) * 4096 + (vc or 0) * 64 + (vd or 0)
-		if n < buffer.len(out) then
-			buffer.writeu8(out, n, v // 65536)
-		end
-		n += 1
-		if vc ~= nil and n < buffer.len(out) then
-			buffer.writeu8(out, n, (v // 256) % 256)
-			n += 1
-		end
-		if vd ~= nil and n < buffer.len(out) then
-			buffer.writeu8(out, n, v % 256)
-			n += 1
+--- RGBA bytes of sprite `rows` (palette letters, "." clear).
+function SiegeArt.pixels(rows: { string }, n: number, palette: { [string]: { number } }): buffer
+	local buf = buffer.create(n * n * 4)
+	for y = 0, n - 1 do
+		local row = rows[y + 1] or ""
+		for x = 0, n - 1 do
+			local c = palette[string.sub(row, x + 1, x + 1)]
+			if c ~= nil then
+				local o = (y * n + x) * 4
+				buffer.writeu8(buf, o, c[1])
+				buffer.writeu8(buf, o + 1, c[2])
+				buffer.writeu8(buf, o + 2, c[3])
+				buffer.writeu8(buf, o + 3, 255)
+			end
 		end
 	end
-	return out
+	return buf
 end
 
 --- The sprite names munition `kind` (Defs.N_*) wears in the era in play (nil: not a siege weapon).
@@ -67,7 +59,7 @@ function SiegeArt.content_named(name: string): any
 		return nil
 	end
 	local n = SiegeData.size
-	local src = unb64(data)
+	local src = SiegeArt.pixels(data, n, SiegeData.palette)
 	local ok, img = pcall(function()
 		return AssetService:CreateEditableImage({ Size = Vector2.new(n, n) })
 	end)
