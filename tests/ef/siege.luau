@@ -196,7 +196,7 @@ for _ = 1, 700 do
 end
 Rules.PLAGUE_SPREAD_P = p_spread
 local died = sim.dbg_flow[P * 5 + 3] - dead0
-expect(died > tr0 * 0.15, string.format("the sick lose troops (%d of %d died in 70 s)", died, tr0))
+expect(died > tr0 * Rules.PLAGUE_LOSS_PER_S * 10, string.format("the sick lose troops (%d of %d died, %.1f%% a second)", died, tr0, Rules.PLAGUE_LOSS_PER_S * 100))
 expect(spread, "it spread to a neighbour")
 for _ = 1, Rules.PLAGUE_TICKS do sim:step() end
 expect(sim.o_plague_until[P] == 0, "the plague ends")

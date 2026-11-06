@@ -1140,13 +1140,13 @@ local function build(K_LIN: number, into: any?): any
 	--- (2026-11-06, balance: no Watchtower stops it now, so it is milder: about 29% of the troops over its
 	--- 75 s, was about 42% over 90 s, and a little less catching)
 	--- (2026-11-06, the plague made deadly: nothing eases it (no Temple, no immunity against a direct hit);
-	--- the struck nation loses 2.5% of its troops a second for 30 s (about 53%), raises none for a minute,
+	--- the struck nation loses 0.5% of its troops a second for 30 s (about 14%), raises none for a minute,
 	--- and the land it spreads over breaks away as a free nation (PLAGUE_LAND_*). It costs a fortune that
 	--- doubles with each use, PLAGUE_MAX_USES a player a match. Its neighbours catch it at
 	--- PLAGUE_SPREAD_SEV, troops only.)
 	Rules.PLAGUE_TICKS = 300
 	Rules.PLAGUE_SPREAD_TICKS = 200
-	Rules.PLAGUE_LOSS_PER_S = 0.025
+	Rules.PLAGUE_LOSS_PER_S = 0.005
 	Rules.PLAGUE_SPREAD_GAP = 100
 	Rules.PLAGUE_SPREAD_AFTER = 100
 	Rules.PLAGUE_SPREAD_P = 0.25
