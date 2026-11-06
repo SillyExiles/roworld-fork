@@ -1005,9 +1005,13 @@ function UIRules.site_bonus(self: any, kind: string, tile: number): ({ { any } }
 	return rows, short
 end
 
---- (Empires Front 2026-11-05) Why `me` can't ally with `own` now (Rules.ALLY_MAX alliances each), or "".
+--- (Empires Front 2026-11-05) Why `me` can't ally with `own` now (a team game: none; a free-for-all:
+--- Rules.ALLY_MAX alliances each), or "".
 function UIRules.ally_full_reason(s: any, me: number, own: number): string
 	local R = Rules()
+	if s:is_team_game() then
+		return "Team game"
+	end
 	if R.ally_full(s:alliance_count(me)) then
 		return string.format("You have %d allies (max)", R.ALLY_MAX)
 	end
@@ -1715,7 +1719,8 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				reason = "Request pending",
 				danger = false,
 			})
-		elseif target_info ~= nil and target_info.alive then
+		elseif target_info ~= nil and target_info.alive and not s:is_team_game() then
+			-- (a team game has no alliances with other teams: no Ally button)
 			-- a new request waits 30 s after the previous one (Rules.ALLY_REQUEST_COOLDOWN_TICKS)
 			local wait = s:request_cooldown_left(me, own)
 			local full = UIRules.ally_full_reason(s, me, own)

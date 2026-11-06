@@ -907,7 +907,11 @@ function SimState.install(C: any)
 		if self:has_alliance(a, b) then
 			return false
 		end
-		-- (Empires Front 2026-11-05) at most Rules.ALLY_MAX alliances each
+		-- (Empires Front 2026-11-05) a team game has no alliances (the team is one); a free-for-all at
+		-- most Rules.ALLY_MAX each
+		if self.team_mode then
+			return false
+		end
 		if Rules.ally_full(self.o_ally_count[a]) or Rules.ally_full(self.o_ally_count[b]) then
 			return false
 		end

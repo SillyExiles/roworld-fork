@@ -1499,9 +1499,12 @@ function Sim.capitulate(self: any, loser: number, winner: number)
 	end
 end
 
---- (Empires Front 2026-11-05) Why `id` can't ally with `target` now (Rules.ALLY_MAX), as told to
---- `id`, or nil.
+--- (Empires Front 2026-11-05) Why `id` can't ally with `target` now, as told to `id`, or nil: a team
+--- game has no alliances with another team; a free-for-all at most Rules.ALLY_MAX each.
 function Sim._ally_full_text(self: any, id: number, target: number): string?
+	if self.team_mode then
+		return "Team game: no alliances with other teams, your team is your alliance"
+	end
 	if Rules.ally_full(self.o_ally_count[id]) then
 		return string.format("You already have %d alliances, the most: let one end or break it first", Rules.ALLY_MAX)
 	end
@@ -1521,7 +1524,7 @@ function Sim.ally_request(self: any, id: number, target: number): boolean
 	if self:allied(id, target) or self:has_request(id, target) then
 		return false
 	end
-	-- (Empires Front 2026-11-05) at most Rules.ALLY_MAX alliances each
+	-- (Empires Front 2026-11-05) none in a team game; at most Rules.ALLY_MAX each in a free-for-all
 	local full = self:_ally_full_text(id, target)
 	if full ~= nil then
 		self:msg(id, Defs.MSG_INFO, full)

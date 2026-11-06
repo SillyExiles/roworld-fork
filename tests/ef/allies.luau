@@ -87,6 +87,34 @@ for _ = 1, 3000 do sim:step() end
 local worst = 0
 for id = 1, sim.owner_total do worst = math.max(worst, sim.o_ally_count[id] or 0) end
 expect(worst <= Rules.ALLY_MAX, "after 3000 ticks of diplomacy the most alliances anyone holds is " .. worst)
+-- (2026-11-05) a team game: no alliances with other teams (the team is the alliance)
+do
+	local ts = Sim.new(WorldMap.get("rome"), { seed = 9, difficulty = 1, tribes = 20, max_humans = 1, teams = 2 })
+	local th = ts:add_human("t", "Tester")
+	ts:assign_teams()
+	local foe, mate = 0, 0
+	for id = 1, ts.owner_total do
+		if id ~= th and ts.o_kind[id] == Defs.KIND_NATION then
+			if ts.o_team[id] ~= ts.o_team[th] and foe == 0 then foe = id end
+			if ts.o_team[id] == ts.o_team[th] and mate == 0 then mate = id end
+		end
+	end
+	expect(foe > 0, "an enemy-team nation")
+	expect(ts:ally_request(th, foe) == false and not ts:has_request(th, foe), "team game: no request to the other team")
+	expect(ts:ally_request(foe, th) == false, "team game: the other team can't ask either")
+	expect(ts:form_alliance(th, foe) == false and not ts:allied(th, foe), "team game: no alliance with the other team forms")
+	expect(mate == 0 or ts:allied(th, mate), "teammates stay friendly")
+	for t = ts.N // 2, ts.N - 1, 97 do
+		if buffer.readi32(ts.owner, t * 4) == 0 and buffer.readu8(ts.map.terrain, t) >= Defs.T_PLAINS then
+			ts:submit(th, { type = "spawn", tile = t })
+			break
+		end
+	end
+	for _ = 1, 2500 do ts:step() end
+	local any = 0
+	for id = 1, ts.owner_total do any += ts.o_ally_count[id] or 0 end
+	expect(any == 0, "team game: after 2500 ticks no alliance at all (" .. any .. ")")
+end
 -- Stars' first match bonus is a Common flag's price
 local Flags = require("../../src/shared/Data/EmpireFlags")
 local cheapest = math.huge

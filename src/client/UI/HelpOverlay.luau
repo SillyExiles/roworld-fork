@@ -243,7 +243,7 @@ HelpOverlay.SECTIONS = {
 		icon = "alliance",
 		color = "violet",
 		title = "Alliances & betrayal",
-		text = "Right-click a nation to propose an alliance. Everyone, player or bot, holds at most 3 alliances at once. Each ally adds 5% to your gold income, and allies win together: when you and allies who are all allied with each other hold the land a win needs, all of you win. Allies can't attack each other, can donate troops and send each other Ore, and can sign a Trade Pact (more income, dearer Market prices), a Defence Pact (whoever attacks one partner makes an enemy of the other) or Military Access (march and sail through each other's land). Breaking an alliance brands you a Traitor for {traitor_s} s: everyone knows, and attacks against you cost only {traitor_def}% of the troops and land faster.",
+		text = "Right-click a nation to propose an alliance. In free-for-all games everyone, player or bot, holds at most 3 alliances at once; in team games your team is your alliance and you can't ally with another team. Each ally adds 5% to your gold income, and allies win together: when you and allies who are all allied with each other hold the land a win needs, all of you win. Allies can't attack each other, can donate troops and send each other Ore, and can sign a Trade Pact (more income, dearer Market prices), a Defence Pact (whoever attacks one partner makes an enemy of the other) or Military Access (march and sail through each other's land). Breaking an alliance brands you a Traitor for {traitor_s} s: everyone knows, and attacks against you cost only {traitor_def}% of the troops and land faster.",
 	},
 	{
 		icon = "ore",

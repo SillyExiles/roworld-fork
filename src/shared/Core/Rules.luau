@@ -1365,8 +1365,9 @@ local function build(K_LIN: number, into: any?): any
 	--- Nukes leave a much longer grudge.
 	Rules.NUKE_GRUDGE_TICKS = 3000
 	Rules.AI_MAX_ALLIES = 3
-	--- (Empires Front 2026-11-05) Every player and bot holds at most ALLY_MAX alliances at once
-	--- (teammates don't count): a request, an answer or a new alliance past it is refused.
+	--- (Empires Front 2026-11-05) In a free-for-all every player and bot holds at most ALLY_MAX
+	--- alliances at once: a request, an answer or a new alliance past it is refused. In a team game
+	--- there are no alliances at all: the team is the alliance (SimState.form_alliance).
 	Rules.ALLY_MAX = 3
 	function Rules.ally_full(count: number?): boolean
 		return (count or 0) >= Rules.ALLY_MAX

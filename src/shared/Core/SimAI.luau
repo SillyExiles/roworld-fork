@@ -984,7 +984,8 @@ function SimAI:_consider_diplomacy(sim, id: number, age: number)
 			end
 		end
 	end
-	if sim.o_ally_count[id] >= Rules.AI_MAX_ALLIES or sim.rng:randf() > 0.4 then
+	-- (Empires Front 2026-11-05) a team game has no alliances (the team is one)
+	if sim.team_mode or sim.o_ally_count[id] >= Rules.AI_MAX_ALLIES or sim.rng:randf() > 0.4 then
 		return
 	end
 	local best = 0

@@ -683,7 +683,7 @@ function SimRevolts.install(C: any)
 				Defs.MSG_GOOD,
 				if allied
 					then string.format("You recognized %s as an independent nation: it is your ally", name)
-					else string.format("You recognized %s as an independent nation (no room for a 4th alliance)", name)
+					else string.format("You recognized %s as an independent nation", name)
 			)
 			self:msg_others(parent, Defs.MSG_INFO, string.format("%s recognized the independence of %s", self.o_name[parent], name))
 			return

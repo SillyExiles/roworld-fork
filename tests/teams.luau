@@ -165,7 +165,9 @@ do
 	expect(not sim:allied(h[1], tribe), "nor are tribes")
 	expect(not sim:ally_request(h[1], mate), "no alliance request to a teammate")
 	expect(not sim:ally_break(h[1], mate), "no betraying a teammate")
-	expect(sim:ally_request(h[1], foe) == true, "an alliance with the other team may be asked")
+	-- (Empires Front 2026-11-05) a team game has no alliances with other teams
+	expect(sim:ally_request(h[1], foe) == false and not sim:has_request(h[1], foe), "no alliance request to the other team")
+	expect(sim:form_alliance(h[1], foe) == false and not sim:allied(h[1], foe), "no alliance with the other team ever forms")
 	-- play into the match: spawn everyone, then a teammate's land can't be attacked
 	while sim.phase ~= Defs.PHASE_PLAYING do
 		sim:step()
