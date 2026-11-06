@@ -682,11 +682,11 @@ function UIAdvisor.on_alliance_changed(
 	ui.feed:close_request(other)
 	if formed then
 		ctx:sfx("alliance")
-		-- (Empires Front 2026-11-05: what it is worth, Rules.ALLY_INCOME / ALLIED_VICTORY)
+		-- (Empires Front 2026-11-05: what it is worth, Rules.ALLY_INCOME)
 		ui.feed:toast(
 			Defs.MSG_ALLIANCE,
 			string.format(
-				"Alliance formed with %s: +%d%% gold income, and you win together",
+				"Alliance formed with %s: +%d%% gold income",
 				nm,
 				math.floor((Rules().ALLY_INCOME or 0) * 100 + 0.5)
 			),

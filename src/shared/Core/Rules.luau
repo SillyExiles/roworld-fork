@@ -1349,12 +1349,11 @@ local function build(K_LIN: number, into: any?): any
 	Rules.ALLIANCE_EXTEND_WINDOW_TICKS = 300
 	--- Empires Front (2026-11-05): what an alliance is worth.
 	---   * ALLY_INCOME: each ally (ALLY_INCOME_MAX at most) adds this share to the gold income;
-	---   * ALLIED_VICTORY: allies win together. In a free-for-all, a group in which everyone is allied
-	---     with everyone else (not an ally's ally) whose land together reaches the win share wins the
-	---     match together, when a player is among them (AI nations alone don't end a match that way).
+	---   * ALLIED_VICTORY: off (2026-11-06): allies don't win together; a win is one nation's own
+	---     land (Sim._allied_victory stays for a mode that wants it).
 	Rules.ALLY_INCOME = 0.05
 	Rules.ALLY_INCOME_MAX = 3
-	Rules.ALLIED_VICTORY = true
+	Rules.ALLIED_VICTORY = false
 	--- traitorDuration 30 s; traitors take x0.5 attacker losses (traitorDefenseDebuff) and x0.8 attack
 	--- time (traitorSpeedDebuff) when attacked.
 	Rules.TRAITOR_TICKS = 300

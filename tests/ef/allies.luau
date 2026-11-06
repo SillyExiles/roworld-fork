@@ -31,7 +31,9 @@ local inc0 = sim:_income_of(h)
 sim:form_alliance(ais[1], h)
 local inc1 = sim:_income_of(h)
 expect(math.abs(inc1 / inc0 - (1 + Rules.ALLY_INCOME)) < 1e-6, string.format("an ally: +%d%% income (%.0f -> %.0f)", Rules.ALLY_INCOME * 100, inc0, inc1))
--- allied victory: the group's land together
+-- (2026-11-06) allied victory is off: a win is one nation's own land
+expect(Rules.ALLIED_VICTORY == false, "allies don't win together")
+-- (Sim._allied_victory, kept for a mode that wants it)
 local need = sim.win_share * (sim.map.contestable_count - sim.fallout_count)
 local w0 = sim:_allied_victory(need)
 expect(w0 == 0, "not yet: the group is small")
