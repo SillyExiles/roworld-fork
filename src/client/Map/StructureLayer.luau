@@ -452,11 +452,14 @@ function StructureLayer.progress(s: any, rt: number): number?
 	-- (a SAM's and a silo's missiles; an airfield rearming, a railgun reloading: Rules.RELOAD_TICKS)
 	local reload = Rules.RELOAD_TICKS[s.kind] or 0
 	if reload > 0 and shots ~= nil and #shots > 0 then
-		local cd = reload
-		local slots = math.max(1, s.level or 1)
+		-- (Empires Front 2026-11-06: a Siege Workshop holds one of each weapon per level, each with its
+		-- own reload, Rules.shot_reload)
+		local siege = s.kind == Defs.S_SILO
+		local slots = math.max(1, s.level or 1) * (if siege then 3 else 1)
 		local reloading, done = 0, 0.0
-		for _, t in shots do
-			local e = rt - t
+		for _, v in shots do
+			local cd = if siege then Rules.shot_reload(s.kind, v) else reload
+			local e = rt - (if siege then Rules.shot_tick(v) else v)
 			if e < cd then
 				reloading += 1
 				done += math.max(0, e) / cd

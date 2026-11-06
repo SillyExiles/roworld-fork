@@ -72,7 +72,11 @@ SimAI.WAR_RATIO = zt({ 1.0, 1.0, 1.0 }) -- PackedFloat32Array
 SimAI.HUMAN_SKIP = zt({ 0.75, 0.25, 0.0 }) -- PackedFloat32Array
 -- Alliance acceptance bias per difficulty.
 SimAI.ACCEPT_BIAS = zt({ f32(0.1), 0.0, f32(-0.15) }) -- PackedFloat32Array
-SimAI.NUKE_GAP = 1800
+-- (Empires Front 2026-11-06: 2 minutes between an AI's siege shots, 1 while it holds RICH_SHOTS of
+-- their price: gold piled up goes to war; was 3 minutes)
+SimAI.NUKE_GAP = 1200
+SimAI.NUKE_GAP_RICH = 600
+SimAI.RICH_SHOTS = 6
 -- After an AI nukes someone, other AIs leave that target alone for this long (Brutal: half).
 SimAI.NUKE_TARGET_COOL = 600
 -- Nuke-age extra delay before AIs may nuke a human (on top of that AI's own grace).
@@ -881,11 +885,14 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 	if age < NUKE_AGE[d] or sim:struct_count(id, Defs.S_SILO) == 0 then
 		return
 	end
-	if sim.tick - self.last_nuke[id] < SimAI.NUKE_GAP then
+	local gold = sim.o_gold[id]
+	local share = sim:land_share(id)
+	local atom_cost = Rules.siege_cost("atom", share)
+	local gap = if gold >= atom_cost * SimAI.RICH_SHOTS then SimAI.NUKE_GAP_RICH else SimAI.NUKE_GAP
+	if sim.tick - self.last_nuke[id] < gap then
 		return
 	end
-	local gold = sim.o_gold[id]
-	if gold < Rules.NUKE_COST[Defs.N_ATOM] then
+	if gold < atom_cost then
 		return
 	end
 	local mine = sim.o_troops[id]
@@ -940,10 +947,30 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 	if best <= 0 then
 		return
 	end
-	-- (Empires Front 2026-11-06: the era's bombard, or fire on a big empire; no MIRV)
-	local kind = Defs.N_ATOM
-	if gold >= Rules.NUKE_COST[Defs.N_HYDROGEN] * 1.5 and sim.o_tiles[best] > 2500 * LA then
+	-- (Empires Front 2026-11-06: a weapon one of its workshops has loaded (each reloads on its own) and
+	-- it can pay for: fire on a big empire; the plague on a big army that isn't sick or immune, when it
+	-- doesn't border them or has Temples; else the bombard. No MIRV.)
+	local tick = sim.tick
+	local big = sim.o_tiles[best] > 2500 * LA
+	local function can(k: number, spare: number): boolean
+		return gold >= Rules.siege_cost(Defs.NUKE_NAMES[k], share) * spare and sim:siege_loaded(id, k)
+	end
+	local kind = -1
+	if big and can(Defs.N_HYDROGEN, 1.5) then
 		kind = Defs.N_HYDROGEN
+	elseif
+		sim.o_troops[best] > sim.o_troops[id] * 0.4
+		and sim.o_plague_until[best] <= tick
+		and sim.o_plague_imm[best] <= tick
+		and (sim.sc_count[best] == 0 or sim:_temples_of(id) >= 2)
+		and can(Defs.N_PLAGUE, 1.5)
+	then
+		kind = Defs.N_PLAGUE
+	elseif can(Defs.N_ATOM, 1.0) then
+		kind = Defs.N_ATOM
+	end
+	if kind < 0 then
+		return
 	end
 	local target = self:_nuke_target(sim, id, best, kind)
 	if target < 0 then

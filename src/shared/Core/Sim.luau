@@ -1022,8 +1022,9 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		end
 	elseif kind == "nuke" then
 		-- `amount`: stacked atom bombs (several at one target, each from a loaded silo)
+		-- (Empires Front 2026-11-06: a volley of bombards or of fire, one from each workshop that has it loaded)
 		local kname = _str(it, "kind")
-		local n = if kname == "atom" then math.clamp(_int(it, "amount", 1), 1, Sim.MAX_INTENT_AMOUNT) else 1
+		local n = if kname == "atom" or kname == "hydrogen" then math.clamp(_int(it, "amount", 1), 1, Sim.MAX_INTENT_AMOUNT) else 1
 		for _ = 1, n do
 			if not self:launch_nuke(id, kname, tile) then
 				break

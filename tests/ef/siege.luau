@@ -1,4 +1,4 @@
--- Empires Front (2026-11-06): the siege weapons. The Siege Workshop (up to five a player, a shot a minute,
+-- Empires Front (2026-11-06): the siege weapons. The Siege Workshop (up to five a player, each weapon reloading on its own,
 -- none before the war is SIEGE_UNLOCK_TICKS old), the bombard (scorched land that clears), fire that
 -- spreads, the plague (it spreads; Temples ease it), the Watchtower, and betraying an ally.
 -- usage: luau tests/ef/siege.luau (from tests/ef)
@@ -80,14 +80,31 @@ expect(not sim:launch_nuke(A, "plague", site), "the plague can't be aimed at you
 -- the bombard: a small disc razed and scorched; the scorch clears after SCORCH_TICKS
 local fo0 = sim.fallout_count
 local btiles0 = sim.o_tiles[B]
+local gold0 = sim.o_gold[A]
+local price = Rules.siege_cost("atom", sim:land_share(A))
 expect(sim:launch_nuke(A, "atom", target), "a bombard flies")
-expect(not sim:launch_nuke(A, "atom", target), "the workshop reloads (one shot a minute)")
+expect(gold0 - sim.o_gold[A] == price and price > Rules.nuke_cost("atom"), string.format("a big empire pays more for it (%d, base %d)", price, Rules.nuke_cost("atom")))
+expect(Rules.siege_cost("atom", 0) == Rules.nuke_cost("atom") and Rules.siege_cost("atom", 0.3) == math.floor(Rules.nuke_cost("atom") * 1.75 / 1000 + 0.5) * 1000, "x1 at no land, x1.75 at 30%")
+expect(not sim:launch_nuke(A, "atom", target), "the workshop reloads its bombard")
+expect(sim:siege_ready(silo, Defs.N_HYDROGEN) and sim:siege_ready(silo, Defs.N_PLAGUE), "but its fire and its plague stay loaded")
+local busy, wait = Rules.shots_busy(silo.shots, Defs.S_SILO, sim.tick, Defs.N_ATOM)
+expect(busy == 1 and wait == Rules.siege_reload(Defs.N_ATOM) and Rules.shots_busy(silo.shots, Defs.S_SILO, sim.tick, Defs.N_PLAGUE) == 0, "the client reads the same reloads from the shots")
 for _ = 1, 200 do sim:step() end
 local scorched = sim.fallout_count - fo0
 expect(scorched > 0 and scorched < 1200, "it scorched a small disc (" .. scorched .. " tiles)")
 expect(sim.o_tiles[B] < btiles0 + 50, "the target lost land")
 for _ = 1, Rules.SCORCH_TICKS + 10 do sim:step() end
 expect(sim.fallout_count <= fo0 + 5, "the scorched land cleared (" .. sim.fallout_count - fo0 .. " left)")
+
+for _ = 1, Rules.siege_reload(Defs.N_ATOM) do sim:step() end
+expect(sim:siege_ready(silo, Defs.N_ATOM) and #silo.shots == 0, "the bombard is loaded again after its own reload")
+-- two workshops: a volley of two bombards, then none
+local second = sim:structs_of(A, Defs.S_SILO)[2]
+expect(second ~= nil and second.active, "the second workshop is finished")
+local volley = 0
+for _ = 1, 3 do if sim:launch_nuke(A, "atom", target) then volley += 1 end end
+expect(volley == 2, "two workshops fire two bombards in a row (" .. volley .. ")")
+second.shots = {}
 
 -- fire: it spreads over FIRE_SPREAD_TICKS
 silo.shots = {}

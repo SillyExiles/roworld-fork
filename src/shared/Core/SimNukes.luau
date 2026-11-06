@@ -3,7 +3,7 @@
 -- Atom bombs, hydrogen bombs and MIRVs: silo launch, SAM interception, blasts and fallout.
 --
 -- Empires Front (2026-11-06): the siege weapons. The silo is the Siege Workshop (up to
--- Rules.STRUCT_LIMITS a player, each a shot a minute, none before Rules.SIEGE_UNLOCK_TICKS of war) and
+-- Rules.STRUCT_LIMITS a player, each weapon reloading on its own, none before Rules.SIEGE_UNLOCK_TICKS of war) and
 -- the SAM the Watchtower; they fire
 --   * the bombard (the atom bomb, in each era's arms: Onager, Catapult, Orban's Bombard, Fire Rocket,
 --     Big Bertha...): it razes a small disc at once, kills troops and destroys the buildings there;
@@ -219,7 +219,8 @@ function SimNukes.install(C)
 				end
 			end
 		end
-		local cost = Rules.nuke_cost(kind_name, self.mirvs_launched)
+		-- (Empires Front 2026-11-06: a siege weapon costs a big empire more, Rules.siege_cost)
+		local cost = if siege then Rules.siege_cost(kind_name, self:land_share(id)) else Rules.nuke_cost(kind_name, self.mirvs_launched)
 		if self.o_gold[id] < cost then
 			self:msg(id, Defs.MSG_INFO, string.format("Not enough gold for %s", a_an(nuke_title(kind))))
 			return false
@@ -236,7 +237,8 @@ function SimNukes.install(C)
 		local bd = 0.0
 		local out_of_reach = false
 		for _, s in self:structs_of(id, launcher) do
-			if not s.active or self:ready_missiles(s, reload) <= 0 then
+			-- (Empires Front 2026-11-06: a Siege Workshop reloads each weapon on its own)
+			if not s.active or (if siege then not self:siege_ready(s, kind) else self:ready_missiles(s, reload) <= 0) then
 				continue
 			end
 			if reach > 0 and range_d2(s.tile, t) > reach2 then
@@ -256,13 +258,14 @@ function SimNukes.install(C)
 				Defs.MSG_INFO,
 				if out_of_reach
 					then string.format("That is out of your %s's reach", what)
+					elseif siege then string.format("No %s has %s loaded", what, a_an(nuke_title(kind)))
 					else string.format("No %s is ready", what)
 			)
 			return false
 		end
 		local tick = self.tick
 		self.o_gold[id] -= cost
-		table.insert(silo.shots, self:shot_stamp(silo))
+		table.insert(silo.shots, self:shot_stamp(silo, if siege then kind else nil))
 		self:ev({ Ev.STRUCT_SHOTS, silo.sid, table.clone(silo.shots) })
 		local arc = self.R.munition_arc(self.W, self.H, silo.tile, t, kind)
 		local n = self:_spawn_nuke(kind, id, silo.tile, t, self.R.nuke_arc_ticks(arc, kind), arc)
@@ -642,6 +645,46 @@ function SimNukes.install(C)
 			s.shots = table.move(shots, k + 1, n, 1, {})
 		end
 		return s.level - #s.shots
+	end
+
+	-- (Empires Front 2026-11-06) Whether Siege Workshop `s` has weapon `kind` loaded: one of each per
+	-- level, each reloading for Rules.siege_reload(kind). Drops the shots whose reload is over.
+	function C:siege_ready(s, kind: number): boolean
+		local shots = s.shots
+		local tick = self.tick
+		local keep = nil
+		local busy = 0
+		for i, v in shots do
+			if Rules.shot_tick(v) + Rules.shot_reload(S_SILO, v) <= tick then
+				if keep == nil then
+					keep = table.move(shots, 1, i - 1, 1, {})
+				end
+			else
+				if keep ~= nil then
+					table.insert(keep, v)
+				end
+				if Rules.shot_kind(v) == kind then
+					busy += 1
+				end
+			end
+		end
+		if keep ~= nil then
+			s.shots = keep
+		end
+		return busy < s.level
+	end
+
+	--- Whether any of `id`'s finished Siege Workshops has `kind` loaded (within `t`'s reach, given a tile).
+	function C:siege_loaded(id: number, kind: number, t: number?): boolean
+		local reach = self.R.launch_range(kind)
+		for _, s in self:structs_of(id, S_SILO) do
+			if s.active and not s.dead and self:siege_ready(s, kind) then
+				if t == nil or reach <= 0 or self.range_d2(s.tile, t) <= reach * reach then
+					return true
+				end
+			end
+		end
+		return false
 	end
 
 	-- MIRV split: up to MIRV_WARHEADS warheads, aimed at the target's land within MIRV_SPREAD

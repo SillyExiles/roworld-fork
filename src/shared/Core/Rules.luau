@@ -475,8 +475,9 @@ local function build(K_LIN: number, into: any?): any
 		elseif kind_name == "defense" then
 			return math.min(250000, 50000 * (n + 1))
 		elseif kind_name == "sam" then
-			-- (Empires Front 2026-11-06: the Watchtower, 500k a tower more each, 2M at most)
-			return math.min(2000000, 500000 * (n + 1))
+			-- (Empires Front 2026-11-06: the Watchtower, 300k a tower more each, 1.2M at most: it stops only
+			-- the fire now)
+			return math.min(1200000, 300000 * (n + 1))
 		elseif kind_name == "silo" then
 			-- (Empires Front 2026-11-06: Siege Workshops, 1M and 500k more for each one after, 3M at most)
 			return math.min(3000000, 1000000 + 500000 * n)
@@ -696,7 +697,12 @@ local function build(K_LIN: number, into: any?): any
 	--- Gold the next `kind_name` (structure, level or warship) costs `id` right now (nukes:
 	--- nuke_cost with the match's MIRV count).
 	function Rules.cost_of(state: any, id: number, kind_name: string): number
-		if Defs.nuke_kind_from_name(kind_name) >= 0 then
+		local nk = Defs.nuke_kind_from_name(kind_name)
+		if nk >= 0 then
+			-- (Empires Front 2026-11-06: a siege weapon costs a big empire more, siege_cost)
+			if Defs.SIEGE_KINDS[nk] and state.land_share ~= nil then
+				return Rules.siege_cost(kind_name, state:land_share(id))
+			end
 			return Rules.nuke_cost(kind_name, state.mirvs_launched)
 		end
 		return Rules.build_cost(kind_name, Rules.cost_count_of(state, id, kind_name))
@@ -1106,7 +1112,7 @@ local function build(K_LIN: number, into: any?): any
 
 	-- ---------------------------------------------------------------------------------------------
 	-- Empires Front (2026-11-06): the siege weapons (Core/SimNukes). The Siege Workshop (the silo: up to
-	-- STRUCT_LIMITS a player, each a shot a minute) fires the era's bombard (atom), fire (hydrogen) and
+	-- STRUCT_LIMITS a player, each weapon reloading on its own) fires the era's bombard (atom), fire (hydrogen) and
 	-- the plague.
 	-- ---------------------------------------------------------------------------------------------
 	--- None flies before SIEGE_UNLOCK_TICKS of war (from the start of PLAYING).
@@ -1130,15 +1136,75 @@ local function build(K_LIN: number, into: any?): any
 	--- for PLAGUE_SPREAD_TICKS; the launcher too, if it borders the sick. A nation that had it is immune
 	--- for PLAGUE_IMMUNE_TICKS after. Each Temple cuts the severity by PLAGUE_TEMPLE_CUT, down to
 	--- PLAGUE_MIN_SEVERITY.
-	Rules.PLAGUE_TICKS = 900
-	Rules.PLAGUE_SPREAD_TICKS = 600
-	Rules.PLAGUE_LOSS_PER_S = 0.006
+	--- (2026-11-06, balance: no Watchtower stops it now, so it is milder: about 29% of the troops over its
+	--- 75 s, was about 42% over 90 s, and a little less catching)
+	Rules.PLAGUE_TICKS = 750
+	Rules.PLAGUE_SPREAD_TICKS = 500
+	Rules.PLAGUE_LOSS_PER_S = 0.0045
 	Rules.PLAGUE_SPREAD_GAP = 100
 	Rules.PLAGUE_SPREAD_AFTER = 100
-	Rules.PLAGUE_SPREAD_P = 0.3
+	Rules.PLAGUE_SPREAD_P = 0.25
 	Rules.PLAGUE_IMMUNE_TICKS = 1800
 	Rules.PLAGUE_TEMPLE_CUT = 0.25
 	Rules.PLAGUE_MIN_SEVERITY = 0.25
+
+	--- (2026-11-06) Each Siege Workshop reloads each weapon on its own: a bombard fired leaves its fire
+	--- and its plague loaded. SIEGE_RELOAD ticks per weapon (index Defs.N_*): the bombard 40 s, fire
+	--- 75 s, the plague 2 minutes. Five workshops fire five of each before any of them waits.
+	Rules.SIEGE_RELOAD = { [Defs.N_ATOM] = 400, [Defs.N_HYDROGEN] = 750, [Defs.N_PLAGUE] = 1200 }
+	function Rules.siege_reload(kind: number): number
+		return Rules.SIEGE_RELOAD[kind] or Rules.RELOAD_TICKS[Defs.S_SILO]
+	end
+	--- A structure's `shots` queue holds the tick each shot fired; a Siege Workshop's also tells which
+	--- weapon in the fraction: tick + kind / SHOT_KIND_DIV (exact in a double; a plain tick is a bombard).
+	Rules.SHOT_KIND_DIV = 16
+	function Rules.shot_value(tick: number, kind: number): number
+		return tick + kind / Rules.SHOT_KIND_DIV
+	end
+	function Rules.shot_tick(v: number): number
+		return math.floor(v)
+	end
+	function Rules.shot_kind(v: number): number
+		return math.floor((v - math.floor(v)) * Rules.SHOT_KIND_DIV + 0.5)
+	end
+	--- How long shot `v` of a structure of kind `skind` reloads.
+	function Rules.shot_reload(skind: number, v: number): number
+		if skind == Defs.S_SILO then
+			return Rules.siege_reload(Rules.shot_kind(v))
+		end
+		return Rules.RELOAD_TICKS[skind] or 0
+	end
+	--- Shots of a structure of kind `skind` still reloading at `tick` (a Siege Workshop's: of weapon
+	--- `nkind` only, unless nil), and the ticks until the first of them is loaded again (0: none).
+	function Rules.shots_busy(shots: { number }?, skind: number, tick: number, nkind: number?): (number, number)
+		local busy, first = 0, math.huge
+		for _, v in shots or {} do
+			if skind == Defs.S_SILO and nkind ~= nil and Rules.shot_kind(v) ~= nkind then
+				continue
+			end
+			local left = Rules.shot_tick(v) + Rules.shot_reload(skind, v) - tick
+			if left > 0 then
+				busy += 1
+				first = math.min(first, left)
+			end
+		end
+		return busy, if busy > 0 then first else 0
+	end
+	--- (2026-11-06, balance) War costs a big empire more: a siege weapon costs x (1 + SIEGE_SHARE_COST x
+	--- the launcher's share of the map), rounded to 1k: x1.25 at 10%, x1.75 at 30%, x2.25 at 50%. Gold
+	--- piled up by a runaway leader pays for its wars; a small nation fires at the base price.
+	Rules.SIEGE_SHARE_COST = 2.5
+	function Rules.siege_cost(kind_name: string, share: number?): number
+		local base = Rules.nuke_cost(kind_name)
+		local k = Defs.nuke_kind_from_name(kind_name)
+		if base <= 0 or not Defs.SIEGE_KINDS[k] then
+			return base
+		end
+		-- (the share in whole percents, so the price shown and the price paid agree while borders move)
+		local pct = math.floor(math.clamp(tonumber(share) or 0, 0, 1) * 100)
+		local mult = 1.0 + Rules.SIEGE_SHARE_COST * pct / 100
+		return math.floor(base * mult / 1000 + 0.5) * 1000
+	end
 
 	--- The plague's severity on a nation with `temples` finished Temples.
 	function Rules.plague_severity(temples: number): number

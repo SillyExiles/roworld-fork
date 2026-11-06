@@ -77,13 +77,16 @@ function SimArsenal.install(C)
 	--- The tick to record for a shot `s` fires now (its `shots` queue: a shot reloads until that tick
 	--- + Rules.RELOAD_TICKS). With Rapid Reload the shot is recorded as fired earlier, so everything
 	--- that reads the queue (the Sim, the mirror's reload bar) needs only the kind's own reload time.
-	function C:shot_stamp(s: any): number
+	--- (Empires Front 2026-11-06: a Siege Workshop's shot also records its weapon `nkind`, which has its
+	--- own reload: Rules.shot_value / siege_reload.)
+	function C:shot_stamp(s: any, nkind: number?): number
 		local tick = self.tick
-		if bit32.band(self.o_unlock[s.owner] or 0, UNLOCK.reload2x) == 0 then
-			return tick
+		local siege = s.kind == S_SILO and nkind ~= nil
+		if bit32.band(self.o_unlock[s.owner] or 0, UNLOCK.reload2x) ~= 0 then
+			local base = if siege then Rules.siege_reload(nkind :: number) else (Rules.RELOAD_TICKS[s.kind] or 0)
+			tick -= base - math.max(1, math.ceil(base * Rules.RAPID_RELOAD_MULT))
 		end
-		local base = Rules.RELOAD_TICKS[s.kind] or 0
-		return tick - (base - math.max(1, math.ceil(base * Rules.RAPID_RELOAD_MULT)))
+		return if siege then Rules.shot_value(tick, nkind :: number) else tick
 	end
 
 	-- =========================================================================================
@@ -117,7 +120,7 @@ function SimArsenal.install(C)
 		end
 		self:ev({ Ev.STRUCT_LEVEL, s.sid, s.level, s.active_tick })
 		-- a SAM or silo loses a missile slot: one still reloading goes first
-		if (s.kind == S_SAM or s.kind == S_SILO) and #s.shots > s.level then
+		if s.kind == S_SAM and #s.shots > s.level then
 			while #s.shots > s.level do
 				table.remove(s.shots)
 			end

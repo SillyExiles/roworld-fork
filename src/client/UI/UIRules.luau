@@ -129,11 +129,11 @@ UIRules.BLURBS = {
 	wall = "Raises stone walls along your frontier within {wall_r} tiles: taking a walled tile costs {wall_mag}x the troops and {wall_cost}x the time. The stones follow the frontier and fall with the tile.",
 	barracks = "Trains troops: each level makes your army grow {bar_pct}% faster (up to {bar_max} levels). Your troop cap stays the same. At most 4 Barracks per player: build near one to upgrade it.",
 	sam = "Shoots down Hydrogen Bombs that pass within {sam_r} tiles. Atom Bombs and the Plague can't be stopped. At most 4, no upgrades.",
-	silo = "Fires your siege weapons at land within {silo_r} tiles: one shot a minute each, from {siege_at} of war on. At most 5 per player.",
+	silo = "Fires your siege weapons at land within {silo_r} tiles, from {siege_at} of war on. Each weapon reloads on its own in each workshop: more workshops, more shots in a row. At most 5 per player.",
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
-	atom = "Razes a {atom_r}-tile circle: troops, land and buildings. The land stays scorched for {scorch_s} s. No SAM can stop it; Walls and Fortresses halve the damage.",
-	hydrogen = "Fire that spreads over {fire_r} tiles in {fire_s} s, burning land and buildings as it goes. SAMs can shoot it down; Walls and Fortresses halve the damage.",
-	plague = "Sickens the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s and passes it to its neighbours (yours too, if you border them). No SAM can stop it; each Temple eases it.",
+	atom = "Razes a {atom_r}-tile circle: troops, land and buildings. The land stays scorched for {scorch_s} s. No SAM can stop it; Walls and Fortresses halve the damage. Reloads in {atom_cd} s.",
+	hydrogen = "Fire that spreads over {fire_r} tiles in {fire_s} s, burning land and buildings as it goes. SAMs can shoot it down; Walls and Fortresses halve the damage. Reloads in {fire_cd} s.",
+	plague = "Sickens the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s and passes it to its neighbours (yours too, if you border them). No SAM can stop it; each Temple eases it. Reloads in {plague_cd} s.",
 	mirv = "Splits into up to {mirv_n} warheads that rain over one nation.",
 	artillery = "Shells every enemy within {art_r} tiles on its own: their troops, and the structures it reaches.",
 	airfield = "Flies Air Strikes on any spot within {air_r} tiles. Rearms in {air_s} s.",
@@ -235,6 +235,10 @@ function UIRules._blurb(kind: string): string
 		scorch_s = tostring((R.SCORCH_TICKS or 1200) // Defs.TICK_RATE),
 		plague_pct = string.format("%.1f", (R.PLAGUE_LOSS_PER_S or 0) * 100),
 		plague_s = tostring((R.PLAGUE_TICKS or 900) // Defs.TICK_RATE),
+		atom_cd = tostring(R.siege_reload(Defs.N_ATOM) // Defs.TICK_RATE),
+		fire_cd = tostring(R.siege_reload(Defs.N_HYDROGEN) // Defs.TICK_RATE),
+		plague_cd = tostring(R.siege_reload(Defs.N_PLAGUE) // Defs.TICK_RATE),
+		share_pct = tostring(math.floor((R.SIEGE_SHARE_COST or 0) * 10 + 0.5)),
 	})
 end
 
@@ -613,25 +617,20 @@ end
 
 --- The local player's finished structures of `kind` that can fire now (a silo's loaded missiles, an
 --- airfield / railgun that isn't reloading), and the seconds until the next one can when none does.
-function UIRules.ready_launchers(self: any, kind: number): (number, number)
+--- (Empires Front 2026-11-06: a Siege Workshop reloads each weapon on its own: `nkind` the weapon.)
+function UIRules.ready_launchers(self: any, kind: number, nkind: number?): (number, number)
 	local s = self.ctx.state
 	if s == nil then
 		return 0, 0.0
 	end
-	local cd = Rules().RELOAD_TICKS[kind] or 0
+	local R = Rules()
 	local n = 0
 	local soonest = math.huge
 	local mine = if kind >= 0 and kind < Defs.STRUCT_KIND_COUNT then self:_mine(s).list[kind + 1] else {}
 	for _, st in mine do
 		if st.active_tick <= s.tick then
-			local busy = 0
-			local first = math.huge
-			for _, t in st.shots or {} do
-				if t + cd > s.tick then
-					busy += 1
-					first = math.min(first, t + cd - s.tick)
-				end
-			end
+			local busy, wait = R.shots_busy(st.shots, kind, s.tick, nkind)
+			local first = if busy > 0 then wait else math.huge
 			local free = math.max(0, (st.level or 1) - busy)
 			n += free
 			if free == 0 then
@@ -707,7 +706,7 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 			return out
 		end
 		-- (Empires Front 2026-11-06) the siege weapons: none before SIEGE_UNLOCK_TICKS of war, then a
-		-- shot a minute
+		-- reload per weapon
 		if lk == Defs.S_SILO then
 			local left = Rules().siege_unlock_left(s.playing_since, s.tick)
 			if left > 0 then
@@ -715,9 +714,9 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 				out.locked = true
 				return out
 			end
-			local ready, wait = self:ready_launchers(lk)
+			local ready, wait = self:ready_launchers(lk, Defs.nuke_kind_from_name(kind))
 			if ready == 0 then
-				out.reason = "Silo reloading · ready in " .. T().fmt_time(math.ceil(wait))
+				out.reason = UIRules.TITLES[kind] .. " reloading · ready in " .. T().fmt_time(math.ceil(wait))
 				return out
 			end
 		end
@@ -837,22 +836,19 @@ UIRules.MAX_BULK = 50
 
 --- Missiles loaded right now in the local player's finished silos (a silo holds one per level;
 --- each launch reloads for SILO_COOLDOWN_TICKS).
-function UIRules.ready_missiles(self: any): number
+--- (Empires Front 2026-11-06: of weapon `kind` (a name), each reloading on its own.)
+function UIRules.ready_missiles(self: any, kind: string?): number
 	local s = self.ctx.state
 	if s == nil then
 		return 0
 	end
 	local me = self.ctx:me()
-	local cd = Rules().SILO_COOLDOWN_TICKS
+	local R = Rules()
+	local nk = if kind ~= nil then Defs.nuke_kind_from_name(kind) else nil
 	local n = 0
 	for _, st in s.structures do
 		if st.owner == me and st.kind == Defs.S_SILO and st.active_tick <= s.tick then
-			local busy = 0
-			for _, t in st.shots or {} do
-				if t + cd > s.tick then
-					busy += 1
-				end
-			end
+			local busy = R.shots_busy(st.shots, Defs.S_SILO, s.tick, nk)
 			n += math.max(0, (st.level or 1) - busy)
 		end
 	end
@@ -863,7 +859,8 @@ end
 function UIRules.bulk_cost(self: any, kind: string, amount: number): number
 	local R = Rules()
 	if UIRules.is_nuke(kind) then
-		return R.nuke_cost(kind, if self.ctx.state then self.ctx.state.mirvs_launched else 0) * amount
+		-- (Empires Front 2026-11-06: what the Sim charges: a siege weapon costs a big empire more)
+		return self:cost(kind) * amount
 	end
 	local count = if self.ctx.state then R.cost_count_of(self.ctx.state, self.ctx:me(), kind) else 0
 	local total = 0
@@ -879,7 +876,7 @@ function UIRules.bulk_max(self: any, kind: string): number
 	local gold = if o ~= nil then (tonumber(o.gold) or 0) else 0
 	local cap = UIRules.MAX_BULK
 	if UIRules.is_nuke(kind) then
-		cap = math.min(cap, self:ready_missiles())
+		cap = math.min(cap, self:ready_missiles(kind))
 	end
 	-- (the per-player level caps: Rules.LEVEL_LIMITS)
 	local sk = Defs.struct_kind_from_name(kind)
@@ -908,14 +905,14 @@ function UIRules.bulk_ring(self: any, prefix: string, kind: string): { any }?
 	local slots = { 1, steps[1], steps[2], max }
 	local ring = {}
 	local nuke = UIRules.is_nuke(kind)
-	local loaded = if nuke then self:ready_missiles() else math.huge
+	local loaded = if nuke then self:ready_missiles(kind) else math.huge
 	for i, n in slots do
 		local cost = self:bulk_cost(kind, n)
 		local ok = n <= max
 		local reason = ""
 		if not ok then
 			reason = if nuke and n > loaded
-				then string.format("Only %d missile%s loaded", loaded, if loaded == 1 then "" else "s")
+				then string.format("Only %d loaded", loaded)
 				else "Not enough gold"
 		end
 		table.insert(ring, {
@@ -1183,16 +1180,11 @@ function UIRules.in_reach(self: any, skind: number, nkind: number, tile: number)
 	local R = s.rules or Rules()
 	local me = self.ctx:me()
 	local reach = R.launch_range(nkind)
-	local cd = R.RELOAD_TICKS[skind] or 0
 	local range_d2 = s.map.range_d2
 	for _, st in s.structures do
 		if st.owner == me and st.kind == skind and st.active_tick <= s.tick then
-			local busy = 0
-			for _, t in st.shots or {} do
-				if t + cd > s.tick then
-					busy += 1
-				end
-			end
+			-- (Empires Front 2026-11-06: a Siege Workshop reloads each weapon on its own)
+			local busy = Rules().shots_busy(st.shots, skind, s.tick, nkind)
 			if busy < (st.level or 1) and (reach <= 0 or range_d2(st.tile, tile) <= reach * reach) then
 				return true
 			end
@@ -1700,8 +1692,8 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				reason = if not av2.ok then tostring(av2.reason) else tostring(pl2.reason),
 				danger = true,
 				cost = av2.cost,
-				-- (Empires Front: one workshop, a shot a minute: no bulk launch)
-				sub = nil,
+				-- (Empires Front 2026-11-06: a volley, one from each workshop with it loaded; not the plague)
+				sub = if ok2 and (k2 == "atom" or k2 == "hydrogen") then self:bulk_ring("nuke", k2) else nil,
 			})
 		end
 		local only_strikes = self:struct_count(Defs.S_SILO) == 0
