@@ -1349,9 +1349,9 @@ local function build(K_LIN: number, into: any?): any
 	Rules.ALLIANCE_EXTEND_WINDOW_TICKS = 300
 	--- Empires Front (2026-11-05): what an alliance is worth.
 	---   * ALLY_INCOME: each ally (ALLY_INCOME_MAX at most) adds this share to the gold income;
-	---   * ALLIED_VICTORY: allies win together. In a free-for-all, allies (and their allies) whose land
-	---     together reaches the win share win the match together, when a player is among them (AI
-	---     nations alone don't end a match that way).
+	---   * ALLIED_VICTORY: allies win together. In a free-for-all, a group in which everyone is allied
+	---     with everyone else (not an ally's ally) whose land together reaches the win share wins the
+	---     match together, when a player is among them (AI nations alone don't end a match that way).
 	Rules.ALLY_INCOME = 0.05
 	Rules.ALLY_INCOME_MAX = 3
 	Rules.ALLIED_VICTORY = true

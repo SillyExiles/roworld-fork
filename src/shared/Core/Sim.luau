@@ -1844,45 +1844,66 @@ function Sim._conquest_gold(self: any, victim: number, by: number)
 	end
 end
 
---- (Empires Front 2026-11-05) A free-for-all's allied victory: the allies (and their allies) whose land
+--- (Empires Front 2026-11-05) A free-for-all's allied victory: a group in which every member is allied
+--- with every other one (an ally's ally who isn't your own ally doesn't win with you), whose land
 --- together reaches `need` tiles, with a player among them. Returns (their biggest member, the group)
---- or (0, nil).
+--- or (0, nil). (2026-11-05 fix: it used to chain allies of allies.)
 function Sim._allied_victory(self: any, need: number): (number, { number }?)
 	local o_alive, o_tiles, o_kind = self.o_alive, self.o_tiles, self.o_kind
-	local seen: { [number]: boolean } = {}
-	for id = 1, self.owner_total do
-		if o_alive[id] == 1 and not seen[id] and (self.o_ally_count[id] or 0) > 0 and o_kind[id] ~= Defs.KIND_TRIBE then
-			local group, stack = {}, { id }
-			seen[id] = true
-			while #stack > 0 do
-				local x = table.remove(stack)
-				table.insert(group, x)
-				for _, y in self:allies_of(x) do
-					if not seen[y] and o_alive[y] == 1 and o_kind[y] ~= Defs.KIND_TRIBE then
-						seen[y] = true
-						table.insert(stack, y)
+	local function eligible(x: number): boolean
+		return o_alive[x] == 1 and o_kind[x] ~= Defs.KIND_TRIBE
+	end
+	local function is_player(x: number): boolean
+		return self.o_ai[x] == 0 and (self.o_bot == nil or self.o_bot[x] ~= 1)
+	end
+	local win_best, win_group, win_sum = 0, nil, -1
+	for c = 1, self.owner_total do
+		if eligible(c) and (self.o_ally_count[c] or 0) > 0 then
+			-- `c` and its own allies, biggest first, each kept only when allied with all kept so far
+			local cands = {}
+			for _, y in self:allies_of(c) do
+				if eligible(y) then
+					table.insert(cands, y)
+				end
+			end
+			table.sort(cands, function(a, b)
+				if o_tiles[a] ~= o_tiles[b] then
+					return o_tiles[a] > o_tiles[b]
+				end
+				return a < b
+			end)
+			local group = { c }
+			for _, y in cands do
+				local ok = true
+				for _, x in group do
+					if x ~= y and not self:allied(x, y) then
+						ok = false
+						break
 					end
+				end
+				if ok then
+					table.insert(group, y)
 				end
 			end
 			if #group >= 2 then
 				local sum, best, bt, player = 0, 0, -1, false
 				for _, x in group do
 					sum += o_tiles[x]
-					if o_tiles[x] > bt then
+					if o_tiles[x] > bt or (o_tiles[x] == bt and x < best) then
 						best, bt = x, o_tiles[x]
 					end
-					if self.o_ai[x] == 0 and (self.o_bot == nil or self.o_bot[x] ~= 1) then
+					if is_player(x) then
 						player = true
 					end
 				end
-				if player and sum >= need then
+				if player and sum >= need and sum > win_sum then
 					table.sort(group)
-					return best, group
+					win_best, win_group, win_sum = best, group, sum
 				end
 			end
 		end
 	end
-	return 0, nil
+	return win_best, win_group
 end
 
 function Sim._check_victory(self: any)
