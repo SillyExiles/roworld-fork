@@ -2,8 +2,9 @@
 -- Port of scripts/core/sim_nukes.gd (SimNukes, mixin of the flattened Sim class).
 -- Atom bombs, hydrogen bombs and MIRVs: silo launch, SAM interception, blasts and fallout.
 --
--- Empires Front (2026-11-06): the siege weapons. The silo is the Siege Workshop (one a player, a shot
--- a minute, none before Rules.SIEGE_UNLOCK_TICKS of war) and the SAM the Watchtower; they fire
+-- Empires Front (2026-11-06): the siege weapons. The silo is the Siege Workshop (up to
+-- Rules.STRUCT_LIMITS a player, each a shot a minute, none before Rules.SIEGE_UNLOCK_TICKS of war) and
+-- the SAM the Watchtower; they fire
 --   * the bombard (the atom bomb, in each era's arms: Onager, Catapult, Orban's Bombard, Fire Rocket,
 --     Big Bertha...): it razes a small disc at once, kills troops and destroys the buildings there;
 --   * fire (the hydrogen bomb: Greek fire, fire arrows, naphtha...): it spreads from where it lands

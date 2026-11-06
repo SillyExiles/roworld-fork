@@ -939,8 +939,9 @@ end
 
 -- Empires Front (2026-11-06): the siege weapons' balance by the period's style (Core/Rules reads
 -- `nuke` = { inner, outer, speed, cost } in full-size tiles, `silo_range_full` the Siege Workshop's
--- reach and `sam_range` the Watchtower's x the base range). A bombard is small and near; fire is wider
--- and spreads; the plague has no blast (its ring is only for aiming).
+-- reach and `sam_range` the Watchtower's x the base range). A bombard is small; fire is wider and
+-- spreads; the plague has no blast (its ring is only for aiming). (2026-11-06: the workshops reach about
+-- two and a half times as far as at first, and a player may have several of them.)
 Eras.SIEGE = {
 	ancient = {
 		nuke = {
@@ -948,7 +949,7 @@ Eras.SIEGE = {
 			hydrogen = { 10, 20, 5, 1500000 },
 			plague = { 0, 4, 5, 1200000 },
 		},
-		silo_range_full = 140,
+		silo_range_full = 350,
 		sam_range = 0.5,
 	},
 	gunpowder = {
@@ -957,7 +958,7 @@ Eras.SIEGE = {
 			hydrogen = { 11, 22, 6, 1800000 },
 			plague = { 0, 4, 6, 1300000 },
 		},
-		silo_range_full = 180,
+		silo_range_full = 450,
 		sam_range = 0.6,
 	},
 	modern = {
@@ -966,7 +967,7 @@ Eras.SIEGE = {
 			hydrogen = { 13, 26, 8, 2200000 },
 			plague = { 0, 4, 8, 1500000 },
 		},
-		silo_range_full = 230,
+		silo_range_full = 575,
 		sam_range = 0.75,
 	},
 }

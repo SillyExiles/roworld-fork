@@ -291,8 +291,9 @@ local function build(K_LIN: number, into: any?): any
 		[Defs.S_MINE] = 8,
 		[Defs.S_MARKET] = 3,
 		[Defs.S_FARM] = 6,
-		-- (2026-11-06) the siege weapons' workshop, and the towers that shoot their shots down
-		[Defs.S_SILO] = 1,
+		-- (2026-11-06) the siege weapons' workshops (each reloads on its own), and the towers that shoot
+		-- their shots down
+		[Defs.S_SILO] = 5,
 		[Defs.S_SAM] = 4,
 	}
 	Rules.LEVEL_LIMITS = {
@@ -477,7 +478,8 @@ local function build(K_LIN: number, into: any?): any
 			-- (Empires Front 2026-11-06: the Watchtower, 500k a tower more each, 2M at most)
 			return math.min(2000000, 500000 * (n + 1))
 		elseif kind_name == "silo" then
-			return 1000000
+			-- (Empires Front 2026-11-06: Siege Workshops, 1M and 500k more for each one after, 3M at most)
+			return math.min(3000000, 1000000 + 500000 * n)
 		elseif kind_name == "warship" then
 			return math.min(1000000, 250000 * (n + 1))
 		elseif kind_name == "artillery" then
@@ -1101,8 +1103,9 @@ local function build(K_LIN: number, into: any?): any
 	Rules.NUKE_ALLIANCE_BREAK_FULL = 100.0
 
 	-- ---------------------------------------------------------------------------------------------
-	-- Empires Front (2026-11-06): the siege weapons (Core/SimNukes). The Siege Workshop (the silo:
-	-- one per player, a shot a minute) fires the era's bombard (atom), fire (hydrogen) and the plague.
+	-- Empires Front (2026-11-06): the siege weapons (Core/SimNukes). The Siege Workshop (the silo: up to
+	-- STRUCT_LIMITS a player, each a shot a minute) fires the era's bombard (atom), fire (hydrogen) and
+	-- the plague.
 	-- ---------------------------------------------------------------------------------------------
 	--- None flies before SIEGE_UNLOCK_TICKS of war (from the start of PLAYING).
 	Rules.SIEGE_UNLOCK_TICKS = 3600
@@ -1501,8 +1504,8 @@ local function build(K_LIN: number, into: any?): any
 		if er.mirv_spread_full then
 			Rules.MIRV_SPREAD = trunc(er.mirv_spread_full / K_LIN)
 		end
-		-- (2026-11-06: a Siege Workshop always has a reach: the era's, else 160 full-size tiles)
-		local silo_r = er.silo_range_full or 160
+		-- (2026-11-06: a Siege Workshop always has a reach: the era's, else 350 full-size tiles)
+		local silo_r = er.silo_range_full or 350
 		local air_r = er.airstrike_range_full or 156.0
 		local art_r = er.artillery_range_full or 45.0
 		local rail_r = er.railgun_range_full or 0

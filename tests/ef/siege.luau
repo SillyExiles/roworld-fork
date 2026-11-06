@@ -1,4 +1,4 @@
--- Empires Front (2026-11-06): the siege weapons. The Siege Workshop (one a player, a shot a minute,
+-- Empires Front (2026-11-06): the siege weapons. The Siege Workshop (up to five a player, a shot a minute,
 -- none before the war is SIEGE_UNLOCK_TICKS old), the bombard (scorched land that clears), fire that
 -- spreads, the plague (it spreads; Temples ease it), the Watchtower, and betraying an ally.
 -- usage: luau tests/ef/siege.luau (from tests/ef)
@@ -33,7 +33,7 @@ sim.step = function(self: any, ...)
 	return base_step(self, ...)
 end
 expect(Defs.NUKE_NAMES[Defs.N_PLAGUE] == "plague" and Defs.NUKE_KIND_COUNT == 10, "the plague is a munition")
-expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 1 and Rules.UPGRADABLE[Defs.S_SILO] == 0, "one Siege Workshop, no levels")
+expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 5 and Rules.UPGRADABLE[Defs.S_SILO] == 0, "Siege Workshops: five at most, no levels")
 expect(R.launch_range(Defs.N_ATOM) > 0, "the bombard has a reach (" .. math.floor(R.launch_range(Defs.N_ATOM)) .. " tiles)")
 
 -- the workshop: a site in A's land with an enemy within reach
@@ -62,7 +62,8 @@ local other = -1
 for t = 0, sim.N - 1, 5 do
 	if buffer.readi32(sim.owner, t * 4) == A and t ~= site and sim:valid_site(A, Defs.S_SILO, t) and sim.range_d2(t, site) > 400 then other = t break end
 end
-expect(other >= 0 and not sim:try_build(A, "silo", other), "a second one is refused (one a player)")
+expect(other >= 0 and sim:try_build(A, "silo", other), "a second one goes up (up to Rules.STRUCT_LIMITS)")
+expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 5, "five a player at most")
 local silo = sim:structs_of(A, Defs.S_SILO)[1]
 expect(silo ~= nil and silo.active, "the workshop is finished")
 

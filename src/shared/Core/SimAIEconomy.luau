@@ -77,8 +77,8 @@ SimAIEconomy.FACTORY_COASTAL_MULT = 0.33
 SimAIEconomy.SAM_PER_CITY = zt({ f32(0.15), f32(0.2), f32(0.25) }) -- PackedFloat32Array
 SimAIEconomy.SILO_PER_CITY = 0.2
 SimAIEconomy.FIRST_SILO_PER_CITY = 0.4
--- (Empires Front 2026-11-06: one Siege Workshop a player, Rules.STRUCT_LIMITS)
-SimAIEconomy.MAX_SILOS = 1
+-- (Empires Front 2026-11-06: a few Siege Workshops at most, Rules.STRUCT_LIMITS allowing 5)
+SimAIEconomy.MAX_SILOS = 3
 -- Perceived cost increase per owned structure of the kind: city/port/factory/silo 1, SAM 0.3.
 SimAIEconomy.PERCEIVED_COST_STEP = zt({ 1.0, 1.0, 1.0, 0.0, f32(0.3), 1.0 }) -- PackedFloat32Array
 -- Upgrade density: with more than one structure per 1500 full-size tiles a nation upgrades an
