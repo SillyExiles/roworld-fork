@@ -124,6 +124,14 @@ FxLayer.SIEGE_LOOK = 2.4
 FxLayer.FIRE_S = 5.0
 FxLayer.FIRE_DENSITY = 2.2
 FxLayer.FIRE_SMOKE = 0.3
+--- (2026-11-07) A small fire (radius up to RAIN_RADIUS tiles: the rain of fire arrows') is lit by
+--- RAIN_ARROWS flaming arrows falling from the sky over RAIN_FALL_S (from RAIN_FROM x its radius up
+--- and to the left), then burns with RAIN_FLAMES flames only: there are many of them at once.
+FxLayer.RAIN_RADIUS = 12
+FxLayer.RAIN_ARROWS = 3
+FxLayer.RAIN_FALL_S = 0.55
+FxLayer.RAIN_FROM = 2.2
+FxLayer.RAIN_FLAMES = 5
 FxLayer.PLAGUE_GREEN = Color3.fromRGB(150, 235, 100)
 FxLayer.PLAGUE_PUFFS = 10
 FxLayer.PLAGUE_EVERY_S = 1.4
@@ -153,7 +161,8 @@ FxLayer.DEBRIS_FADE_OUT = 0.8
 --- wait their turn: none is drawn), and of a strike's warheads about WARHEAD_DEBRIS leave debris,
 --- picked at random over all of them (so it is spread over the whole strike).
 FxLayer.BURST_MAX = 96
-FxLayer.DEBRIS_MAX = 240
+-- (2026-11-07: 480, from 240: the rain of fire arrows lights some 200 small fires at once)
+FxLayer.DEBRIS_MAX = 480
 FxLayer.WARHEAD_DEBRIS = 28
 --- how long a strike's warheads are counted together (s)
 FxLayer.WARHEAD_WINDOW_S = 10.0
@@ -223,6 +232,10 @@ type Burst = {
 	fade_in: number?,
 	fade_out: number?,
 	col: Color3?,
+	-- (2026-11-07) a falling arrow: it falls for `fall` s from (du, dv) tiles up and to the left
+	fall: number?,
+	du: number?,
+	dv: number?,
 }
 type BurstGui = {
 	img: ImageLabel,
@@ -529,6 +542,33 @@ function FxLayer.blaze(self: any, tile: number, radius: number, spread_s: number
 	local u0, v0 = tile % W + 0.5, tile // W + 0.5
 	local now = FrameClock.now()
 	local count = math.floor(radius * FxLayer.FIRE_DENSITY) + 6
+	-- (2026-11-07) a fire of the rain of fire arrows: the arrows fall first, then a few flames
+	if radius <= FxLayer.RAIN_RADIUS then
+		local fall = FxLayer.RAIN_FALL_S
+		for i = 1, FxLayer.RAIN_ARROWS do
+			if #self._debris >= FxLayer.DEBRIS_MAX then
+				break
+			end
+			local seed = uid * 7919 + 0x40000 + i
+			local ang = FxLayer.seeded_random(seed) * math.pi * 2
+			local d = FxLayer.seeded_random(seed + 0x10000) * radius * 0.6
+			local lag = FxLayer.seeded_random(seed + 0x20000) * 0.25
+			table.insert(self._debris, {
+				u = u0 + math.cos(ang) * d,
+				v = v0 + math.sin(ang) * d,
+				t0 = now + lag,
+				row = FxLayer.BURSTS.fire,
+				life = fall,
+				fade_in = 0.05,
+				fade_out = 0.85,
+				fall = fall,
+				du = radius * FxLayer.RAIN_FROM * 0.45,
+				dv = radius * FxLayer.RAIN_FROM,
+			})
+		end
+		now += fall
+		count = FxLayer.RAIN_FLAMES
+	end
 	for i = 1, count do
 		if #self._debris >= FxLayer.DEBRIS_MAX then
 			break
@@ -1260,7 +1300,14 @@ local function bursts_step(self: any, cam: any, now: number, list: { Burst }, po
 		end
 		keep += 1
 		list[keep] = b
-		local x, y = ax + (b.u - cu) * sc, ay + (b.v - cv) * sc
+		local bu, bv = b.u, b.v
+		-- (2026-11-07) a falling arrow of the rain: from (du, dv) tiles up and to the left, onto its tile
+		if b.fall ~= nil then
+			local p = math.clamp(el / b.fall, 0, 1)
+			bu -= b.du * (1 - p)
+			bv -= b.dv * (1 - p)
+		end
+		local x, y = ax + (bu - cu) * sc, ay + (bv - cv) * sc
 		local w = math.max(row.min_px, row.world / k * sc)
 		if not (x >= -w and y >= -w and x <= vw + w and y <= vh + w) then
 			continue
