@@ -1154,6 +1154,7 @@ return { values = {
 	"Com colegas de time ou aliados, abra o menu de ações em qualquer lugar e escolha Sinal: \"Ataquem aqui\" ou \"Ajudem aqui\" marca o ponto nos mapas deles. Ou aperte G sobre o mapa (Shift + G pede ajuda).",
 	"Mundo",
 	"Controle do mundo",
+	"X / Botão direito",
 	"VOCÊ É UM GENERAL",
 	"SEU PAÍS",
 	"SUA NAÇÃO CAIU",

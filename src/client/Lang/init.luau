@@ -148,6 +148,34 @@ local function compile(key: string, value: string): any?
 	return { pat = pat, names = names, parts = parts, value = value, literal = literal, key = key, anchor = anchor }
 end
 
+--- A template's text value in the player's language (2026-11-07): a list ("few troops, far from the
+--- capital") item by item, and "a Port" / "an Airfield" as the name without the English article.
+local function tr_value(x: string): string
+	if string.find(x, ", ", 1, true) then
+		local parts = string.split(x, ", ")
+		local changed = false
+		for i, part in parts do
+			local p2 = Lang.tr(part)
+			changed = changed or p2 ~= part
+			parts[i] = p2
+		end
+		if changed then
+			return table.concat(parts, ", ")
+		end
+	end
+	local y = Lang.tr(x)
+	if y == x then
+		local rest = string.match(x, "^[Aa]n? (.+)$")
+		if rest ~= nil then
+			local r2 = Lang.tr(rest)
+			if r2 ~= rest then
+				return r2
+			end
+		end
+	end
+	return y
+end
+
 local function fill(t: any, caps: { string }): string
 	local v = t.value
 	local by_name: { [string]: string } = {}
@@ -164,7 +192,7 @@ local function fill(t: any, caps: { string }): string
 			if i ~= nil then
 				taken[i] = true
 			end
-			return Lang.tr(x)
+			return tr_value(x)
 		end
 		return nil
 	end)
@@ -177,7 +205,7 @@ local function fill(t: any, caps: { string }): string
 		end
 		local x = caps[used] or ""
 		if string.sub(tok, -1) == "s" and string.find(x, "%a%a") then
-			return Lang.tr(x)
+			return tr_value(x)
 		end
 		return x
 	end)
@@ -254,9 +282,14 @@ local function load(c: string)
 		end
 	end
 	-- (the most literal templates first: "Your %s" must not take what "Your rain falls on %d" means)
+	-- (2026-11-07: then the fewer values: "From %s." before "%s from %s", which took "From few troops,
+	-- far from the capital." apart)
 	table.sort(templates, function(a, b)
 		if a.literal ~= b.literal then
 			return a.literal > b.literal
+		end
+		if #a.names ~= #b.names then
+			return #a.names < #b.names
 		end
 		return a.key < b.key
 	end)
@@ -319,6 +352,23 @@ end
 local SEPS = { "\n", "  ·  ", " · ", " — ", ": " }
 
 local function tr_raw(s: string, depth: number): string
+	-- (2026-11-07) a list of known words ("few troops, far from the capital"): each item, before a
+	-- template could take the whole of it apart ("%s from %s")
+	if dict[s] == nil and string.find(s, ", ", 1, true) then
+		local parts = string.split(s, ", ")
+		local all = true
+		for i, part in parts do
+			local x = dict[part] or upper_dict[part]
+			if x == nil then
+				all = false
+				break
+			end
+			parts[i] = x
+		end
+		if all then
+			return table.concat(parts, ", ")
+		end
+	end
 	local v = lookup(s)
 	if v ~= nil then
 		return v

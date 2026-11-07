@@ -76,6 +76,7 @@ T = [
     ("Attack share −/+", "Parte do ataque −/+", "Parte del ataque −/+", "Доля атаки −/+"),
     ("Space", "Espaço", "Espacio", "Пробел"),
     ("Attack at cursor", "Atacar no cursor", "Atacar en el cursor", "Атака под курсором"),
+    ("X / Right-click", "X / Botão direito", "X / Clic derecho", "X / Правый клик"),
     ("Retreat your latest attack", "Recuar o último ataque", "Retirar tu último ataque", "Отозвать последнюю атаку"),
     ("This help", "Esta ajuda", "Esta ayuda", "Эта справка"),
     ("Leaderboard", "Ranking", "Clasificación", "Таблица лидеров"),

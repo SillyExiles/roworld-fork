@@ -1154,6 +1154,7 @@ return { values = {
 	"Con compañeros o aliados, abre el menú de acciones en cualquier punto y elige Señal: \"Atacad aquí\" o \"Ayuda aquí\" lo marca en sus mapas. O pulsa G sobre el mapa (Shift + G pide ayuda).",
 	"Mundo",
 	"Control del mundo",
+	"X / Clic derecho",
 	"ERES UN GENERAL",
 	"TU PAÍS",
 	"TU NACIÓN HA CAÍDO",

@@ -1154,6 +1154,7 @@ return {
 	"With teammates or allies, open the action menu on any spot and pick Signal: \"Attack here\" or \"Help here\" marks it on their maps. Or press G over the map (Shift + G asks for help).",
 	"World",
 	"World control",
+	"X / Right-click",
 	"YOU'RE A GENERAL",
 	"YOUR COUNTRY",
 	"YOUR NATION HAS FALLEN",
