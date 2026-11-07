@@ -118,6 +118,9 @@ local NUKE_COL = {
 }
 --- Munitions drawn without a trail and a target ring (a battery's shells: there are many).
 local NUKE_PLAIN = { [Defs.N_SHELL] = true }
+--- Munitions not drawn at all (2026-11-07: the rain of fire arrows' lead arrow, whose trail crossed
+--- the map: its volley is drawn, FxLayer.volley).
+local NUKE_HIDDEN = { [Defs.N_FIRERAIN] = true }
 --- Munitions drawn bigger than the others.
 local NUKE_SCALE = { [Defs.N_MEGA] = 1.5, [Defs.N_SHELL] = 0.75, [Defs.N_SLUG] = 1.2, [Defs.N_ATOM] = 1.2, [Defs.N_HYDROGEN] = 1.3, [Defs.N_PLAGUE] = 1.3, [Defs.N_FIRERAIN] = 1.3 }
 
@@ -629,6 +632,9 @@ function UnitLayer.tick(self: any, _dt: number)
 	local rings_seen = {}
 	local trail_dots, rings_for_warheads = UnitLayer.trail_allowance(st.nukes)
 	for uid, n in st.nukes do
+		if NUKE_HIDDEN[n.kind] then
+			continue
+		end
 		local t = math.clamp((rt - n.launch_tick) / math.max(n.flight_ticks, 1), 0, 1)
 		local col = NUKE_COL[n.kind] or COL_ATOM
 		-- (Empires Front 2026-11-06: the era's bombard, fire and plague)
