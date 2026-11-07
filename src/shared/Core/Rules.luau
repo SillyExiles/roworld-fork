@@ -1161,6 +1161,15 @@ local function build(K_LIN: number, into: any?): any
 	--- least PLAGUE_LAND_MIN tiles.
 	Rules.PLAGUE_LAND_SHARE = 0.35
 	Rules.PLAGUE_LAND_MIN = 30
+	--- (2026-11-07) Its shape (SimNukes._blight_key): lobes { waves around, strength } warp the distance
+	--- by angle, so it reaches out in a few tendrils; PLAGUE_JITTER tiles of noise rag its edge. The free
+	--- nation's colour is PLAGUE_TINT of the plague's green; PLAGUE_FX_TILES of each step's tiles go to
+	--- the clients for the effects (Ev.BLIGHT).
+	Rules.PLAGUE_LOBES = { { 2, 0.22 }, { 3, 0.3 }, { 5, 0.2 }, { 8, 0.1 } }
+	Rules.PLAGUE_JITTER = 2.0
+	Rules.PLAGUE_NOISE = { { 40, 6, 0.18 }, { 13, 3, 0.07 }, { 5, 1.5, 0.02 } }
+	Rules.PLAGUE_TINT = 0.35
+	Rules.PLAGUE_FX_TILES = 5
 	--- Each player may send the plague this many times a match; each costs PLAGUE_COST_GROWTH x the last.
 	Rules.PLAGUE_MAX_USES = 2
 	Rules.PLAGUE_COST_GROWTH = 2

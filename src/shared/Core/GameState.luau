@@ -79,6 +79,7 @@ local SIGNALS = {
 	"rebels_changed", -- (rid, state) Empires Front Ev.REBEL: rebels rose, were crushed / bought back, went free
 	"plague_changed", -- (id) Empires Front Ev.PLAGUE: a nation fell sick or got well (GameState.plague)
 	"blaze_started", -- (uid, owner, tile, radius, start_tick, spread_ticks) Empires Front Ev.BLAZE: fire spreads
+	"blight_spread", -- (victim, rid, origin, done, tiles) Empires Front Ev.BLIGHT: the plague's land breaking away
 }
 GameState.SIGNAL_NAMES = SIGNALS
 
@@ -1406,6 +1407,14 @@ end
 --- Whether `id` is a new player (safe from the siege weapons).
 function GameState.is_rookie(self: GameState, id: number): boolean
 	return self.rookies[id] == true
+end
+
+HANDLERS[Ev.BLIGHT] = function(self, e)
+	local tiles = {}
+	for i = 6, #e do
+		table.insert(tiles, tonumber(e[i]) or -1)
+	end
+	self.blight_spread:Fire(tonumber(e[2]) or 0, tonumber(e[3]) or 0, tonumber(e[4]) or -1, e[5] == 1, tiles)
 end
 
 HANDLERS[Ev.BLAZE] = function(self, e)

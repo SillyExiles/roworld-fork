@@ -127,6 +127,17 @@ FxLayer.FIRE_SMOKE = 0.3
 FxLayer.PLAGUE_GREEN = Color3.fromRGB(150, 235, 100)
 FxLayer.PLAGUE_PUFFS = 10
 FxLayer.PLAGUE_EVERY_S = 1.4
+--- (2026-11-07) The plague's land breaking away (FxLayer.blight): its front gives off BLIGHT_PUFFS
+--- spores a tile it sends (Ev.BLIGHT, a few a step) for BLIGHT_PUFF_S, each with a rot-green ring
+--- BLIGHT_RING tiles wide; where it landed a ring BLIGHT_START_RING wide goes out, and when the land is
+--- free one BLIGHT_DONE_RING wide and a last cloud.
+FxLayer.BLIGHT_ROT = Color3.fromRGB(70, 130, 40)
+FxLayer.BLIGHT_SPORE = Color3.fromRGB(185, 255, 120)
+FxLayer.BLIGHT_PUFFS = 2
+FxLayer.BLIGHT_PUFF_S = 2.6
+FxLayer.BLIGHT_RING = 5
+FxLayer.BLIGHT_START_RING = 22
+FxLayer.BLIGHT_DONE_RING = 40
 --- The debris a nuke leaves: the sprite, how far out (of the radius) and how many (radius x density)
 FxLayer.DEBRIS_PLAN = {
 	{ kind = "fire", factor = 1.0, density = 1 / 25 },
@@ -558,6 +569,61 @@ function FxLayer.plague_cloud(self: any, tile: number, n: number, life: number)
 			fade_out = 0.6,
 			col = FxLayer.PLAGUE_GREEN,
 		})
+	end
+end
+
+--- (Empires Front 2026-11-07) The plague's land breaking away from `victim` (GameState.blight_spread):
+--- where it landed (`rid` 0: no tile taken yet) a slow rot-green ring and a cloud; then along its front,
+--- at each of `tiles`, spores drifting up and a small ring; and when it is `done`, a wide ring from
+--- where it landed and a last cloud, as the free nation stands.
+function FxLayer.blight(self: any, _victim: number, rid: number, origin: number, done: boolean, tiles: { number })
+	local st = self._state
+	if st == nil then
+		return
+	end
+	local W = st.map.W or Defs.W
+	local now = FrameClock.now()
+	if rid == 0 and #tiles == 0 and not done then
+		add(self, origin, 0, FxLayer.BLIGHT_START_RING, 2.2, FxLayer.BLIGHT_ROT, false)
+		add(self, origin, 0, FxLayer.BLIGHT_START_RING * 0.55, 1.4, FxLayer.BLIGHT_SPORE, false)
+		self:plague_cloud(origin, 6, 4.0)
+		local cam = self.view.rig
+		local x, y = cam:tile_to_screen(origin)
+		if cam:on_screen(x, y, 200) then
+			cam:add_shake(0.2)
+		end
+		return
+	end
+	self._plague_seq = (self._plague_seq or 0) + 1
+	for i, t in tiles do
+		if t < 0 then
+			continue
+		end
+		local u0, v0 = t % W + 0.5, t // W + 0.5
+		add(self, t, 0, FxLayer.BLIGHT_RING, 0.9, FxLayer.BLIGHT_ROT, false)
+		for j = 1, FxLayer.BLIGHT_PUFFS do
+			if #self._debris >= FxLayer.DEBRIS_MAX then
+				break
+			end
+			local seed = self._plague_seq * 104729 + i * 31 + j
+			local ang = FxLayer.seeded_random(seed) * math.pi * 2
+			local d = FxLayer.seeded_random(seed + 0x10000) * 2.5
+			table.insert(self._debris, {
+				u = u0 + math.cos(ang) * d,
+				v = v0 + math.sin(ang) * d,
+				t0 = now + FxLayer.seeded_random(seed + 0x30000) * 0.4,
+				row = FxLayer.BURSTS[if j % 2 == 0 then "smoke" else "big_smoke"],
+				life = FxLayer.BLIGHT_PUFF_S,
+				fade_in = 0.2,
+				fade_out = 0.9,
+				col = if j % 2 == 0 then FxLayer.BLIGHT_SPORE else FxLayer.PLAGUE_GREEN,
+			})
+		end
+	end
+	if done and origin >= 0 then
+		add(self, origin, 0, FxLayer.BLIGHT_DONE_RING, 1.8, FxLayer.PLAGUE_GREEN, false)
+		add(self, origin, 0, FxLayer.BLIGHT_DONE_RING * 0.6, 1.2, FxLayer.BLIGHT_SPORE, false)
+		self:plague_cloud(origin, 8, 5.0)
 	end
 end
 

@@ -65,6 +65,9 @@ Ev.ROOKIE = 41 -- id, on (1 / 0)
 --- (Empires Front 2026-11-06) how many times a player sent the plague (its price doubles each time,
 --- Rules.PLAGUE_MAX_USES a match).
 Ev.PLAGUE_USES = 42 -- id, uses
-Ev.COUNT = 43
+--- (Empires Front 2026-11-07) the plague's land breaking away: its victim, the free nation (0 before its
+--- first tile), where it landed, done (1 / 0), then a few of the tiles it just took (Map/FxLayer.blight).
+Ev.BLIGHT = 43 -- victim, rid, origin, done, tiles...
+Ev.COUNT = 44
 
 return Ev

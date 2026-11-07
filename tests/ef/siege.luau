@@ -7,6 +7,7 @@ local WorldMap = require("../../src/shared/Core/WorldMap")
 WorldMap.put_data("rome", require("./rome_raw"))
 local Sim = require("../../src/shared/Core/Sim")
 local Defs = require("../../src/shared/Core/Defs")
+local Ev = require("../../src/shared/Core/Ev")
 local Rules = require("../../src/shared/Core/Rules")
 local fails = 0
 local function expect(c, w)
@@ -149,7 +150,17 @@ expect(P > 0 and P ~= A, "a nation to strike with the plague")
 sim.o_troops[P] = math.max(sim.o_troops[P], 50000)
 local land0 = sim.o_tiles[P]
 local owners0 = sim.owner_total
--- (what the plague's land came to when it stopped spreading)
+-- (what the plague's land came to when it stopped spreading, and what it told the clients)
+local blight_evs, blight_fx, blight_done = 0, 0, false
+local ev_real = sim.ev
+sim.ev = function(self2, e)
+	if e[1] == Ev.BLIGHT then
+		blight_evs += 1
+		blight_fx += #e - 5
+		if e[5] == 1 then blight_done = true end
+	end
+	return ev_real(self2, e)
+end
 local blight_taken = 0
 local bt_real = sim._blights_tick
 sim._blights_tick = function(self2)
@@ -209,6 +220,8 @@ end
 expect(free > 0 and sim.o_tiles[free] >= Rules.PLAGUE_LAND_MIN, string.format("the land it spread over broke away as %s (%d tiles of %d)", if free > 0 then sim.o_name[free] else "?", if free > 0 then sim.o_tiles[free] else 0, land0))
 expect(blight_taken >= Rules.PLAGUE_LAND_MIN and blight_taken <= math.max(Rules.PLAGUE_LAND_MIN, land0 * Rules.PLAGUE_LAND_SHARE) + 1 and sim.o_ai[free] == 1 and sim.o_troops[free] > 0, string.format("its share of the land (%d of %d tiles), an AI nation with an army", blight_taken, land0))
 sim._blights_tick = bt_real
+sim.ev = ev_real
+expect(blight_evs > 5 and blight_fx > 5 and blight_done, string.format("the clients saw it spread (%d events, %d front tiles, done)", blight_evs, blight_fx))
 -- (the free nation keeps still for the rest of the test)
 sim.o_ai[free] = 0
 expect(#sim.blights == 0, "and the plague stopped spreading")

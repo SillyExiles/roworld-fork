@@ -407,6 +407,12 @@ function MapView.bind_state(self: any, state: any)
 			call(self.layers.fx, "blaze", tile, radius, (tonumber(ticks) or 60) / Defs.TICK_RATE, uid)
 		end)
 	end
+	-- (Empires Front 2026-11-07) the plague's land breaking away: spores along its front
+	if state.blight_spread ~= nil then
+		self:_connect(state.blight_spread, function(victim, rid, origin, done, tiles)
+			call(self.layers.fx, "blight", victim, rid, origin, done, tiles)
+		end)
+	end
 	self:_connect(state.unit_removed, function(uid, reason)
 		self:_on_unit_removed(uid, reason)
 	end)

@@ -453,6 +453,10 @@ function SimNukes.install(C)
 		if #self.plague_list > 0 then
 			self:_plague_tick()
 		end
+		-- (2026-11-07: the plague's land breaking away goes on whether or not its victim is still sick)
+		if #self.blights > 0 then
+			self:_blights_tick()
+		end
 	end
 
 	-- SAM targeting: every non-friendly finished SAM plans, for each
@@ -1200,31 +1204,132 @@ function SimNukes.install(C)
 	end
 
 	--- (2026-11-06) The plague spreading over `victim`'s land from tile `t` (sent by `src`): over
-	--- Rules.PLAGUE_TICKS the land it reaches (its connected land, nearest first, up to PLAGUE_LAND_SHARE
-	--- of it) breaks away as an independent nation (_blights_tick).
+	--- Rules.PLAGUE_TICKS the land it reaches (its connected land, up to PLAGUE_LAND_SHARE of it) breaks
+	--- away as an independent nation (_blights_tick). (2026-11-07: it grows as a ragged blot, not a
+	--- diamond: the next tile is the one nearest the origin after a warp by angle (a few random lobes,
+	--- reaching out like tendrils) and a little noise per tile, Rules.PLAGUE_LOBES / PLAGUE_JITTER.)
 	function C:_blight_start(victim: number, t: number, src: number)
 		if readi32(self.owner, t * 4) ~= victim then
 			return
 		end
 		local budget = math.max(Rules.PLAGUE_LAND_MIN, math.floor(self.o_tiles[victim] * Rules.PLAGUE_LAND_SHARE))
 		local steps = math.max(1, Rules.PLAGUE_TICKS // 5)
-		table.insert(self.blights, {
+		local rng = self.rng
+		local lobes = {}
+		for _, l in Rules.PLAGUE_LOBES do
+			table.insert(lobes, { k = l[1], a = l[2] * (0.6 + 0.8 * rng:randf()), ph = rng:randf() * math.pi * 2 })
+		end
+		local b = {
 			victim = victim,
 			src = src,
 			at = t,
+			x0 = t % self.W,
+			y0 = t // self.W,
+			lobes = lobes,
+			seed = rng:randi() % 1000003,
 			rid = 0,
-			queue = { t },
-			head = 1,
+			keys = {} :: { number },
+			tiles = {} :: { number },
 			seen = { [t] = true },
 			budget = budget,
 			per_step = math.max(1, math.ceil(budget / steps)),
 			taken = 0,
 			until_tick = self.tick + Rules.PLAGUE_TICKS,
-		})
+		}
+		self:_blight_push(b, t)
+		table.insert(self.blights, b)
+		self:ev({ Ev.BLIGHT, victim, 0, t, 0 })
 	end
 
-	--- The independent nation the plague's land becomes: "Free <province>", in a shade of the old
-	--- empire's colour, an AI nation (SimRevolts.FREE_SKILL).
+	--- A hash of grid point (x, y) for plague `seed`, in [0, 1).
+	local function hash01(x: number, y: number, seed: number): number
+		local h = (x * 374761393 + y * 668265263 + seed * 2246822519) % 4294967296
+		h = ((h // 8192) * 1274126177 + h % 8192 * 3266489917) % 4294967296
+		return (h % 100003) / 100003
+	end
+
+	--- Smooth noise in [0, 1) at (x, y), on a grid of `cell` tiles (value noise, smoothstepped).
+	local function vnoise(x: number, y: number, cell: number, seed: number): number
+		local gx, gy = x / cell, y / cell
+		local ix, iy = math.floor(gx), math.floor(gy)
+		local fx, fy = gx - ix, gy - iy
+		fx = fx * fx * (3 - 2 * fx)
+		fy = fy * fy * (3 - 2 * fy)
+		local a = hash01(ix, iy, seed)
+		local b = hash01(ix + 1, iy, seed)
+		local c = hash01(ix, iy + 1, seed)
+		local d = hash01(ix + 1, iy + 1, seed)
+		return (a + (b - a) * fx) + ((c + (d - c) * fx) - (a + (b - a) * fx)) * fy
+	end
+
+	--- How far the plague's front is from tile `t` (smaller is sooner): the distance from where it
+	--- landed, shrunk along its lobes, plus noise at a few scales (Rules.PLAGUE_NOISE: { cell, tiles,
+	--- tiles per tile of distance }) so its edge comes out ragged, with bays and spurs, and a little
+	--- per tile (PLAGUE_JITTER).
+	function C:_blight_key(b: any, t: number): number
+		local x, y = t % self.W, t // self.W
+		local dx, dy = x - b.x0, y - b.y0
+		local d = math.sqrt(dx * dx + dy * dy)
+		local ang = math.atan2(dy, dx)
+		local lobe = 0
+		for _, l in b.lobes do
+			lobe += l.a * math.sin(l.k * ang + l.ph)
+		end
+		local warp = math.max(0.35, 1 + lobe)
+		local k = d / warp
+		for i, nz in Rules.PLAGUE_NOISE do
+			k += (vnoise(x, y, nz[1], b.seed + i * 7919) - 0.5) * 2 * (nz[2] + nz[3] * d)
+		end
+		return k + hash01(x, y, b.seed) * Rules.PLAGUE_JITTER
+	end
+
+	--- A binary min-heap of (key, tile) in b.keys / b.tiles.
+	function C:_blight_push(b: any, t: number)
+		local keys, tiles = b.keys, b.tiles
+		local k = self:_blight_key(b, t)
+		local i = #keys + 1
+		keys[i], tiles[i] = k, t
+		while i > 1 do
+			local p = i // 2
+			if keys[p] <= k then
+				break
+			end
+			keys[i], tiles[i] = keys[p], tiles[p]
+			keys[p], tiles[p] = k, t
+			i = p
+		end
+	end
+
+	function C:_blight_pop(b: any): number
+		local keys, tiles = b.keys, b.tiles
+		local n = #keys
+		local top = tiles[1]
+		local lk, lt = keys[n], tiles[n]
+		keys[n], tiles[n] = nil, nil
+		n -= 1
+		if n > 0 then
+			local i = 1
+			while true do
+				local c = i * 2
+				if c > n then
+					break
+				end
+				if c < n and keys[c + 1] < keys[c] then
+					c += 1
+				end
+				if keys[c] >= lk then
+					break
+				end
+				keys[i], tiles[i] = keys[c], tiles[c]
+				i = c
+			end
+			keys[i], tiles[i] = lk, lt
+		end
+		return top
+	end
+
+	--- The independent nation the plague's land becomes: "Free <province>", in a sickly shade of the
+	--- old empire's colour (Rules.PLAGUE_TINT of the plague's green), an AI nation (SimRevolts.FREE_SKILL).
 	function C:_blight_nation(b: any): number
 		local victim = b.victim
 		local pname = self:_province_name(victim, b.at)
@@ -1243,7 +1348,16 @@ function SimNukes.install(C)
 			n += 1
 			name = string.format("%s %d", base, n)
 		end
-		local rid = self:add_owner(name, SimRevolts.rebel_color(self.o_color[victim]), Defs.KIND_NATION)
+		local col = SimRevolts.rebel_color(self.o_color[victim])
+		do
+			local f = Rules.PLAGUE_TINT
+			local function mix(c: number, g: number): number
+				return math.clamp(math.floor(c * (1 - f) + g * f + 0.5), 0, 255)
+			end
+			local r, g, bl, a = (col // 0x1000000) % 256, (col // 0x10000) % 256, (col // 0x100) % 256, col % 256
+			col = ((mix(r, 120) * 256 + mix(g, 190)) * 256 + mix(bl, 70)) * 256 + a
+		end
+		local rid = self:add_owner(name, col, Defs.KIND_NATION)
 		if rid <= 0 then
 			return 0
 		end
@@ -1259,9 +1373,10 @@ function SimNukes.install(C)
 		return rid
 	end
 
-	--- Each 5 ticks, the plague takes the next tiles of its struck land (breadth-first from where it
-	--- landed, through the victim's land only) for the free nation; done when its time is up, its share
-	--- is taken or the land around it is gone.
+	--- Each 5 ticks, the plague takes the next tiles of its struck land (nearest its warped front first,
+	--- through the victim's land only) for the free nation; done when its time is up, its share is
+	--- taken or the land around it is gone. Ev.BLIGHT tells the clients where its front went (a few of
+	--- the tiles it took: Map/FxLayer.blight).
 	function C:_blights_tick()
 		local list = self.blights
 		if #list == 0 or self.tick % 5 ~= 0 then
@@ -1275,29 +1390,27 @@ function SimNukes.install(C)
 		while i <= #list do
 			local b = list[i]
 			local victim = b.victim
-			local q = b.queue
-			local took = 0
-			while took < b.per_step and b.taken < b.budget and b.head <= #q and self.o_alive[victim] == 1 do
-				local t = q[b.head]
-				b.head += 1
+			local took = {}
+			while #took < b.per_step and b.taken < b.budget and #b.keys > 0 and self.o_alive[victim] == 1 do
+				local t = self:_blight_pop(b)
 				if readi32(owner, t * 4) ~= victim then
 					continue
 				end
 				if b.rid == 0 then
 					b.rid = self:_blight_nation(b)
 					if b.rid == 0 then
-						b.head = #q + 1
+						b.keys, b.tiles = {}, {}
 						break
 					end
 				end
 				self:set_owner(t, b.rid)
-				took += 1
+				table.insert(took, t)
 				b.taken += 1
 				local x = t % W
 				local function push(u: number)
 					if not b.seen[u] and readi32(owner, u * 4) == victim then
 						b.seen[u] = true
-						q[#q + 1] = u
+						self:_blight_push(b, u)
 					end
 				end
 				if x > 0 then push(t - 1) end
@@ -1311,7 +1424,17 @@ function SimNukes.install(C)
 				local levy = 0.5 * self.R.max_troops(Defs.KIND_NATION, self.o_tiles[rid], 0, SimRevolts.FREE_SKILL)
 				self.o_troops[rid] = math.max(self.o_troops[rid], levy)
 			end
-			if tick >= b.until_tick or b.taken >= b.budget or b.head > #q or self.o_alive[victim] ~= 1 then
+			local done = tick >= b.until_tick or b.taken >= b.budget or #b.keys == 0 or self.o_alive[victim] ~= 1
+			-- (where the front went: up to PLAGUE_FX_TILES of the tiles taken, spread over them)
+			if #took > 0 or done then
+				local e = { Ev.BLIGHT, victim, rid, b.at, if done then 1 else 0 }
+				local m = math.min(#took, Rules.PLAGUE_FX_TILES)
+				for j = 1, m do
+					table.insert(e, took[math.max(1, math.floor(j * #took / m))])
+				end
+				self:ev(e)
+			end
+			if done then
 				list[i] = list[#list]
 				list[#list] = nil
 				if rid > 0 and b.taken > 0 then
@@ -1359,7 +1482,6 @@ function SimNukes.install(C)
 
 	--- The sick lose troops; the plague passes to their neighbours; it ends when its time is up.
 	function C:_plague_tick()
-		self:_blights_tick()
 		local list = self.plague_list
 		local tick = self.tick
 		local o_troops = self.o_troops
