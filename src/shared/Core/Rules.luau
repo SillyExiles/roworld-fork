@@ -1200,8 +1200,9 @@ local function build(K_LIN: number, into: any?): any
 	Rules.PLAGUE_TINT = 0.35
 	Rules.PLAGUE_FX_TILES = 5
 	--- Each player may send the plague this many times a match; each costs PLAGUE_COST_GROWTH x the last.
-	Rules.PLAGUE_MAX_USES = 2
-	Rules.PLAGUE_COST_GROWTH = 2
+	--- (2026-11-07: 5 times, each half again dearer; were 2, doubling)
+	Rules.PLAGUE_MAX_USES = 5
+	Rules.PLAGUE_COST_GROWTH = 1.5
 
 	--- (2026-11-06) The plague's price after `uses` of it by the player: the era's, doubled each time.
 	function Rules.plague_cost(uses: number?): number
@@ -1224,8 +1225,9 @@ local function build(K_LIN: number, into: any?): any
 	--- (where its fires fall on a nation's land: near its buildings, its capital, and tiles along its
 	--- border, at most this many of the border looked at)
 	Rules.FIRERAIN_BORDER_WALK = 3000
-	Rules.FIRERAIN_MAX_USES = 2
-	Rules.FIRERAIN_COST_GROWTH = 2
+	--- (2026-11-07: 5 times a match, each half again dearer; were 2, doubling)
+	Rules.FIRERAIN_MAX_USES = 5
+	Rules.FIRERAIN_COST_GROWTH = 1.5
 	--- (2026-11-07, like RoWorld's nuke, that leaves nothing standing) The rain is a volley: every fire
 	--- is a sheaf of arrows shot at once from the launcher's Siege Workshop nearest it (Ev.VOLLEY: the
 	--- clients draw them flying), FIRERAIN_FLIGHT_K x a bombard's time in the air (FIRERAIN_FLIGHT_MIN

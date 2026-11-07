@@ -948,7 +948,7 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 		return
 	end
 	-- (Empires Front 2026-11-06: a weapon one of its workshops has loaded (each reloads on its own) and
-	-- it can pay for: fire on a big empire; the plague (twice a match, Rules.PLAGUE_MAX_USES) on a big
+	-- it can pay for: fire on a big empire; the plague (Rules.PLAGUE_MAX_USES times a match) on a big
 	-- nation with a big army that isn't sick or immune; else the bombard. No MIRV.)
 	local tick = sim.tick
 	local big = sim.o_tiles[best] > 2500 * LA

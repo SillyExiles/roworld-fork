@@ -169,7 +169,7 @@ sim._blights_tick = function(self2)
 end
 sim.o_gold[A] += 100000000
 local g0 = sim.o_gold[A]
-expect(sim:plague_uses(A) == 0 and Rules.plague_cost(0) == Rules.nuke_cost("plague") and Rules.plague_cost(1) == 2 * Rules.nuke_cost("plague"), "the plague's price doubles with each use")
+expect(sim:plague_uses(A) == 0 and Rules.plague_cost(0) == Rules.nuke_cost("plague") and Rules.plague_cost(1) == math.floor(Rules.PLAGUE_COST_GROWTH * Rules.nuke_cost("plague")), "the plague's price grows with each use")
 expect(sim:launch_nuke(A, "plague", target), "the plague flies")
 expect(g0 - sim.o_gold[A] == Rules.plague_cost(0) and sim:plague_uses(A) == 1, "at its first price (" .. (g0 - sim.o_gold[A]) .. ")")
 local sick_at = -1
@@ -255,7 +255,7 @@ if P2 <= 0 or P2 == A then
 end
 local g1 = sim.o_gold[A]
 expect(sim:launch_nuke(A, "plague", target), "a second plague flies")
-expect(g1 - sim.o_gold[A] == Rules.plague_cost(1), "at double the price (" .. (g1 - sim.o_gold[A]) .. ")")
+expect(g1 - sim.o_gold[A] == Rules.plague_cost(1), "at the higher price (" .. (g1 - sim.o_gold[A]) .. ")")
 local took2 = false
 for _ = 1, 300 do
 	sim:step()
@@ -263,7 +263,9 @@ for _ = 1, 300 do
 end
 expect(took2, "and it takes, immune or not")
 ensure_plague()
-expect(not sim:launch_nuke(A, "plague", target) and sim:plague_uses(A) == 2, "no third plague this match")
+-- (the uses left spent, as if sent)
+sim.o_plague_used[A] = Rules.PLAGUE_MAX_USES
+expect(Rules.PLAGUE_MAX_USES == 5 and not sim:launch_nuke(A, "plague", target) and sim:plague_uses(A) == Rules.PLAGUE_MAX_USES, "no plague past the " .. Rules.PLAGUE_MAX_USES .. "th this match")
 for _ = 1, Rules.PLAGUE_TICKS + 10 do sim:step() end
 
 -- (A's workshop may have fallen to a neighbour meanwhile: a new one)
@@ -500,9 +502,10 @@ do
 		if o > 0 and o ~= A and not sim:allied(A, o) and sim.o_rookie[o] ~= 1 and sim:siege_loaded(A, Defs.N_FIRERAIN, u) then t2 = u break end
 	end
 	expect(t2 >= 0 and sim:launch_nuke(A, "firerain", t2), "a second rain flies")
-	expect(g1 - sim.o_gold[A] == Rules.firerain_cost(1), "at double the price")
+	expect(g1 - sim.o_gold[A] == Rules.firerain_cost(1) and Rules.firerain_cost(1) == math.floor(Rules.nuke_cost("firerain") * 1.5), "at half again the price")
 	for _, w in sim:structs_of(A, Defs.S_SILO) do w.shots = {} end
-	expect(not sim:launch_nuke(A, "firerain", t2), "no third this match")
+	sim.o_firerain_used[A] = Rules.FIRERAIN_MAX_USES
+	expect(Rules.FIRERAIN_MAX_USES == 5 and not sim:launch_nuke(A, "firerain", t2), "none past the 5th this match")
 	for _ = 1, 300 do sim:step() end
 	sim.firerain = {}
 	sim.blazes = {}
