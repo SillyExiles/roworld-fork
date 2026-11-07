@@ -1199,6 +1199,9 @@ local function build(K_LIN: number, into: any?): any
 	Rules.FIRERAIN_STRIKES_MAX = 16
 	Rules.FIRERAIN_TILES_PER = 1000
 	Rules.FIRERAIN_STRIKES_ALL = 300
+	--- (where its fires fall on a nation's land: near its buildings, its capital, and tiles along its
+	--- border, at most this many of the border looked at)
+	Rules.FIRERAIN_BORDER_WALK = 3000
 	Rules.FIRERAIN_MAX_USES = 2
 	Rules.FIRERAIN_COST_GROWTH = 2
 	function Rules.firerain_cost(uses: number?): number

@@ -1219,32 +1219,56 @@ function SimNukes.install(C)
 				want[o] = math.max(1, math.floor(want[o] * f))
 			end
 		end
-		-- each target's land: a sample by reservoir (one pass over the map), as many as it needs
-		local sample = {}
-		local seen = {}
-		local is_t = {}
-		for _, o in targets do
-			sample[o] = {}
-			seen[o] = 0
-			is_t[o] = true
-		end
+		-- each target's land: tiles found near its buildings, its capital and along its border, a few
+		-- random steps from them (2026-11-07: no pass over the whole map, which took a quarter of a second)
 		local owner = self.owner
-		for t = 0, self.N - 1 do
-			local o = readi32(owner, t * 4)
-			if o > 0 and is_t[o] then
-				local c = seen[o] + 1
-				seen[o] = c
-				local k = want[o]
-				local sm = sample[o]
-				if #sm < k then
-					table.insert(sm, t)
-				else
-					local j = rng:randi() % c + 1
-					if j <= k then
-						sm[j] = t
+		local W, H = self.W, self.H
+		local sample = {}
+		for _, o in targets do
+			local centres = {}
+			for k = 0, Defs.STRUCT_KIND_COUNT - 1 do
+				for _, s in self:structs_of(o, k) do
+					if not s.dead then
+						table.insert(centres, s.tile)
 					end
 				end
 			end
+			local sp = self.o_spawn_tile[o]
+			if sp ~= nil and sp >= 0 and readi32(owner, sp * 4) == o then
+				table.insert(centres, sp)
+			end
+			-- (border tiles: every few along its list, FIRERAIN_BORDER_WALK steps at most)
+			local bt = self.bhead[o]
+			local bnext = self.bnext
+			local steps, every = 0, math.max(1, math.min(self.bcount[o], Rules.FIRERAIN_BORDER_WALK) // 24)
+			while bt ~= -1 and steps < Rules.FIRERAIN_BORDER_WALK do
+				if steps % every == 0 then
+					table.insert(centres, bt)
+				end
+				steps += 1
+				bt = readi32(bnext, bt * 4)
+			end
+			local sm = {}
+			if #centres > 0 then
+				local reach = math.clamp(math.floor(math.sqrt(self.o_tiles[o]) * 0.35), 4, 60)
+				for _ = 1, want[o] do
+					local c = centres[rng:randi() % #centres + 1]
+					local pick = c
+					for _ = 1, 10 do
+						local x = c % W + rng:randi() % (2 * reach + 1) - reach
+						local y = c // W + rng:randi() % (2 * reach + 1) - reach
+						if x >= 0 and x < W and y >= 0 and y < H then
+							local u = y * W + x
+							if readi32(owner, u * 4) == o then
+								pick = u
+								break
+							end
+						end
+					end
+					table.insert(sm, pick)
+				end
+			end
+			sample[o] = sm
 		end
 		local q = self.firerain
 		local tick = self.tick
