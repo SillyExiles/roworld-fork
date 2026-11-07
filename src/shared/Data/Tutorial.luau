@@ -135,6 +135,17 @@ Tutorial.STEP_MAX_S = 75
 --- With no order for this long the pointer shows where to tap again.
 Tutorial.NUDGE_S = 5
 
+--- (2026-11-07) Two tutorials: phones and PCs each get their own (steps_for). STEPS holds every step
+--- of both in the funnel's order; `only = "touch"` / `"desktop"` keeps a step to one of them, and the
+--- shared ones say it each their own way (`touch` / `desktop`): a finger on a phone (drag, pinch, hold,
+--- the BUILD tray and its ✓), the mouse and the keyboard on a PC (drag, the wheel, right-click, the
+--- number keys, Q / E, Space, Backspace, Tab, H).
+--- "camera": move the map and zoom once each (CAMERA_PAN_PX of dragging, CAMERA_ZOOM of zoom), with
+--- a bar for both; passed over after CAMERA_MAX_S.
+Tutorial.CAMERA_PAN_PX = 80
+Tutorial.CAMERA_ZOOM = 0.15
+Tutorial.CAMERA_MAX_S = 35
+
 --- The steps, in order. `touch` / `desktop`: what the card says; `%s` is the neighbour's name.
 --- `info`: nothing to do but read it; the card's button says GOT IT and moves on (or INFO_S passes).
 --- `mark`: what the tap mark says instead of "Tap here".
@@ -144,6 +155,14 @@ Tutorial.BUILD_MAX_S = 45
 Tutorial.STEPS = {
 	{ id = "spawn", touch = "Tap the map to found your empire", desktop = "Click the map to found your empire" },
 	{ id = "expand", touch = "Tap the land next to you to claim it", desktop = "Click the land next to you to claim it" },
+	-- (2026-11-07) the map itself: a finger on a phone, the mouse on a PC
+	{
+		id = "camera",
+		touch = "Drag to move the map, pinch to zoom",
+		desktop = "Drag with the mouse to move the map, and scroll the wheel to zoom",
+		bar = true,
+		max_s = Tutorial.CAMERA_MAX_S,
+	},
 	{
 		id = "grow",
 		touch = "Troops ready: tap empty land again",
@@ -160,18 +179,37 @@ Tutorial.STEPS = {
 		touch = "Tap %s, then tap again to attack",
 		desktop = "Click %s's land to attack them",
 	},
+	-- (2026-11-07) a phone's attacks list: a small chip that opens it (a PC calls back with Backspace:
+	-- "keys")
+	{
+		id = "attacks",
+		only = "touch",
+		info = true,
+		at = "attacks",
+		touch = "Tap your attacks to call one back",
+		mark = "Your attacks",
+		max_s = Tutorial.INFO_S,
+	},
 	{
 		id = "ratio",
 		touch = "Tap 50% below. Keep troops home!",
-		desktop = "Click 50% on the Attack bar. Keep troops home!",
+		desktop = "Click 50% on the Attack bar (or press Q / E). Keep troops home!",
 		max_s = Tutorial.RATIO_MAX_S,
+	},
+	-- (2026-11-07) a PC's keyboard
+	{
+		id = "keys",
+		only = "desktop",
+		info = true,
+		desktop = "Keys: Space attacks where the mouse is, Backspace calls back your last attack, Tab shows the rankings, H opens the help",
+		max_s = 14,
 	},
 	{
 		id = "city",
 		build = "city",
 		max_s = Tutorial.BUILD_MAX_S,
-		touch = "Open BUILD, pick City, tap your land",
-		desktop = "Pick City (1) and click your land",
+		touch = "BUILD, pick City, tap your land, then ✓",
+		desktop = "Press 1 (City) and click your land",
 		note = "Here is gold for your first City",
 	},
 	-- (2026-11-01: the rest of the game, one building or one idea a card; 2026-11-03: shorter and
@@ -219,8 +257,8 @@ Tutorial.STEPS = {
 		id = "world",
 		info = true,
 		at = "neighbour",
-		touch = "Hold a nation to ally with it",
-		desktop = "Right-click a nation to ally with it; click land over the sea to send boats",
+		touch = "Hold a nation's land to ally or trade",
+		desktop = "Right-click a nation to ally or trade with it; click land over the sea to send boats",
 		mark = "A nation",
 		max_s = Tutorial.INFO_S,
 	},
@@ -240,9 +278,12 @@ Tutorial.FUNNEL = {
 	"Started",
 	"Spawned",
 	"First Tap",
+	"Moved Camera",
 	"Grew",
 	"Attacked",
+	"Saw Attacks",
 	"Used Slider",
+	"Saw Shortcuts",
 	"Built City",
 	"Built Farm",
 	"Built Mine",
@@ -289,6 +330,18 @@ function Tutorial.refill(troops: number, cap: number, shown: number?): number
 	local need = Tutorial.GROW_READY * cap
 	local f = if need > 0 then math.clamp(troops / need, 0, 1) else 1
 	return math.max(f, shown or 0)
+end
+
+--- (2026-11-07) The tutorial a device gets: STEPS without the other device's own (`only`), in order.
+function Tutorial.steps_for(touch: boolean): { any }
+	local out = {}
+	local mine = if touch then "touch" else "desktop"
+	for _, s in Tutorial.STEPS do
+		if s.only == nil or s.only == mine then
+			table.insert(out, s)
+		end
+	end
+	return out
 end
 
 --- Where step `id` is in STEPS, or nil.

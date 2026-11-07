@@ -964,7 +964,8 @@ function UIRoot._build(self)
 		if how == "skipped" then
 			local s = ctx.session
 			if s ~= nil and type(s.report) == "function" then
-				s:report("tutorial_skip", tutorial._i)
+				-- (2026-11-07: phones and PCs have their own steps: the funnel's own number)
+				s:report("tutorial_skip", tutorial:skip_index())
 			end
 		end
 	end)

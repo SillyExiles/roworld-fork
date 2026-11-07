@@ -30,11 +30,48 @@ expect(Tutorial.is_new({ tips_seen = {} }, { matches = "x" }), "junk counts as n
 expect(#Tutorial.FUNNEL == #Tutorial.STEPS + 2, "the funnel is Started, a step each, Completed")
 local seen = {}
 for i, s in Tutorial.STEPS do
-	expect(type(s.touch) == "string" and #s.touch <= 40, s.id .. ": a phone line of at most 40 characters")
+	-- (2026-11-07: a PC-only step has no phone line)
+	if s.only ~= "desktop" then
+		expect(type(s.touch) == "string" and utf8.len(s.touch) <= 40, s.id .. ": a phone line of at most 40 characters")
+	end
+	if s.only ~= "touch" then
+		expect(type(s.desktop) == "string" and #s.desktop > 0, s.id .. ": a PC line")
+	end
 	expect(Tutorial.funnel_step(s.id) == i + 1 and not seen[s.id], s.id .. ": its own funnel step")
 	seen[s.id] = true
 end
 expect(Tutorial.funnel_step("nope") == nil, "an unknown step has none")
+-- (2026-11-07) a phone's tutorial and a PC's: each its own steps, in the funnel's order
+do
+	local phone, pc = Tutorial.steps_for(true), Tutorial.steps_for(false)
+	local function ids(list)
+		local out = {}
+		for _, s in list do
+			table.insert(out, s.id)
+		end
+		return table.concat(out, ",")
+	end
+	expect(ids(phone) ~= ids(pc), "the two tutorials differ: " .. ids(phone) .. " / " .. ids(pc))
+	local has_keys = false
+	for _, s in pc do
+		has_keys = has_keys or s.id == "keys"
+	end
+	local phone_keys = false
+	for _, s in phone do
+		phone_keys = phone_keys or s.id == "keys"
+	end
+	expect(has_keys and not phone_keys, "the keyboard's card: PC only")
+	for _, list in { phone, pc } do
+		local last = 0
+		local ordered = true
+		for _, s in list do
+			local f = Tutorial.funnel_step(s.id)
+			ordered = ordered and f ~= nil and f > last
+			last = f or last
+		end
+		expect(ordered, "funnel steps rise through the tutorial")
+	end
+end
 
 -- the slider's cap and the floor under the army
 expect(Tutorial.RATIO_CAP <= 0.5 and Tutorial.RATIO_HIGH <= Tutorial.RATIO_CAP, "the slider stops at half the army or less")

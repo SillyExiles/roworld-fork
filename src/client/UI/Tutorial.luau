@@ -53,6 +53,8 @@ function Tutorial.new(c: any, ui: any)
 	--- the last card (the reward) is gone: the screen is the coach's again
 	self.closed = Signal.new()
 	self._i = 0
+	--- (2026-11-07) this device's tutorial: Data.steps_for (a phone's or a PC's own steps)
+	self._steps = Data.steps_for(c.touch == true)
 	self._t = 0.0
 	self._step_t = 0.0
 	self._flash = 0.0
@@ -132,7 +134,7 @@ function Tutorial.new(c: any, ui: any)
 		elseif not self.active or self._flash > 0.0 or os.clock() < (self._guard or 0.0) then
 			-- (a tap just as the card moved on, or on the green card, is not for the next step)
 			return
-		elseif (Data.STEPS[self._i] or {}).info then
+		elseif (self._steps[self._i] or {}).info then
 			self:_advance() -- (read: counts as done)
 		elseif self._i > 1 then
 			self:_advance(true) -- (passed over)
@@ -160,6 +162,7 @@ end
 --- The tutorial match was asked for: the steps begin with its spawn phase.
 function Tutorial.begin(self)
 	self.active = true
+	self._steps = Data.steps_for(self.ctx.touch == true)
 	self._i = 1
 	self._step_t = 0.0
 	self._flash = 0.0
@@ -313,13 +316,30 @@ function Tutorial._find_spot(self): number?
 	return best
 end
 
+--- Where step `id` is in this device's tutorial, or nil.
+function Tutorial._index_of(self, id: string): number?
+	for i, st in self._steps do
+		if st.id == id then
+			return i
+		end
+	end
+	return nil
+end
+
+--- The funnel step of the step being shown, less one (what "Tutorial Skipped" names: Analytics).
+function Tutorial.skip_index(self): number
+	local st = self._steps[self._i]
+	local f = if st ~= nil then Data.funnel_step(st.id) else nil
+	return if f ~= nil then f - 1 else self._i
+end
+
 function Tutorial._say(self, i: number, arg: string?)
-	local step = Data.STEPS[i]
+	local step = self._steps[i]
 	local txt = if self.ctx.touch then step.touch else step.desktop
 	if string.find(txt, "%s", 1, true) then
 		txt = string.format(txt, arg or "them")
 	end
-	self._count:set_text(string.format("%d / %d", i, #Data.STEPS))
+	self._count:set_text(string.format("%d / %d", i, #self._steps))
 	self._text:set_text(txt)
 	self._bar:set_visible(step.bar == true)
 	self._fill.Size = UDim2.fromScale(0, 1)
@@ -339,7 +359,7 @@ end
 
 --- Step `i` is finished (`passed`: nobody did it in time, it is passed over without a tick).
 function Tutorial._advance(self, passed: boolean?)
-	local step = Data.STEPS[self._i]
+	local step = self._steps[self._i]
 	if not passed then
 		self.step_done:Fire(Data.funnel_step(step.id), Data.FUNNEL[Data.funnel_step(step.id)])
 		self.ctx:sfx("confirm", -4.0)
@@ -355,7 +375,7 @@ function Tutorial._advance(self, passed: boolean?)
 	self._idle = 0.0
 	self._shown = nil
 	self._guard = os.clock() + Tutorial.GUARD_S
-	if self._i > #Data.STEPS then
+	if self._i > #self._steps then
 		self.step_done:Fire(#Data.FUNNEL, Data.FUNNEL[#Data.FUNNEL])
 		self:stop("done")
 	end
@@ -396,13 +416,13 @@ function Tutorial._process(self, delta: number)
 		end
 	end
 	local i = self._i
-	local step = Data.STEPS[i]
+	local step = self._steps[i]
 	local o = ctx:my()
 	local any, on_owner, on_land = self:_orders()
 	self._step_t += delta
 	if
 		ctx.troop_floor == nil
-		and i >= (Data.step_index(Data.FLOOR_FROM) or 1)
+		and i >= (self:_index_of(Data.FLOOR_FROM) or 1)
 		and o ~= nil
 		and Data.floor_armed(o.troops or 0, o.max_troops or 0, ctx:alive_seconds())
 	then
@@ -470,6 +490,11 @@ function Tutorial._process(self, delta: number)
 				any = false
 			elseif id == "attack" then
 				self._neighbour = nil
+			elseif id == "camera" then
+				-- (2026-11-07) how far the map moved and zoomed since the card came up
+				self._cam = nil
+				self._cam_pan = 0.0
+				self._cam_zoom = 0.0
 			elseif id == "ratio" then
 				self._ratio_ok = 0.0
 				self._ratio_high = false
@@ -478,6 +503,9 @@ function Tutorial._process(self, delta: number)
 				if self._relief ~= nil then
 					ctx:world_call("focus_tile", { self._relief, -1.0, 0.9 })
 				end
+			elseif step.at == "attacks" then
+				-- (2026-11-07, phones) the attacks list's chip: nothing to focus on the map
+				self._spot_at = nil
 			elseif step.at ~= nil then
 				-- (the boats' card: the sea nearest the player's land; the allies': a neighbour)
 				if step.at == "sea" then
@@ -580,6 +608,39 @@ function Tutorial._process(self, delta: number)
 			elseif self._taps == 0 or self._idle > Data.NUDGE_S then
 				point = ui.advisor:frontier_point()
 			end
+		elseif id == "camera" then
+			-- (2026-11-07) drag the map and zoom it once each (a finger and a pinch; the mouse and its
+			-- wheel): the bar fills half for each. The tutorial's own camera moves don't count.
+			local w = ctx.world
+			local rig = if w ~= nil then w.rig else nil
+			if rig == nil or type(rig.scale) ~= "number" or type(rig.cu) ~= "number" then
+				self:_advance(true)
+				return
+			end
+			if rig._focus_active then
+				self._cam = nil
+			else
+				local last = self._cam
+				if last ~= nil then
+					local du, dv = rig.cu - last[1], rig.cv - last[2]
+					self._cam_pan += math.sqrt(du * du + dv * dv) * rig.scale
+					if last[3] > 0 and rig.scale > 0 then
+						self._cam_zoom += math.abs(math.log(rig.scale / last[3]))
+					end
+				end
+				self._cam = { rig.cu, rig.cv, rig.scale }
+			end
+			local fp = math.clamp(self._cam_pan / Data.CAMERA_PAN_PX, 0, 1)
+			local fz = math.clamp(self._cam_zoom / math.log(1 + Data.CAMERA_ZOOM), 0, 1)
+			if fp >= 1 and fz >= 1 then
+				self:_advance()
+				return
+			end
+			local f = (fp + fz) * 0.5
+			if math.abs(f - (self._fill_f or 0.0)) >= 0.01 then
+				self._fill_f = f
+				self._fill.Size = UDim2.fromScale(f, 1)
+			end
 		elseif id == "ratio" then
 			-- a moderate share, and left there: never a push to send everything
 			local r = ctx.ratio
@@ -616,6 +677,15 @@ function Tutorial._process(self, delta: number)
 			if id == "terrain" then
 				if self._relief ~= nil then
 					point = ctx:tile_screen_pos(self._relief)
+				end
+			elseif step.at == "attacks" then
+				-- (2026-11-07) the attacks list (a chip on phones), while it is up
+				local ap = ui.attacks
+				local pn = if ap ~= nil then ap.panel else nil
+				if pn ~= nil and pn:is_visible_in_tree() then
+					local r = pn:get_global_rect()
+					point = UICtx.rect_center(r)
+					around = math.max(r.Width, r.Height) * 0.5
 				end
 			elseif step.button ~= nil then
 				-- (the building's slot on the command bar, or the BUILD tray that holds it)
