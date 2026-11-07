@@ -279,7 +279,7 @@ end
 -- =============================================================================================
 
 --- A card's shell: the grid cell, and the body inside it that animates (rises in, grows when hovered).
-local function card_shell(name: string, order: number, worn: boolean, stroke: Color3, legendary: boolean): (Frame, Frame)
+local function card_shell(name: string, order: number, worn: boolean, stroke: Color3, legendary: boolean, mythic: boolean?): (Frame, Frame)
 	local cell = make("Frame", { Name = name, LayoutOrder = order, BackgroundTransparency = 1 }, grid)
 	local body = make("Frame", {
 		Name = "Body",
@@ -297,7 +297,20 @@ local function card_shell(name: string, order: number, worn: boolean, stroke: Co
 		Thickness = if worn then 2.5 else 1.5,
 		ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
 	}, body)
-	if legendary then
+	if mythic then
+		-- (2026-11-07) a Mythic flag: a rainbow sweeps round its border
+		local g = make("UIGradient", {
+			Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 61, 127)),
+				ColorSequenceKeypoint.new(0.2, Color3.fromRGB(255, 178, 46)),
+				ColorSequenceKeypoint.new(0.4, Color3.fromRGB(124, 240, 200)),
+				ColorSequenceKeypoint.new(0.6, Color3.fromRGB(61, 139, 255)),
+				ColorSequenceKeypoint.new(0.8, Color3.fromRGB(163, 91, 255)),
+				ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 61, 127)),
+			}),
+		}, st)
+		table.insert(shimmers, g)
+	elseif legendary then
 		local g = make("UIGradient", {
 			Color = ColorSequence.new({
 				ColorSequenceKeypoint.new(0, stroke),
@@ -370,8 +383,8 @@ local function flag_card(it: any, order: number)
 	local inv = inventory() or {}
 	local owned = inv.owned ~= nil and inv.owned[it.id] == true
 	local worn = inv.equipped ~= nil and inv.equipped.skin == it.id
-	local legendary = it.rarity == "legendary"
-	local _, body = card_shell(it.id, order, worn, tier_color(it.rarity), legendary)
+	local legendary = it.rarity == "legendary" or it.rarity == "mythic"
+	local _, body = card_shell(it.id, order, worn, tier_color(it.rarity), legendary, it.rarity == "mythic")
 	local img = make("ImageLabel", {
 		Name = "Flag",
 		BackgroundColor3 = Color3.new(0, 0, 0),

@@ -332,6 +332,9 @@ Cosmetics.general_skins = {
 --- How a General skin shows in the Locker.
 Cosmetics.GENERAL = { id = "general", name = "General", odds = 0, color = 0xD9B24E }
 
+--- (2026-11-07) The Empire Shop's Mythic flags (Data/EmpireShop.TIERS): above Legendary, never in a crate.
+Cosmetics.MYTHIC = { id = "mythic", name = "Mythic", odds = 0, color = 0xFF3D7F }
+
 --- Alpha of the secondary tiles (the primary fill is MapSurface.TERRITORY_ALPHA, 150).
 Cosmetics.SECONDARY_ALPHA = 190
 
@@ -497,6 +500,8 @@ function Cosmetics.rarity(id: string): any
 		return Cosmetics.EXCLUSIVE
 	elseif id == "general" then
 		return Cosmetics.GENERAL
+	elseif id == "mythic" then
+		return Cosmetics.MYTHIC
 	end
 	for _, r in Cosmetics.RARITIES do
 		if r.id == id then

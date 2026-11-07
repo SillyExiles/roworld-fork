@@ -958,7 +958,140 @@ add("celestial", "Celestial Night", "legendary", (lambda f: [f.set(x, y, "white"
     F().fill("navy").crescent(6, 6, 3.8, "gold", off=1.5)))
 add("conqueror", "Conqueror's Crown", "legendary", F().fill("black").shape(3, 3, CROWN, {"x": "gold", "o": "red"}).rect(3, 10, 14, 10, "gold"))
 
-TIER_PRICE = {"common": 1500, "rare": 3000, "epic": 6000, "legendary": 12000}
+# ---------------------------------------------------------------- 2026-11-07: more legends, and the Mythic
+C.update({"night": 0x0B1030, "dusk": 0x2A1650, "plum": 0x4A1A6E, "ember": 0xE8420C, "flame": 0xFF7A00,
+          "jade": 0x1FA97A, "jadedark": 0x0E5C45, "pearl": 0xEFF4FF, "aurora1": 0x0F3B4A, "aurora2": 0x147A6B,
+          "aurora3": 0x2BC48A, "aurora4": 0x6A3FB5, "leaf": 0xF5C542, "bark": 0x5A3A1E, "moon": 0xF0E8C8,
+          "steel": 0x9AA7B8, "deepsea": 0x053A5E, "foam": 0xBFE6FF, "sky2": 0x3E7FD8, "sky1": 0x9CC8FF,
+          "blood": 0x8E0B1C, "rose": 0xFF3D7F, "mint": 0x7CF0C8})
+
+
+def vgrad(f, *cs):
+    """Rows top to bottom through the colours `cs` (a sky)."""
+    n = len(cs)
+    for y in range(H):
+        f.rect(0, y, W - 1, y, cs[min(n - 1, y * n // H)])
+    return f
+
+
+GRIFFIN = [  # an eagle's head and raised wing on a lion's body
+    "......xxx....",
+    ".xx..xxxx....",
+    "xxxoxxxx.....",
+    "..xxxxx......",
+    "..xxxxxxxxxx.",
+    "..xxxxxxxxxxx",
+    "..xx.xx.xx..x",
+    ".x...x...x...",
+]
+BOLT = ["..xx", ".xx.", "xxxx", "..x.", ".x..", "x..."]
+WYVERN = [
+    "x...........x",
+    "xx....x....xx",
+    ".xxx..xx..xxx",
+    "..xxxxxxxxxx.",
+    "....xxxxxx...",
+    "...xx.xx.....",
+    "..xo.....xx..",
+    "..x.......xxx",
+]
+WOLF = [
+    "...x....",
+    "..xx....",
+    ".xxxx...",
+    "xxxxxx..",
+    ".xxxxxx.",
+    "..xxxxxx",
+    "..xxxxxx",
+    ".xxxxxxx",
+]
+UNICORN = [
+    "x.........",
+    ".x........",
+    "..xxx.....",
+    ".xxxxx....",
+    "xxoxxxx...",
+    "xxxxxxxx..",
+    "..x.xxxxx.",
+    "....xxxxx.",
+    "...xxxxxx.",
+]
+SERPENT = [
+    "...xx.....xx.....",
+    "..x..x...x..x..xo",
+    ".x....x.x....x.xx",
+    "x......x......x..",
+]
+FALCON = [
+    "xx.........xx",
+    ".xxx.....xxx.",
+    "..xxxx.xxxx..",
+    "...xxxoxxx...",
+    "....xxxxx....",
+    ".....xxx.....",
+    "....x.x.x....",
+]
+PHOENIX_M = [  # wings spread, a tail of flame
+    "ff.....xx.....ff",
+    "fff...xxxx...fff",
+    ".fff..xoox..fff.",
+    "..ffffxxxxffff..",
+    "...fffxxxxfff...",
+    "....ffxxxxff....",
+    ".....xxxxxx.....",
+    "....x..xx..x....",
+    "...x...xx...x...",
+    "..x....xx....x..",
+]
+JADE_DRAGON = [
+    "..xxx......xx....",
+    ".xo.xx...xxxxx...",
+    "..xxxxx.xx...xx..",
+    ".....xxxx..pp.x..",
+    "....xx....pppp.x.",
+    "...xx.....pppp.x.",
+    "...x.......pp.xx.",
+    "...xx........xx..",
+    "....xxxx..xxxx...",
+    ".......xxxx......",
+]
+TREE = [
+    "...llll.llll...",
+    "..lllllllllll..",
+    ".lllllllllllll.",
+    "lllll.lll.lllll",
+    ".lll..ttt..lll.",
+    "......ttt......",
+    "......ttt......",
+    ".....ttttt.....",
+    "...tt.t.t.tt...",
+    "..t..t...t..t..",
+]
+
+# legendary banners (12,000 Stars)
+add("golden_griffin", "Golden Griffin", "legendary", border(F().fill("navy"), "gold").shape(2, 2, GRIFFIN, {"x": "gold", "o": "red"}))
+add("storm_lion", "Storm Lion", "legendary", F().fill("night").shape(2, 3, RAMPANT, {"x": "gold"}).shape(13, 2, BOLT, {"x": "foam"}).shape(11, 6, BOLT, {"x": "foam"}))
+add("crimson_wyvern", "Crimson Wyvern", "legendary", F().fill("black").shape(2, 2, WYVERN, {"x": "red", "o": "gold"}).rect(0, H - 1, W - 1, H - 1, "blood"))
+add("wolf_moon", "Wolf Moon", "legendary", F().fill("night").disc(10.5, 5, 4.4, "moon").shape(6, 2, WOLF, {"x": "black"}).rect(0, 10, W - 1, H - 1, "black")
+    .rect(2, 1, 2, 1, "white").rect(16, 2, 16, 2, "white"))
+add("unicorn", "Silver Unicorn", "legendary", border(F().fill("lapis"), "silver").shape(4, 2, UNICORN, {"x": "white", "o": "lapis"}))
+add("sea_serpent", "Sea Serpent", "legendary", F().fill("deepsea").shape(0, 4, SERPENT, {"x": "jade", "o": "gold"})
+    .rect(0, 9, W - 1, 9, "foam").rect(0, 10, W - 1, H - 1, "blue"))
+add("sun_moon", "Sun and Moon", "legendary", (lambda f: f.disc(4.5, 6, 3.3, "gold").crescent(13, 6, 3.6, "moon", off=1.6))(
+    (lambda f: [f.set(x, y, "orange" if x < W / 2 else "night") for y in range(H) for x in range(W)] and f)(F())))
+add("sky_falcon", "Sky Falcon", "legendary", vgrad(F(), "sky2", "sky2", "sky1", "sky1", "white").shape(2, 3, FALCON, {"x": "brown", "o": "gold"}))
+
+# Mythic: the rarest (25,000 Stars), skies of several colours
+add("phoenix_reborn", "Phoenix Reborn", "mythic", border(vgrad(F(), "night", "plum", "plum", "dusk"), "flame")
+    .shape(1, 1, PHOENIX_M, {"f": "gold", "o": "white", "x": "ember"}))
+add("jade_dragon", "Jade Dragon", "mythic", border(vgrad(F(), "night", "aurora1", "aurora1", "night"), "gold")
+    .shape(0, 1, JADE_DRAGON, {"x": "jade", "o": "gold", "p": "pearl"}))
+add("aurora_crown", "Aurora Crown", "mythic", vgrad(F(), "night", "aurora4", "aurora2", "aurora3", "aurora2", "aurora1", "night")
+    .shape(3, 3, CROWN, {"x": "gold", "o": "rose"}).rect(3, 9, 14, 9, "gold"))
+add("world_tree", "World Tree", "mythic", border(vgrad(F(), "night", "night", "dusk", "plum"), "mint")
+    .shape(1, 1, TREE, {"l": "leaf", "t": "bark"}).rect(16, 2, 16, 2, "white"))
+
+TIER_PRICE = {"common": 1500, "rare": 3000, "epic": 6000, "legendary": 12000, "mythic": 25000}
 ROBUX_PRICE = 149
 
 

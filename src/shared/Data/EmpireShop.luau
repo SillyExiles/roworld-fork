@@ -32,6 +32,8 @@ EmpireShop.TIERS = {
 	rare = { name = "Rare", color = 0x3D8BFF, order = 2 },
 	epic = { name = "Epic", color = 0xA35BFF, order = 3 },
 	legendary = { name = "Legendary", color = 0xFFB22E, order = 4 },
+	-- (2026-11-07) the rarest: four flags, 25,000 Stars, a rainbow border in the shop
+	mythic = { name = "Mythic", color = 0xFF3D7F, order = 5 },
 }
 
 EmpireShop.PREFIX = "ef_"

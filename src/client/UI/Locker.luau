@@ -816,7 +816,7 @@ function Locker._rebuild(self)
 			table.insert(list, it)
 		end
 	end
-	local rank = { exclusive = 0, general = 0, legendary = 1, epic = 2, rare = 3, common = 4 }
+	local rank = { exclusive = 0, general = 0, mythic = 0.5, legendary = 1, epic = 2, rare = 3, common = 4 }
 	table.sort(list, function(a, b)
 		local oa, ob = inv.owned[a.id] == true, inv.owned[b.id] == true
 		if oa ~= ob then

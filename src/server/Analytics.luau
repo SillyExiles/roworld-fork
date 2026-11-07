@@ -126,7 +126,7 @@ Analytics.ARSENAL_FROM = {
 	--- the result screen's offers (the next unlock, 2x Stars), not its Stars pill
 	offer = "Result Offer",
 }
-Analytics.RARITY_NAMES = { common = "Common", rare = "Rare", epic = "Epic", legendary = "Legendary" }
+Analytics.RARITY_NAMES = { common = "Common", rare = "Rare", epic = "Epic", legendary = "Legendary", mythic = "Mythic" }
 Analytics.STATS = "stats"
 --- Longest match time a report may claim (minutes).
 Analytics.MAX_MINUTES = 240
