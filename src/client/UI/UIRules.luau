@@ -133,7 +133,7 @@ UIRules.BLURBS = {
 	warship = "Patrols where you send it: sinks transports, then warships, and captures trade ships. Heals at your ports.",
 	atom = "Razes a {atom_r}-tile circle: troops, land and buildings. The land stays scorched for {scorch_s} s. No SAM can stop it; Walls and Fortresses halve the damage. Reloads in {atom_cd} s.",
 	hydrogen = "Fire that spreads over {fire_r} tiles in {fire_s} s, burning land and buildings as it goes. SAMs can shoot it down; Walls and Fortresses halve the damage. Reloads in {fire_cd} s.",
-	plague = "Strikes the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s, raises none for {plague_halt} s, and the land the plague spreads over ({plague_land}% of theirs) breaks away as an independent nation. Their neighbours may catch it too (yours, if you border them). Nothing stops or eases it. Twice a match at most: its price doubles each time. Reloads in {plague_cd} s.",
+	plague = "Strikes the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s, raises none for {plague_halt} s, loses {plague_gold}% of its gold at once, and the land the plague spreads over ({plague_land}% of theirs) breaks away as an independent nation, taking its garrison along. Their neighbours may catch it too (yours, if you border them). Nothing stops or eases it. Twice a match at most: its price doubles each time. Reloads in {plague_cd} s.",
 	mirv = "Splits into up to {mirv_n} warheads that rain over one nation.",
 	artillery = "Shells every enemy within {art_r} tiles on its own: their troops, and the structures it reaches.",
 	airfield = "Flies Air Strikes on any spot within {air_r} tiles. Rearms in {air_s} s.",
@@ -240,6 +240,7 @@ function UIRules._blurb(kind: string): string
 		plague_cd = tostring(R.siege_reload(Defs.N_PLAGUE) // Defs.TICK_RATE),
 		plague_halt = tostring((R.PLAGUE_HALT_TICKS or 0) // Defs.TICK_RATE),
 		plague_land = tostring(math.floor((R.PLAGUE_LAND_SHARE or 0) * 100 + 0.5)),
+		plague_gold = tostring(math.floor((R.PLAGUE_GOLD_LOSS or 0) * 100 + 0.5)),
 		share_pct = tostring(math.floor((R.SIEGE_SHARE_COST or 0) * 10 + 0.5)),
 	})
 end

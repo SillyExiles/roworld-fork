@@ -32,6 +32,7 @@ local Ev = require("./Ev")
 local Rules = require("./Rules")
 local SimState = require("./SimState")
 local SimRevolts = require("./SimRevolts")
+local NumberFormat = require("./NumberFormat")
 
 local readu8 = buffer.readu8
 local writeu8 = buffer.writeu8
@@ -1155,6 +1156,12 @@ function SimNukes.install(C)
 		-- (2026-11-06: a direct hit always takes, sick or immune; the land it spreads over breaks away)
 		if self:_infect(victim, n.owner, Rules.PLAGUE_TICKS, 1.0, true) then
 			self:_blight_start(victim, to, n.owner)
+			-- (2026-11-07) the treasury lost in the chaos (Rules.PLAGUE_GOLD_LOSS)
+			local lost = math.floor(self.o_gold[victim] * Rules.PLAGUE_GOLD_LOSS)
+			if lost > 0 then
+				self.o_gold[victim] -= lost
+				self:msg(victim, Defs.MSG_BAD, string.format("The plague empties your treasury: %s gold lost", NumberFormat.render_number(lost)))
+			end
 			self:msg(victim, Defs.MSG_ALERT, string.format("%s struck your land with the plague! It is spreading: the land it reaches breaks away", o_name[n.owner]))
 			self:msg(n.owner, Defs.MSG_INFO, string.format("The plague took hold in %s", o_name[victim]))
 			for _, h in self.humans do
@@ -1213,7 +1220,7 @@ function SimNukes.install(C)
 			return
 		end
 		local budget = math.max(Rules.PLAGUE_LAND_MIN, math.floor(self.o_tiles[victim] * Rules.PLAGUE_LAND_SHARE))
-		local steps = math.max(1, Rules.PLAGUE_TICKS // 5)
+		local steps = math.max(1, Rules.PLAGUE_LAND_TICKS // 5)
 		local rng = self.rng
 		local lobes = {}
 		for _, l in Rules.PLAGUE_LOBES do
@@ -1234,7 +1241,7 @@ function SimNukes.install(C)
 			budget = budget,
 			per_step = math.max(1, math.ceil(budget / steps)),
 			taken = 0,
-			until_tick = self.tick + Rules.PLAGUE_TICKS,
+			until_tick = self.tick + Rules.PLAGUE_LAND_TICKS,
 		}
 		self:_blight_push(b, t)
 		table.insert(self.blights, b)
@@ -1419,8 +1426,16 @@ function SimNukes.install(C)
 				if t < NW then push(t + W) end
 			end
 			local rid = b.rid
+			-- (2026-11-07) the garrison of the land that broke away goes with it: the victim's troops in
+			-- the share of its land just taken
+			if rid > 0 and #took > 0 and self.o_alive[rid] == 1 then
+				local before = self.o_tiles[victim] + #took
+				local moved = self.o_troops[victim] * #took / math.max(1, before)
+				self.o_troops[victim] -= moved
+				self.o_troops[rid] += moved
+			end
 			if rid > 0 and self.o_alive[rid] == 1 then
-				-- a free nation's army: half a nation's cap for the land it holds
+				-- a free nation's army: at least half a nation's cap for the land it holds
 				local levy = 0.5 * self.R.max_troops(Defs.KIND_NATION, self.o_tiles[rid], 0, SimRevolts.FREE_SKILL)
 				self.o_troops[rid] = math.max(self.o_troops[rid], levy)
 			end

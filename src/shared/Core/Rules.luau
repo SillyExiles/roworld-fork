@@ -1144,7 +1144,12 @@ local function build(K_LIN: number, into: any?): any
 	--- and the land it spreads over breaks away as a free nation (PLAGUE_LAND_*). It costs a fortune that
 	--- doubles with each use, PLAGUE_MAX_USES a player a match. Its neighbours catch it at
 	--- PLAGUE_SPREAD_SEV, troops only.)
-	Rules.PLAGUE_TICKS = 300
+	--- (2026-11-07, harsher on the nation struck: sick a minute (about 26% of the troops at 0.5% a
+	--- second), no troops raised for 90 s, PLAGUE_GOLD_LOSS of its treasury lost at once, 45% of its
+	--- land breaking away over PLAGUE_LAND_TICKS, and the garrison of that land going with it.)
+	Rules.PLAGUE_TICKS = 600
+	Rules.PLAGUE_LAND_TICKS = 300
+	Rules.PLAGUE_GOLD_LOSS = 0.25
 	Rules.PLAGUE_SPREAD_TICKS = 200
 	Rules.PLAGUE_LOSS_PER_S = 0.005
 	Rules.PLAGUE_SPREAD_GAP = 100
@@ -1152,14 +1157,14 @@ local function build(K_LIN: number, into: any?): any
 	Rules.PLAGUE_SPREAD_P = 0.25
 	Rules.PLAGUE_SPREAD_SEV = 0.5
 	--- A nation the plague takes raises no new troops for PLAGUE_HALT_TICKS from then (x its severity).
-	Rules.PLAGUE_HALT_TICKS = 600
+	Rules.PLAGUE_HALT_TICKS = 900
 	Rules.PLAGUE_IMMUNE_TICKS = 1800
 	Rules.PLAGUE_TEMPLE_CUT = 0.0
 	Rules.PLAGUE_MIN_SEVERITY = 1.0
 	--- The struck nation's land the plague spreads over from where it landed (in PLAGUE_TICKS, its
 	--- connected land only) and that breaks away as an independent nation: this share of its land, at
 	--- least PLAGUE_LAND_MIN tiles.
-	Rules.PLAGUE_LAND_SHARE = 0.35
+	Rules.PLAGUE_LAND_SHARE = 0.45
 	Rules.PLAGUE_LAND_MIN = 30
 	--- (2026-11-07) Its shape (SimNukes._blight_key): lobes { waves around, strength } warp the distance
 	--- by angle, so it reaches out in a few tendrils; PLAGUE_JITTER tiles of noise rag its edge. The free

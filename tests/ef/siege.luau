@@ -173,11 +173,25 @@ expect(sim:plague_uses(A) == 0 and Rules.plague_cost(0) == Rules.nuke_cost("plag
 expect(sim:launch_nuke(A, "plague", target), "the plague flies")
 expect(g0 - sim.o_gold[A] == Rules.plague_cost(0) and sim:plague_uses(A) == 1, "at its first price (" .. (g0 - sim.o_gold[A]) .. ")")
 local sick_at = -1
+sim.o_gold[P] = math.max(sim.o_gold[P], 1000000)
+local pgold = 0
 for _ = 1, 300 do
+	pgold = sim.o_gold[P]
 	sim:step()
 	if sim.o_plague_until[P] > sim.tick then sick_at = sim.tick break end
 end
 expect(sick_at > 0, "it took hold")
+expect(sim.o_gold[P] <= pgold * (1 - Rules.PLAGUE_GOLD_LOSS) + pgold * 0.02, string.format("and emptied a quarter of its treasury (%d -> %d)", pgold, sim.o_gold[P]))
+-- (the garrison of the land breaking away goes with it: watched over the spread)
+local garrison = { moved = 0 }
+local bt_g = sim._blights_tick
+sim._blights_tick = function(self2)
+	local b = self2.blights[1]
+	local vt0 = if b then self2.o_troops[b.victim] else 0
+	local taken0 = if b then b.taken else 0
+	bt_g(self2)
+	if b and b.rid > 0 and b.taken > taken0 then garrison.moved += 1; garrison.ok = (garrison.ok ~= false) and self2.o_troops[b.victim] < vt0 end
+end
 expect(sim.o_plague_sev[P] == 1 and Rules.plague_severity(9) == 1, "at full strength: nothing eases it")
 local halt_to = sim.o_plague_halt[P]
 expect(halt_to == sick_at + math.floor(Rules.PLAGUE_HALT_TICKS * sim.o_plague_sev[P] + 0.5) and halt_to > sim.tick, "its army stops growing for a while (" .. (halt_to - sim.tick) .. " ticks)")
@@ -212,6 +226,8 @@ expect(spread, "it spread to a neighbour")
 for _ = 1, Rules.PLAGUE_TICKS do sim:step() end
 expect(sim.o_plague_until[P] == 0, "the plague ends")
 expect(not sim:_infect(P, A, 100), "and leaves the nation immune to contagion for a while")
+sim._blights_tick = bt_g
+expect(garrison.moved > 0 and garrison.ok, "the land that broke away took its garrison along (" .. garrison.moved .. " steps)")
 -- the land it spread over broke away as a free nation
 local free = 0
 for o = owners0 + 1, sim.owner_total do
