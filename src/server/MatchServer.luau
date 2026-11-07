@@ -733,7 +733,8 @@ function MatchServer._start_match(self: any)
 			end
 			-- a team game (Core/Teams; staging only for now): no nations in public team
 			-- games, except Humans Vs Nations, which has as many as the match has player slots
-			if info.mode == "team" and info.teams ~= nil then
+			-- (World's lobby is a team game every other round: mode "world" with teams)
+			if (info.mode == "team" or info.mode == "world") and info.teams ~= nil then
 				config.teams = info.teams
 				if info.teams == MatchServer.HVN then
 					config.nation_limit = if type(info.max) == "number" then info.max else nil
@@ -1292,7 +1293,7 @@ function MatchServer.lobby_info(self: any, peer: any): { [string]: any }
 		if ok and type(info) == "table" then
 			max = info.max
 			lobby_map = info.map_id
-			teams = if info.mode == "team" then info.teams else nil
+			teams = if info.mode == "team" or info.mode == "world" then info.teams else nil
 			public_mode = info.mode
 			hosted = info.hosted == true
 		end

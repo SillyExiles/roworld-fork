@@ -14,7 +14,8 @@
 --     repeating the last RECENT_MAPS maps.
 --   * Player cap: 50 per million full-size land tiles x 1.5 (round to 5), clamped to [MIN_PLAYERS,
 --     MAX_PLAYERS]: World and larger maps host 50 (and never more than a server holds: max_players).
---   * Kinds: a free-for-all, a team game, and World's own free-for-all (MODE_WORLD, always open).
+--   * Kinds: a free-for-all, a team game, and World's own (MODE_WORLD, always open; Empires Front: a
+--     team game every other round, world_teams). Empires Front starts them together (ROUND_S).
 
 local LobbyRules = {}
 
@@ -49,14 +50,17 @@ end
 --- open at least (more when the demand calls for them: missing_starts).
 function LobbyRules.kinds(team_games: boolean?): { { mode: string, target: number } }
 	if team_games then
-		-- (Empires Front: no World mode; the empires' maps rotate in the free-for-all)
+		-- (Empires Front 2026-11-07: three cards, starting together each round (ROUND_S): the
+		-- free-for-all, World (free for all or teams, a round each: world_teams) and the team game)
 		return {
 			{ mode = LobbyRules.MODE_FFA, target = LobbyRules.TARGETS_WITH_TEAMS.ffa },
+			{ mode = LobbyRules.MODE_WORLD, target = LobbyRules.TARGETS_WITH_TEAMS.world },
 			{ mode = LobbyRules.MODE_TEAM, target = LobbyRules.TARGETS_WITH_TEAMS.team },
 		}
 	end
 	return {
 		{ mode = LobbyRules.MODE_FFA, target = LobbyRules.TARGET_OPEN },
+		{ mode = LobbyRules.MODE_WORLD, target = LobbyRules.TARGETS_WITH_TEAMS.world },
 	}
 end
 --- Public matches play their map at this % of its width and height (the full-size maps felt huge,
@@ -79,6 +83,10 @@ LobbyRules.QUIET_INTERVAL_S = 25
 --- second and PUBLIC MATCH, which takes World's seats when World's lobby is the sooner (takes_from),
 --- never was. Half an interval apart, the soonest alternates.
 LobbyRules.WORLD_STAGGER_S = 22
+--- Empires Front (2026-11-07): the public lobbies start in rounds, every kind together: their starts
+--- fall on multiples of ROUND_S seconds (os.time(), the same on every server), ROUND_S apart, so the
+--- title's three cards (PUBLIC MATCH, WORLD, the team game) count down to the same start.
+LobbyRules.ROUND_S = 30
 LobbyRules.JOIN_CLOSE_S = 6
 LobbyRules.RECENT_MAPS = 3
 LobbyRules.MIN_PLAYERS = 10
@@ -338,8 +346,8 @@ function LobbyRules.public_weights(maps: { any }): { { id: string, weight: numbe
 	local out = {}
 	for _, m in maps do
 		local w = math.max(0, tonumber(m.weight) or 0)
-		-- (Empires Front 2026-10-31: no World mode, so World rotates in the free-for-all with the others)
-		if true then
+		-- (Empires Front 2026-11-07: World has its own card again (MODE_WORLD), so not in this rotation)
+		if m.id ~= LobbyRules.WORLD_ID then
 			for _, c in (if type(m.categories) == "table" then m.categories else {}) do
 				if LobbyRules.WEIRD_CATEGORIES[c] then
 					w *= LobbyRules.WEIRD_FACTOR
@@ -384,13 +392,16 @@ end
 --- `avoid` (World's: the free-for-alls' starts, made and about to be): on the quiet schedule the first
 --- new start that would fall within WORLD_STAGGER_S of one moves to WORLD_STAGGER_S after it (once, and
 --- not past LOBBY_OPEN_S), so a schedule that started level (every lobby until 2026-10-19) comes apart.
+--- `round` (Empires Front, ROUND_S): every start on a multiple of it and `round` apart instead (no
+--- `avoid`), so the kinds start together.
 function LobbyRules.missing_starts(
 	open: { Lobby },
 	now: number,
 	mode: string?,
 	target: number?,
 	demand: Demand?,
-	avoid: { number }?
+	avoid: { number }?,
+	round: number?
 ): { number }
 	local joinable = 0
 	local free = 0
@@ -423,8 +434,16 @@ function LobbyRules.missing_starts(
 		lead = LobbyRules.QUIET_LEAD_S
 		interval = math.min(interval, LobbyRules.QUIET_INTERVAL_S)
 	end
+	if round ~= nil and round > 0 then
+		-- rounds: every kind's starts on the same grid, one round apart (and a new one far enough out
+		-- to count as open, past `cover`, or the round after it would be made at once too)
+		interval = round
+		lead = math.max(lead, cover + 1)
+	end
 	local next_start = math.max(now + lead, latest + interval)
-	if avoid ~= nil and interval >= LobbyRules.LOBBY_INTERVAL_S then
+	if round ~= nil and round > 0 then
+		next_start = math.ceil(next_start / round) * round
+	elseif avoid ~= nil and interval >= LobbyRules.LOBBY_INTERVAL_S then
 		for _, a in avoid do
 			if math.abs(next_start - a) < LobbyRules.WORLD_STAGGER_S then
 				local moved = a + LobbyRules.WORLD_STAGGER_S
@@ -513,6 +532,54 @@ function LobbyRules.spread(list: { Lobby }, uid: string, now: number): { Lobby }
 	return out
 end
 
+--- The round (a start time) player `uid` is shown first: among the joinable lobbies' starts, a
+--- weighted pick (each start weighs the spread_weight of its lobbies), stable for that player. nil:
+--- none joinable.
+function LobbyRules.pick_round(list: { Lobby }, uid: string, now: number): number?
+	local weight: { [number]: number } = {}
+	for _, l in list do
+		local w = LobbyRules.spread_weight(l, now)
+		if w > 0 then
+			weight[l.starts] = (weight[l.starts] or 0) + w
+		end
+	end
+	local best: number? = nil
+	local best_k: number = -math.huge
+	for starts: number, w: number in weight do
+		local u = math.max(LobbyRules.hash01(uid .. ":round:" .. tostring(starts)), 1e-9)
+		local k: number = u ^ (1 / w)
+		if k > best_k or (k == best_k and best ~= nil and starts < best) then
+			best, best_k = starts, k
+		end
+	end
+	return best
+end
+
+--- `list` (in a player's spread order) with the lobbies of round `starts` that have room moved to the
+--- front, the rest in their order: each kind's card (its first lobby) shows that round when it can.
+function LobbyRules.round_first(list: { Lobby }, starts: number?, now: number): { Lobby }
+	if starts == nil then
+		return list
+	end
+	local front: { Lobby }, rest: { Lobby } = {}, {}
+	for _, l in list do
+		if l.starts == starts and LobbyRules.spread_weight(l, now) > 0 then
+			table.insert(front, l)
+		else
+			table.insert(rest, l)
+		end
+	end
+	for _, l in rest do
+		table.insert(front, l)
+	end
+	return front
+end
+
+--- World's lobby starting at `starts` is a team game (every other round; the rest free for all).
+function LobbyRules.world_teams(starts: number): boolean
+	return (starts // LobbyRules.ROUND_S) % 2 == 1
+end
+
 --- The map id a public match on `map` plays ("world@80").
 function LobbyRules.match_map_id(map: string): string
 	return if LobbyRules.MAP_SCALE_PCT < 100 then map .. "@" .. LobbyRules.MAP_SCALE_PCT else map
@@ -547,7 +614,7 @@ function LobbyRules.public_view(l: Lobby, now: number): { [string]: any }
 	local live = l.status == "started"
 	return {
 		mode = if l.mode == LobbyRules.MODE_TEAM or l.mode == LobbyRules.MODE_WORLD then l.mode else nil,
-		teams = if l.mode == LobbyRules.MODE_TEAM then l.teams else nil,
+		teams = if l.mode == LobbyRules.MODE_TEAM or l.mode == LobbyRules.MODE_WORLD then l.teams else nil,
 		id = l.id,
 		map = l.map,
 		map_name = l.map_name,
@@ -602,7 +669,7 @@ function LobbyRules.decode(v: any): Lobby?
 		code = if type(v.code) == "string" then v.code else nil,
 		psid = if type(v.psid) == "string" then v.psid else nil,
 		mode = if v.mode == LobbyRules.MODE_TEAM or v.mode == LobbyRules.MODE_WORLD then v.mode else nil,
-		teams = if v.mode == LobbyRules.MODE_TEAM and (type(v.teams) == "number" or type(v.teams) == "string")
+		teams = if (v.mode == LobbyRules.MODE_TEAM or v.mode == LobbyRules.MODE_WORLD) and (type(v.teams) == "number" or type(v.teams) == "string")
 			then v.teams
 			else nil,
 		seats = seats,
@@ -684,8 +751,18 @@ function LobbyRules.team_weights(maps: { any }): { { id: string, weight: number 
 	for _, m in maps do
 		local f: number? = (LobbyRules.TEAM_FREQUENCY :: { [string]: number })[m.id]
 		local w = if f ~= nil then f else math.max(0, tonumber(m.weight) or 0)
-		-- (Empires Front 2026-11-01: every map is played both ways, free for all and in teams)
-		table.insert(out, { id = m.id, weight = w })
+		-- (Empires Front 2026-11-01: every map is played both ways, free for all and in teams; World
+		-- has its own card since 2026-11-07, which is a team game every other round: world_teams)
+		if m.id ~= LobbyRules.WORLD_ID then
+			table.insert(out, { id = m.id, weight = w })
+		end
+	end
+	if #out == 0 then
+		for _, m in maps do
+			if m.id == LobbyRules.WORLD_ID then
+				table.insert(out, { id = m.id, weight = math.max(0, tonumber(m.weight) or 0) })
+			end
+		end
 	end
 	return out
 end

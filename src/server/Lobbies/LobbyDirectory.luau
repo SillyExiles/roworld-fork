@@ -143,7 +143,9 @@ function LobbyDirectory.view_for(self: any, uid: string): { any }
 		end
 	end
 	local out = {}
-	for _, l in LobbyRules.spread(open, uid, now) do
+	-- (2026-11-07: the kinds start together, in rounds; this player's round first, so every card shows it)
+	local order = LobbyRules.spread(open, uid, now)
+	for _, l in LobbyRules.round_first(order, LobbyRules.pick_round(open, uid, now), now) do
 		table.insert(out, LobbyRules.public_view(l, now))
 	end
 	table.sort(live, function(a, b)
@@ -233,6 +235,8 @@ function LobbyDirectory.refresh(self: any)
 		self.demand[k.mode] = LobbyRules.demand(list, now, k.mode, window)
 	end
 	local want = {}
+	-- (Empires Front, team games on: every kind on the same rounds, LobbyRules.ROUND_S)
+	local round = if deps.team_games then LobbyRules.ROUND_S else nil
 	-- the free-for-alls' starts, made and about to be: World's keep clear of them (WORLD_STAGGER_S), so
 	-- PUBLIC MATCH, which takes World's seats too, finds World's lobby the soonest about half the time
 	local ffa_starts = {}
@@ -246,12 +250,12 @@ function LobbyDirectory.refresh(self: any)
 		local plain = k.mode == LobbyRules.MODE_FFA and not deps.team_games
 		local mode = if plain then nil else k.mode
 		local avoid = nil
-		if k.mode == LobbyRules.MODE_WORLD then
+		if k.mode == LobbyRules.MODE_WORLD and round == nil then
 			table.sort(ffa_starts)
 			avoid = ffa_starts
 		end
 		for _, starts in
-			LobbyRules.missing_starts(list, now, mode, if plain then nil else k.target, self.demand[k.mode], avoid)
+			LobbyRules.missing_starts(list, now, mode, if plain then nil else k.target, self.demand[k.mode], avoid, round)
 		do
 			table.insert(want, { starts, k.mode })
 			if k.mode == LobbyRules.MODE_FFA then
@@ -280,7 +284,8 @@ end
 
 --- Create one lobby starting at `starts` (a reserved server + a store record); `mode`:
 --- LobbyRules.MODE_TEAM for a team game (team playlist and team sizes), MODE_WORLD for
---- World's own free-for-all (that map only).
+--- World's own (that map only; with team games on, a team game every other round:
+--- LobbyRules.world_teams).
 function LobbyDirectory.create(self: any, starts: number, mode: string?): LobbyRules.Lobby?
 	local deps = self.deps
 	local maps = deps.maps()
@@ -335,7 +340,7 @@ function LobbyDirectory.create(self: any, starts: number, mode: string?): LobbyR
 		if type(deps.server_size) == "function" then deps.server_size() else nil
 	)
 	local teams = nil
-	if team then
+	if team or (world and deps.team_games and LobbyRules.world_teams(starts)) then
 		max, teams = LobbyRules.team_slots(max, LobbyRules.team_config(map_id, deps.rand(), deps.rand()))
 	end
 	local code, psid = deps.teleport.reserve()
@@ -365,7 +370,7 @@ function LobbyDirectory.create(self: any, starts: number, mode: string?): LobbyR
 			l.id,
 			l.map,
 			l.max,
-			if team then ", " .. tostring(teams) .. " teams" else "",
+			if teams ~= nil then ", " .. tostring(teams) .. " teams" else "",
 			starts - now
 		)
 	)
@@ -520,8 +525,20 @@ function LobbyDirectory.join_public(self: any, players: { any }, mode: string, o
 	end
 	local now = deps.now()
 	local spec = LobbyRules.take_spec(mode, n, uids, now, o.id)
-	-- (Empires Front: tried in the order the joining player sees them, LobbyRules.spread)
-	local open = LobbyRules.spread(self:_open_of(mode, now), uids[1] or "", now)
+	-- (Empires Front: tried in the order the joining player sees them, LobbyRules.spread, their
+	-- round first: view_for)
+	local uid1 = uids[1] or ""
+	local joinable = {}
+	for _, l in self._lobbies do
+		if l.status == "open" and l.starts > now and LobbyRules.joinable(l, now) then
+			table.insert(joinable, l)
+		end
+	end
+	local open = LobbyRules.round_first(
+		LobbyRules.spread(self:_open_of(mode, now), uid1, now),
+		LobbyRules.pick_round(joinable, uid1, now),
+		now
+	)
 	local ids = {}
 	for _, l in open do
 		table.insert(ids, l.id)

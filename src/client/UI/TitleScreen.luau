@@ -1401,14 +1401,8 @@ function TitleScreen._refresh_lobby_cards(self)
 		soonest[k] = soonest[k] or lb
 		has_team = has_team or k == "team"
 	end
-	-- PUBLIC MATCH takes World's seats too (the server's LobbyRules.takes_from; 2026-10-19: the World
-	-- and PUBLIC MATCH buttons can still put players into the same match):
-	-- its next match is World's when that starts sooner (a tie: the free-for-all, as the server picks)
-	local cards_of: { [string]: any } = table.clone(soonest)
-	local w, f = soonest.world, soonest.ffa
-	if w ~= nil and (f == nil or (tonumber(w.starts_in) or 0) < (tonumber(f.starts_in) or 0)) then
-		cards_of.ffa = w
-	end
+	-- (each card its own kind: PUBLIC MATCH no longer takes World's seats, LobbyRules.takes_from)
+	local cards_of: { [string]: any } = soonest
 	local kinds = self._kinds or (if has_team then { "ffa", "team" } else { "ffa" })
 	-- phones with three kinds side by side: each card is only its title and status line (the whole
 	-- card is the button), or the titles and lines were cut to "GIANT W", "World ·…" (2026-10-19)
@@ -1479,7 +1473,8 @@ function TitleScreen._refresh_kind_card(self, card: { [string]: any }, kind: str
 		card.title:set_text(if kind == "team" then "TEAM GAME" elseif kind == "world" then "WORLD" else "PUBLIC MATCH")
 	end
 	-- a team game: its teams first ("4 Teams", "Duos", "Humans Vs Nations")
-	local teams = if l ~= nil and l.mode == "team" and l.teams ~= nil
+	-- (World's lobby is a team game every other round)
+	local teams = if l ~= nil and (l.mode == "team" or l.mode == "world") and l.teams ~= nil
 		then (
 			if type(l.teams) == "number"
 				then string.format("%d Teams", l.teams)
