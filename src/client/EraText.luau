@@ -159,7 +159,8 @@ local function watch(obj: Instance)
 	if watched[obj] then
 		return
 	end
-	if obj:IsA("TextLabel") or obj:IsA("TextButton") then
+	-- (UI/Widgets labels translate their own text, and measure it: "WText")
+	if (obj:IsA("TextLabel") or obj:IsA("TextButton")) and obj.Name ~= "WText" then
 		watched[obj] = true
 		fix(obj)
 		obj:GetPropertyChangedSignal("Text"):Connect(function()
@@ -179,13 +180,34 @@ local function redo()
 	end
 end
 
+--- The player's words for a text the game wrote (its language, then the era's names).
+function EraText.show(t: string): string
+	return Lang.terms(EraText.tr(Lang.tr(t)))
+end
+
 function EraText.start()
 	build(Era.id())
+	-- (UI/Widgets labels: shown in the player's words, measured by them; redrawn when either changes)
+	local okw, W = pcall(function()
+		return require(script.Parent:WaitForChild("UI"):WaitForChild("Widgets")) :: any
+	end)
+	local relabel = function() end
+	if okw and type(W) == "table" then
+		W.translate = EraText.show
+		relabel = function()
+			W.relabel()
+		end
+		relabel()
+	end
 	Era.on_change(function(id: string?)
 		build(id)
 		redo()
+		relabel()
 	end)
-	Lang.on_change(redo)
+	Lang.on_change(function()
+		redo()
+		relabel()
+	end)
 	task.spawn(function()
 		Lang.apply_default()
 	end)

@@ -1995,6 +1995,36 @@ Icon.set_self_modulate = Icon.set_color
 local Label = class(Control)
 W.Label = Label
 
+-- (2026-11-07) The player's language: a Label shows `W.translate(text)` (set by EraText: Lang, then the
+-- era's words) and is measured by it, so a longer translation gets the room it needs. `text` stays the
+-- game's English (code compares and reads it). W.relabel() redraws every live label after a change.
+W.translate = nil :: ((string) -> string)?
+local live_labels: { [any]: boolean } = setmetatable({}, { __mode = "k" }) :: any
+
+local function shown(s: string): string
+	local tr = W.translate
+	if tr == nil or s == "" then
+		return s
+	end
+	local ok, out = pcall(tr, s)
+	return if ok and type(out) == "string" then out else s
+end
+
+function W.relabel()
+	for l in live_labels do
+		if l.gui ~= nil and l.gui.Parent ~= nil then
+			local d = shown(l.text)
+			if d ~= l._disp then
+				l._disp = d
+				if l:_min_depends_on_text() then
+					l:update_minimum_size()
+				end
+				l:_redraw()
+			end
+		end
+	end
+end
+
 function Label.new(text: string?)
 	local self = new_of(Label)
 	Control._init(self)
@@ -2004,6 +2034,8 @@ end
 
 function Label._init_label(self, text: string?)
 	self.text = text or ""
+	self._disp = shown(self.text)
+	live_labels[self] = true
 	self.font_size = 15
 	self.base_fs = 15
 	self.weight = 500
@@ -2031,6 +2063,7 @@ function Label.set_text(self, s: string)
 		return
 	end
 	self.text = s
+	self._disp = shown(s)
 	if self:_min_depends_on_text() then
 		self:update_minimum_size()
 	end
@@ -2095,9 +2128,9 @@ function Label._get_minimum_size(self): Vector2
 	local lh = UITheme.line_height(self.font_size)
 	if self.autowrap then
 		local w = if self.size.X > 0 then self.size.X else self.custom_minimum_size.X
-		return Vector2.new(0, UITheme.wrapped_height(self.text, self.font_size, self.weight, math.max(w, 1)))
+		return Vector2.new(0, UITheme.wrapped_height(self._disp, self.font_size, self.weight, math.max(w, 1)))
 	end
-	local lines = string.split(self.text, "\n")
+	local lines = string.split(self._disp, "\n")
 	local h = lh * math.max(1, #lines)
 	if self.clip_text or self.text_overrun_behavior ~= W.OVERRUN_NONE then
 		return Vector2.new(1, h)
@@ -2133,6 +2166,8 @@ end
 
 local function make_text(parent: Instance, weight: number, z: number): TextLabel
 	local t = Instance.new("TextLabel")
+	-- (a Widgets label is already in the player's words: client/EraText leaves "WText" alone)
+	t.Name = "WText"
 	-- (Roblox's default text is "Label": an empty label must show nothing until its text is set)
 	t.Text = ""
 	t.BackgroundTransparency = 1
@@ -2148,7 +2183,7 @@ local function make_text(parent: Instance, weight: number, z: number): TextLabel
 end
 
 function Label._use_glyphs(self): boolean
-	return (self.spacing ~= 0 or self.tabular) and not self.autowrap and not string.find(self.text, "\n", 1, true)
+	return (self.spacing ~= 0 or self.tabular) and not self.autowrap and not string.find(self._disp, "\n", 1, true)
 end
 
 function Label._recolor(self)
@@ -2196,7 +2231,7 @@ function Label._redraw(self)
 		end
 		-- Per-glyph rendering: letter spacing and / or tabular digits.
 		local chars = {}
-		for _, cp in utf8.codes(self.text) do
+		for _, cp in utf8.codes(self._disp) do
 			table.insert(chars, utf8.char(cp))
 		end
 		local sp = self.spacing * s
@@ -2215,7 +2250,7 @@ function Label._redraw(self)
 			end
 			total = x
 		else
-			local pos, adv = UITheme.glyph_positions(self.text, ts, self.weight)
+			local pos, adv = UITheme.glyph_positions(self._disp, ts, self.weight)
 			local prev = 0
 			for i = 1, #chars do
 				-- monotonic pen positions (kerning never moves a glyph behind its predecessor)
@@ -2280,7 +2315,7 @@ function Label._redraw(self)
 	end
 	tl.FontFace = font
 	tl.TextSize = ts
-	tl.Text = self.text
+	tl.Text = self._disp
 	tl.TextWrapped = self.autowrap
 	tl.LineHeight = if self.autowrap then lh * s / ts else 1
 	tl.TextXAlignment = if self.horizontal_alignment == W.ALIGN_CENTER
