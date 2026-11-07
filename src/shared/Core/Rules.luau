@@ -1072,7 +1072,7 @@ local function build(K_LIN: number, into: any?): any
 	--- Atom 750k, hydrogen 5M, MIRV 25M (+15M per MIRV launched in the match; see nuke_cost()).
 	--- (Arsenal: mega 2.5M, scattershot 3.75M; a shell, an air strike and a railgun slug are free —
 	--- their battery, airfield or railgun is the price.)
-	Rules.NUKE_COST = zt({ 750000, 5000000, 25000000, 0, 2500000, 3750000, 0, 0, 0, 1200000, 6000000 })
+	Rules.NUKE_COST = zt({ 750000, 5000000, 25000000, 0, 2500000, 3750000, 0, 0, 0, 1200000, 9000000 })
 	Rules.MIRV_COST_STEP = 15000000
 	--- nukeMagnitudes (full-size tiles): atom 12/30, hydrogen 80/100, warhead 12/18 (inner / outer).
 	--- (Arsenal: mega = twice an atom bomb's radii, four times its ground; scattershot's own crater is
@@ -1192,11 +1192,13 @@ local function build(K_LIN: number, into: any?): any
 	--- like a small Fire (nuke radii of N_FIRERAIN, FIRE_BURN_*: the land burns free, the buildings
 	--- burn down) and spares the launcher's friends. At most FIRERAIN_STRIKES_ALL fires in all. Like
 	--- the plague, FIRERAIN_MAX_USES a player a match, its price doubling (FIRERAIN_COST_GROWTH).
+	--- (2026-11-07, a bit more destructive and dearer: 4-16 fires a nation, one more a 1,000 tiles, 300
+	--- in all, wider fires (Data/Eras) and a price half as high again)
 	Rules.FIRERAIN_TICKS = 100
-	Rules.FIRERAIN_STRIKES_MIN = 3
-	Rules.FIRERAIN_STRIKES_MAX = 12
-	Rules.FIRERAIN_TILES_PER = 1500
-	Rules.FIRERAIN_STRIKES_ALL = 220
+	Rules.FIRERAIN_STRIKES_MIN = 4
+	Rules.FIRERAIN_STRIKES_MAX = 16
+	Rules.FIRERAIN_TILES_PER = 1000
+	Rules.FIRERAIN_STRIKES_ALL = 300
 	Rules.FIRERAIN_MAX_USES = 2
 	Rules.FIRERAIN_COST_GROWTH = 2
 	function Rules.firerain_cost(uses: number?): number
