@@ -425,6 +425,14 @@ do
 		end
 	end
 	local ally_s0 = count_structs(ally)
+	-- (2026-11-07) the strongest foe: made strong enough (its share of the map) for the rain to humble
+	local big, bt0 = 0, 0
+	for o, f in foes do if f.tiles > bt0 then big, bt0 = o, f.tiles end end
+	local share0 = Rules.FIRERAIN_STRONG_SHARE
+	Rules.FIRERAIN_STRONG_SHARE = math.min(share0, sim:land_share(big) * 0.99)
+	expect(sim:_firerain_strong(big), string.format("%s counts as strong (%.1f%% of the map)", sim.o_name[big], sim:land_share(big) * 100))
+	sim.o_troops[big] = math.max(sim.o_troops[big], 100000)
+	local big_troops0 = sim.o_troops[big]
 	sim.o_gold[A] += 100000000
 	local g0 = sim.o_gold[A]
 	expect(not sim:launch_nuke(A, "firerain", sim.o_spawn_tile[ally]), "the rain can't be aimed at an ally")
@@ -449,11 +457,18 @@ do
 		end
 	end
 	sim._unrest_tick = unrest_tick
+	Rules.FIRERAIN_STRONG_SHARE = share0
+	expect(sim.o_troops[big] < big_troops0 * 0.8, string.format("the strong one lost a share of its army (%d -> %d)", big_troops0, sim.o_troops[big]))
+	local rose_big = 0
+	for o = owners0 + 1, sim.owner_total do
+		if sim.o_alive[o] == 1 and string.sub(sim.o_name[o], 1, 5) == "Free " then rose_big += 1 end
+	end
 	local risen = 0
 	for o = owners0 + 1, sim.owner_total do
 		if sim.o_alive[o] == 1 and string.sub(sim.o_name[o], 1, 5) == "Free " then risen += sim.o_tiles[o] end
 	end
 	expect(risen > 0, string.format("some of the burned land rose as free nations (%d nations, %d tiles)", sim.owner_total - owners0, risen))
+	expect(sim.o_tiles[big] < bt0 * 0.8, string.format("and much of its land is gone or risen (%d -> %d tiles)", bt0, sim.o_tiles[big]))
 	local hit, burned, razed = 0, 0, 0
 	for o, f in foes do
 		if sim.o_tiles[o] < f.tiles then hit += 1; burned += f.tiles - sim.o_tiles[o] end

@@ -1246,6 +1246,22 @@ local function build(K_LIN: number, into: any?): any
 	Rules.FIRERAIN_FREE_MIN_TILES = 1200
 	--- (at most this many rise a rain: on its biggest victims; each is a new AI nation to run)
 	Rules.FIRERAIN_FREE_MAX = 8
+	--- (2026-11-07) The rain humbles the strong: a nation holding FIRERAIN_STRONG_SHARE of the map's
+	--- land or more (and FIRERAIN_STRONG_MIN_TILES) takes FIRERAIN_STRONG_MULT x the fires (up to
+	--- FIRERAIN_STRONG_MAX), loses FIRERAIN_STRONG_TROOPS of its army over the fires that land (a fire a
+	--- Watchtower shoots down spares its share), and FIRERAIN_STRONG_UPRISINGS of its fires each set off
+	--- an uprising: from where it lands, FIRERAIN_STRONG_UPRISE_SHARE of its land breaks away as a free
+	--- nation over FIRERAIN_STRONG_UPRISE_TICKS (the garrison goes with it).
+	Rules.FIRERAIN_STRONG_SHARE = 0.1
+	Rules.FIRERAIN_STRONG_MIN_TILES = 3000
+	Rules.FIRERAIN_STRONG_MULT = 1.75
+	Rules.FIRERAIN_STRONG_MAX = 30
+	Rules.FIRERAIN_STRONG_TROOPS = 0.3
+	Rules.FIRERAIN_STRONG_UPRISINGS = 3
+	Rules.FIRERAIN_STRONG_UPRISE_SHARE = 0.07
+	Rules.FIRERAIN_STRONG_UPRISE_TICKS = 200
+	--- (and its army raises no troops for FIRERAIN_STRONG_HALT_TICKS from an uprising on: its losses stick)
+	Rules.FIRERAIN_STRONG_HALT_TICKS = 600
 	--- (its colour: the old empire's, FIRERAIN_FREE_TINT of the way to ash-orange)
 	Rules.FIRERAIN_FREE_TINT = 0.35
 	--- Ticks a volley's arrows fly from `from_tile` to `to_tile` (W x H map).

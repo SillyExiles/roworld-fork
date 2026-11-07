@@ -1282,6 +1282,10 @@ function SimNukes.install(C)
 					Rules.FIRERAIN_STRIKES_MIN,
 					Rules.FIRERAIN_STRIKES_MAX
 				)
+				-- (2026-11-07) the strong take more
+				if self:_firerain_strong(o) then
+					want[o] = math.min(Rules.FIRERAIN_STRONG_MAX, math.floor(want[o] * Rules.FIRERAIN_STRONG_MULT + 0.5))
+				end
 			end
 		end
 		if #targets == 0 then
@@ -1296,7 +1300,10 @@ function SimNukes.install(C)
 		if total > Rules.FIRERAIN_STRIKES_ALL then
 			local f = Rules.FIRERAIN_STRIKES_ALL / total
 			for _, o in targets do
-				want[o] = math.max(1, math.floor(want[o] * f))
+				-- (a strong nation keeps its share: the others are cut)
+				if not self:_firerain_strong(o) then
+					want[o] = math.max(1, math.floor(want[o] * f))
+				end
 			end
 		end
 		-- each target's land: tiles found near its buildings, its capital and along its border, a few
@@ -1414,6 +1421,18 @@ function SimNukes.install(C)
 				n_free = math.min(#tiles - on_b, math.floor(#tiles * Rules.FIRERAIN_FREE_SHARE + 0.5))
 			end
 			local free = if n_free > 0 then { victim = o, launcher = id, rid = 0, taken = 0 } else nil
+			-- (2026-11-07) a strong nation: each fire that lands costs it a share of its army, and a few
+			-- of them (spread over its land) set off uprisings
+			local strong = self:_firerain_strong(o)
+			local loss = if strong and #tiles > 0 then 1 - (1 - Rules.FIRERAIN_STRONG_TROOPS) ^ (1 / #tiles) else 0
+			local uprise = {}
+			if strong then
+				local nu = math.min(Rules.FIRERAIN_STRONG_UPRISINGS, #tiles)
+				for u = 1, nu do
+					uprise[math.max(1, math.floor(u * #tiles / nu))] = true
+				end
+				self:msg(o, Defs.MSG_ALERT, "Your empire is the mightiest: the fire arrows fall hardest on you, and your provinces may rise!")
+			end
 			for j, t in tiles do
 				local from, bd = silos[1], math.huge
 				for _, st in silos do
@@ -1423,7 +1442,7 @@ function SimNukes.install(C)
 					end
 				end
 				local at = tick + self.R.firerain_flight(self.W, self.H, from, t) + rng:randi() % math.max(1, Rules.FIRERAIN_STAGGER)
-				table.insert(q, { at = at, tile = t, victim = o, owner = id, vid = n.uid, free = if j > #tiles - n_free then free else nil })
+				table.insert(q, { at = at, tile = t, victim = o, owner = id, vid = n.uid, free = if j > #tiles - n_free then free else nil, loss = loss, uprise = uprise[j] == true })
 				table.insert(shot, { from, t, at })
 			end
 			self:add_grudge(o, id, Rules.NUKE_GRUDGE_TICKS)
@@ -1478,6 +1497,40 @@ function SimNukes.install(C)
 			if #guards > 0 and self:_rain_guarded(f, guards) then
 				continue
 			end
+			-- (2026-11-07) a strong nation's army thins with each fire that lands, and its provinces rise
+			local v = f.victim
+			if self.o_alive[v] == 1 then
+				if (f.loss or 0) > 0 then
+					local dead = self.o_troops[v] * f.loss
+					self.o_troops[v] -= dead
+					self.dbg_flow[v * 5 + 3] += dead
+				end
+				-- (the uprising starts on its land just beyond the crater, which the fire razes)
+				local at = -1
+				if f.uprise then
+					local W = self.W
+					local _, outer = self.R.nuke_radii(N_FIRERAIN)
+					for k = 0, 23 do
+						local r = outer + 3 + (k // 8) * 6
+						local ang = (k % 8) * math.pi / 4 + (k // 8) * 0.4
+						local x = f.tile % W + math.floor(math.cos(ang) * r)
+						local y = f.tile // W + math.floor(math.sin(ang) * r)
+						if x >= 0 and x < W and y >= 0 and y < self.H and readi32(self.owner, (y * W + x) * 4) == v then
+							at = y * W + x
+							break
+						end
+					end
+				end
+				if at >= 0 then
+					-- (and its army stops growing a while: the losses stick)
+					self.o_plague_halt[v] = math.max(self.o_plague_halt[v], self.tick + Rules.FIRERAIN_STRONG_HALT_TICKS)
+					self:_blight_start(v, at, f.owner, {
+						fire = true,
+						share = Rules.FIRERAIN_STRONG_UPRISE_SHARE,
+						ticks = Rules.FIRERAIN_STRONG_UPRISE_TICKS,
+					})
+				end
+			end
 			local fake = {
 				uid = self.next_uid,
 				kind = N_FIRERAIN,
@@ -1495,6 +1548,11 @@ function SimNukes.install(C)
 				q[i] = nil
 			end
 		end
+	end
+
+	--- (2026-11-07) Whether `o` is strong enough for the rain to fall hardest on it (Rules.FIRERAIN_STRONG_*).
+	function C:_firerain_strong(o: number): boolean
+		return self.o_tiles[o] >= Rules.FIRERAIN_STRONG_MIN_TILES and self:land_share(o) >= Rules.FIRERAIN_STRONG_SHARE
 	end
 
 	--- (2026-11-07) Whether a Watchtower among `guards` (SAM_HEAVY_LEVEL or more) shoots down the rain's
@@ -1615,12 +1673,16 @@ function SimNukes.install(C)
 	--- away as an independent nation (_blights_tick). (2026-11-07: it grows as a ragged blot, not a
 	--- diamond: the next tile is the one nearest the origin after a warp by angle (a few random lobes,
 	--- reaching out like tendrils) and a little noise per tile, Rules.PLAGUE_LOBES / PLAGUE_JITTER.)
-	function C:_blight_start(victim: number, t: number, src: number)
+	--- (2026-11-07: `opts` { fire, share, ticks }: an uprising the rain of fire arrows set off on a strong
+	--- nation, its share of the land over its ticks, the free nation ash-orange (_fire_nation), no spores)
+	function C:_blight_start(victim: number, t: number, src: number, opts: any?)
 		if readi32(self.owner, t * 4) ~= victim then
 			return
 		end
-		local budget = math.max(Rules.PLAGUE_LAND_MIN, math.floor(self.o_tiles[victim] * Rules.PLAGUE_LAND_SHARE))
-		local steps = math.max(1, Rules.PLAGUE_LAND_TICKS // 5)
+		local share = if opts ~= nil and opts.share ~= nil then opts.share else Rules.PLAGUE_LAND_SHARE
+		local ticks = if opts ~= nil and opts.ticks ~= nil then opts.ticks else Rules.PLAGUE_LAND_TICKS
+		local budget = math.max(Rules.PLAGUE_LAND_MIN, math.floor(self.o_tiles[victim] * share))
+		local steps = math.max(1, ticks // 5)
 		local rng = self.rng
 		local lobes = {}
 		for _, l in Rules.PLAGUE_LOBES do
@@ -1641,11 +1703,14 @@ function SimNukes.install(C)
 			budget = budget,
 			per_step = math.max(1, math.ceil(budget / steps)),
 			taken = 0,
-			until_tick = self.tick + Rules.PLAGUE_LAND_TICKS,
+			until_tick = self.tick + ticks,
+			fire = opts ~= nil and opts.fire == true,
 		}
 		self:_blight_push(b, t)
 		table.insert(self.blights, b)
-		self:ev({ Ev.BLIGHT, victim, 0, t, 0 })
+		if not b.fire then
+			self:ev({ Ev.BLIGHT, victim, 0, t, 0 })
+		end
 	end
 
 	--- A hash of grid point (x, y) for plague `seed`, in [0, 1).
@@ -1827,7 +1892,7 @@ function SimNukes.install(C)
 					continue
 				end
 				if b.rid == 0 then
-					b.rid = self:_blight_nation(b)
+					b.rid = if b.fire then math.max(0, self:_fire_nation(b, t)) else self:_blight_nation(b)
 					if b.rid == 0 then
 						b.keys, b.tiles = {}, {}
 						break
@@ -1864,7 +1929,7 @@ function SimNukes.install(C)
 			end
 			local done = tick >= b.until_tick or b.taken >= b.budget or #b.keys == 0 or self.o_alive[victim] ~= 1
 			-- (where the front went: up to PLAGUE_FX_TILES of the tiles taken, spread over them)
-			if #took > 0 or done then
+			if (#took > 0 or done) and not b.fire then
 				local e = { Ev.BLIGHT, victim, rid, b.at, if done then 1 else 0 }
 				local m = math.min(#took, Rules.PLAGUE_FX_TILES)
 				for j = 1, m do
@@ -1876,7 +1941,11 @@ function SimNukes.install(C)
 				list[i] = list[#list]
 				list[#list] = nil
 				if rid > 0 and b.taken > 0 then
-					self:msg(victim, Defs.MSG_BAD, string.format("The plague took %d tiles of your land", b.taken))
+					self:msg(
+						victim,
+						Defs.MSG_BAD,
+						string.format(if b.fire then "The uprising took %d tiles of your land" else "The plague took %d tiles of your land", b.taken)
+					)
 				end
 				continue
 			end

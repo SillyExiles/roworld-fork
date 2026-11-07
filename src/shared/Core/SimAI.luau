@@ -963,11 +963,20 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 			foes += 1
 		end
 	end
+	-- (2026-11-07) a nation that isn't its friend grown too strong (Rules.FIRERAIN_STRONG_*): the rain is
+	-- how the others humble it, so an AI that can pay sends it at once
+	local mighty = false
+	for o = 1, sim.owner_total do
+		if o ~= id and sim.o_alive[o] == 1 and sim.o_kind[o] == Defs.KIND_NATION and not sim:allied(id, o) and sim:_firerain_strong(o) then
+			mighty = true
+			break
+		end
+	end
 	if
-		foes >= 2
+		(foes >= 2 or mighty)
 		and sim:siege_uses(id, Defs.N_FIRERAIN) < Rules.FIRERAIN_MAX_USES
-		and can(Defs.N_FIRERAIN, 1.3)
-		and sim.rng:randi() % 3 == 0
+		and can(Defs.N_FIRERAIN, if mighty then 1.05 else 1.3)
+		and (mighty or sim.rng:randi() % 3 == 0)
 	then
 		kind = Defs.N_FIRERAIN
 	elseif
