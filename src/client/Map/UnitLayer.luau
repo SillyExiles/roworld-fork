@@ -72,6 +72,11 @@ UnitLayer.MIN_PX = 5
 UnitLayer.TRAIL_ALPHA = 0.588
 UnitLayer.TRAIL_STEP = 2.0 -- full-size tiles between a trail's points
 UnitLayer.TRAIL_WIDTH = 0.9 -- a nuke trail's width, map tiles
+--- (2026-11-07) A munition's trail is a tail behind it, TRAIL_TAIL of its path, fading toward its end
+--- (it was the whole path flown: lines across the map that looked left behind). One still drawn
+--- LATE_TICKS after it should have landed is gone (its BOOM was missed): it is dropped from the mirror.
+UnitLayer.TRAIL_TAIL = 0.3
+UnitLayer.LATE_TICKS = 20
 --- ship wakes: the least a wake is wide on screen (the route's shape: Map/WakeRoute)
 UnitLayer.TRAIL_MIN_PX = 1.5
 --- Trains: 5 cars, 2 tiles between cars, the nearest car 2 tiles
@@ -386,7 +391,7 @@ function UnitLayer._dot(self: any, x: number, y: number, px: number, col: Color3
 end
 
 --- A straight wake bar between two screen points, `w` px thick.
-function UnitLayer._bar(self: any, x0: number, y0: number, x1: number, y1: number, w: number, col: Color3)
+function UnitLayer._bar(self: any, x0: number, y0: number, x1: number, y1: number, w: number, col: Color3, alpha: number?)
 	self._bars_used += 1
 	local b = self._bars[self._bars_used]
 	if b == nil then
@@ -408,6 +413,11 @@ function UnitLayer._bar(self: any, x0: number, y0: number, x1: number, y1: numbe
 	if b.col ~= col then
 		b.col = col
 		f.BackgroundColor3 = col
+	end
+	local a = alpha or 1
+	if b.a ~= a then
+		b.a = a
+		f.BackgroundTransparency = 1 - UnitLayer.TRAIL_ALPHA * a
 	end
 	if b.x0 ~= x0 or b.y0 ~= y0 or b.x1 ~= x1 or b.y1 ~= y1 or b.w ~= w then
 		b.x0, b.y0, b.x1, b.y1, b.w = x0, y0, x1, y1, w
@@ -635,6 +645,10 @@ function UnitLayer.tick(self: any, _dt: number)
 		if NUKE_HIDDEN[n.kind] then
 			continue
 		end
+		if rt > n.launch_tick + n.flight_ticks + UnitLayer.LATE_TICKS then
+			st.nukes[uid] = nil
+			continue
+		end
 		local t = math.clamp((rt - n.launch_tick) / math.max(n.flight_ticks, 1), 0, 1)
 		local col = NUKE_COL[n.kind] or COL_ATOM
 		-- (Empires Front 2026-11-06: the era's bombard, fire and plague)
@@ -660,10 +674,12 @@ function UnitLayer.tick(self: any, _dt: number)
 		local steps = math.clamp(math.floor(len * k / UnitLayer.TRAIL_STEP), 2, TrailBudget.MAX)
 		local thick = math.max(2, math.round(cam.scale * UnitLayer.TRAIL_WIDTH))
 		local x, y = cam:map_to_screen(UnitLayer.nuke_uv(st, n, t))
-		-- (the newest `trail_dots` points: the whole trail unless many munitions fly at once)
+		-- (the newest points: a tail TRAIL_TAIL of the path long, fewer when many munitions fly at once)
 		local newest = math.floor(steps * t)
+		local first = math.max(0, newest - math.min(trail_dots, math.max(2, math.floor(steps * UnitLayer.TRAIL_TAIL))) + 1)
+		local span = math.max(1, newest + 1 - first)
 		local px0, py0 = nil, nil
-		for i = math.max(0, newest - trail_dots + 1), newest + 1 do
+		for i = first, newest + 1 do
 			local tx, ty
 			if i > newest then
 				tx, ty = x, y
@@ -671,7 +687,7 @@ function UnitLayer.tick(self: any, _dt: number)
 				tx, ty = cam:map_to_screen(UnitLayer.nuke_uv(st, n, i / steps))
 			end
 			if px0 ~= nil and (cam:on_screen(tx, ty, thick) or cam:on_screen(px0, py0, thick)) then
-				self:_bar(px0, py0, tx, ty, thick, c)
+				self:_bar(px0, py0, tx, ty, thick, c, (i - first) / span)
 			end
 			px0, py0 = tx, ty
 		end

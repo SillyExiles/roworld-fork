@@ -11,6 +11,9 @@ local W = require("./Widgets")
 local GlassPanel = require("./GlassPanel")
 local UICtx = require("./UICtx")
 local UIRules = require("./UIRules")
+-- (2026-11-07) the player's language: a help text is translated before the touch wording, which the
+-- translation already carries for its own words
+local Lang = require("../Lang")
 local Signal = UITheme.core("Signal")
 local Defs = UICtx.core("Defs")
 
@@ -528,7 +531,10 @@ function HelpOverlay._section(self, n: number, d: any)
 	tr:add_child(UITheme.label(d.title, 16, 700))
 	v:add_child(tr)
 	local body = HelpOverlay._fill_rules(d.text)
-	if ctx.touch then
+	local translated = Lang.tr(body)
+	if translated ~= body then
+		body = translated
+	elseif ctx.touch then
 		body = body:gsub("Right%-click", "Long-press"):gsub("Click", "Tap"):gsub("click", "tap")
 		body = body:gsub(" %(Q / E, or Shift %+ wheel%)", ""):gsub(" with the command bar %(1 – 7%)", " with BUILD")
 	end

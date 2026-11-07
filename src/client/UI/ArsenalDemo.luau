@@ -712,7 +712,7 @@ function ArsenalDemo._build_mega(self, _it: any)
 	p.silo = self:_plate("Silo", SILO_COL, false, dark(MINE, 0.3), self:_plate_d())
 	self:_at(p.silo, 0.15, 0.7)
 	p.launch = { self:_fx("Launch1", "smoke", 8), self:_fx("Launch2", "smoke", 8) }
-	p.fallout = self:_fx("Fallout", "glow", 7, Color3.fromRGB(150, 236, 90))
+	p.fallout = self:_fx("Fallout", "glow", 7, Color3.fromRGB(255, 132, 40))
 	p.reticle = self:_fx("Reticle", "reticle", 12, RED)
 	p.trail = self:_trail("Trail", 10)
 	p.missile = self:_render("Missile", "mega", H * 0.36, 13)

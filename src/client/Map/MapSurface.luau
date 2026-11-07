@@ -934,12 +934,17 @@ function MapSurface.tile_pixel(self: MapSurface, i: number): number
 	local W, N = self.W, self.N
 	local x = i % W
 	if band(readu8(flags, i), F_FALLOUT) ~= 0 then
-		-- stale-nuke ground: (0.05, 0.55, 0.07) + hash noise * 0.05, opaque
+		-- scorched ground: ash grey (0.27, 0.26, 0.25) + hash noise * 0.08, a char-dark speck now and
+		-- then, opaque (2026-11-07: it was a radioactive green, RoWorld's fallout; the fire over it is
+		-- FalloutGlow's while it burns)
 		local y = i // W
 		local h = math.sin(x * 12.9898 + y * 78.233) * 43758.5453
 		h -= math.floor(h)
-		local nz = h * 0.05
-		return pack((0.05 + nz) * 255, (0.55 + nz) * 255, (0.07 + nz) * 255, 255)
+		local nz = h * 0.08
+		if h > 0.9 then
+			return pack(0.14 * 255, 0.13 * 255, 0.12 * 255, 255)
+		end
+		return pack((0.27 + nz) * 255, (0.26 + nz) * 255, (0.25 + nz) * 255, 255)
 	end
 	local o = readi32(own, i * 4)
 	if o <= 0 or o >= MAX_OWNERS then

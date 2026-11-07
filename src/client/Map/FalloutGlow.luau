@@ -52,11 +52,15 @@ FalloutGlow.INTENSITY_HOT = 1.8
 FalloutGlow.META_INFLUENCE_COLD = 1.0
 FalloutGlow.META_INFLUENCE_HOT = 0.0
 FalloutGlow.OPACITY_FADE_END = 1.0
-FalloutGlow.BLOOM = { 0.054901960784313725, 0.8196078431372549, 0.0 }
+--- (Empires Front 2026-11-07: scorched land burns, it doesn't glow green: the glow is fire, from
+--- BLOOM_COOL (deep red embers, as the heat drains) to BLOOM (bright flame, fresh), its dots sparks;
+--- once the heat is gone only the ash-grey ground is left, MapSurface.tile_pixel)
+FalloutGlow.BLOOM = { 1.0, 0.52, 0.06 }
+FalloutGlow.BLOOM_COOL = { 0.55, 0.07, 0.02 }
 FalloutGlow.COVERAGE = 1.1
 FalloutGlow.HEAT_DECAY_PER_TICK = 1.0
-FalloutGlow.PARTICLE_DARK = { 0.05, 0.4, 0.05 }
-FalloutGlow.PARTICLE_BRIGHT = { 0.2, 1.0, 0.2 }
+FalloutGlow.PARTICLE_DARK = { 0.6, 0.14, 0.02 }
+FalloutGlow.PARTICLE_BRIGHT = { 1.0, 0.78, 0.22 }
 FalloutGlow.PARTICLE_THRESHOLD_UNOWNED = 0.85
 FalloutGlow.PARTICLE_THRESHOLD_OWNED = 0.875
 FalloutGlow.PARTICLE_FLICKER_SPEED = 0.2
@@ -327,8 +331,8 @@ local function extract(heat: number, rt: number, nz: { number }, owned: boolean,
 		* mix(1.0, nz[2], mix(G.META_INFLUENCE_COLD, G.META_INFLUENCE_HOT, heat))
 	local opacity = smoothstep(0.0, G.OPACITY_FADE_END, heat)
 	local s = broil * intensity * opacity
-	local col = G.BLOOM
-	local r, g, bb, a = col[1] * s, col[2] * s, col[3] * s, s
+	local hot, cool = G.BLOOM, G.BLOOM_COOL
+	local r, g, bb, a = mix(cool[1], hot[1], heat) * s, mix(cool[2], hot[2], heat) * s, mix(cool[3], hot[3], heat) * s, s
 	-- the particle dots
 	if h2 >(if owned then G.PARTICLE_THRESHOLD_OWNED else G.PARTICLE_THRESHOLD_UNOWNED) then
 		local rate = G.PARTICLE_FLICKER_SPEED * (0.4 + h1 * 1.2)

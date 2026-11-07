@@ -12,6 +12,7 @@ local UITheme = require("./UITheme")
 local W = require("./Widgets")
 local GlassPanel = require("./GlassPanel")
 local UICtx = require("./UICtx")
+local Lang = require("../Lang")
 local Signal = UITheme.core("Signal")
 local Defs = UICtx.core("Defs")
 local UserInputService = game:GetService("UserInputService")
@@ -470,6 +471,21 @@ function PauseMenu.new(c: any)
 	self._confirm_sw.pressed:Connect(function()
 		self.ctx:set_setting(self:_confirm_key(), self._confirm_sw.on)
 	end)
+	-- (2026-11-07) the game's language: Auto (the account's, or its country's), or one chosen
+	self._lang = UITheme.button("Language: Auto", "GhostButton", "info", 44.0)
+	self._lang.alignment = W.ALIGN_LEFT
+	self._lang:set_font_size(13)
+	self._lang.pressed:Connect(function()
+		local order = { "auto", "en", "pt", "es", "ru" }
+		local cur = tostring(self.ctx:setting("lang", "auto"))
+		local nxt = order[(table.find(order, cur) or 1) % #order + 1]
+		self.ctx:set_setting("lang", nxt)
+		task.spawn(function()
+			Lang.set(Lang.choose(nxt))
+			self:_lang_text()
+		end)
+		self:_lang_text()
+	end)
 	self._tips = UITheme.button("Show tips again", "GhostButton", "info", 44.0)
 	self._tips.alignment = W.ALIGN_LEFT
 	self._tips:set_font_size(13)
@@ -533,6 +549,13 @@ function PauseMenu.new(c: any)
 	row:add_child(self._confirm_go)
 	self._confirm:add_child(row)
 	return self
+end
+
+--- The Language button's text: the choice, and for Auto the language it chose.
+function PauseMenu._lang_text(self)
+	local cur = tostring(self.ctx:setting("lang", "auto"))
+	local name = if cur == "auto" then "Auto · " .. (Lang.NAMES[Lang.code()] or "English") else (Lang.NAMES[cur] or "English")
+	self._lang:set_text("Language: " .. name)
 end
 
 function PauseMenu._ask_restart(self)
@@ -627,6 +650,7 @@ function PauseMenu.open(self, labels_on: boolean, page: string?)
 	self._confirm_sw:set_visible(not on_title)
 	self._tips:set_text("Show tips again")
 	self._tips:set_disabled(false)
+	self:_lang_text()
 	self._new_player:set_visible(ctx.staging == true or ctx:admin())
 	local o = ctx:my()
 	local alive = o ~= nil and o.alive and ctx.state ~= nil and ctx.state.phase == Defs.PHASE_PLAYING
@@ -726,6 +750,7 @@ function PauseMenu._reflow(self, compact: boolean)
 		self._music,
 		self._pops,
 		self._confirm_sw,
+		self._lang,
 		self._tips,
 		self._new_player,
 		self._divider,
@@ -773,10 +798,10 @@ function PauseMenu._reflow(self, compact: boolean)
 			-- (no labels or orders on the title: the music slider and the pops side by side; Staging's
 			-- "Replay as new player" under them, the game menu's main page being out of reach on the title)
 			a = { self._music, self._new_player }
-			b = { self._pops }
+			b = { self._pops, self._lang }
 		else
 			a = { self._music, self._pops, self._new_player }
-			b = { self._labels, self._confirm_sw }
+			b = { self._labels, self._confirm_sw, self._lang }
 		end
 	elseif self._page == "settings" then
 		-- (Staging: "Replay as new player" here too: the title's gear only opens this page,
@@ -786,6 +811,7 @@ function PauseMenu._reflow(self, compact: boolean)
 			self._pops,
 			self._labels,
 			self._confirm_sw,
+			self._lang,
 			self._tips,
 			self._new_player,
 			self._done,

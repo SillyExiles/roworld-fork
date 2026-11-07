@@ -22,6 +22,7 @@ local gs = GameState.new()
 gs:load_snapshot(Protocol.decode_snapshot(Protocol.encode_snapshot(sim:snapshot())))
 local Defs = require("../../src/shared/Core/Defs")
 local errs, seen = 0, {}
+ghosts, ghost_seen = 0, {}
 -- (a player's part: every 90 s the biggest nation fires each siege weapon at a random enemy, with the
 -- gold and the workshops it needs)
 local function player_fire()
@@ -67,6 +68,18 @@ for i = 1, ticks do
 		gs = GameState.new()
 		gs:load_snapshot(Protocol.decode_snapshot(Protocol.encode_snapshot(sim:snapshot())))
 	end
+	-- (2026-11-07) every munition the mirror still draws must still fly in the Sim
+	if ok and i % 10 == 0 then
+		local alive = {}
+		for _, n in sim.nukes do if not n.dead then alive[n.uid] = n end end
+		for uid, m in gs.nukes do
+			if alive[uid] == nil and not ghost_seen[uid] then
+				ghost_seen[uid] = true
+				ghosts += 1
+				if ghosts <= 5 then print(string.format("GHOST nuke %d kind %d at tick %d (launched %d, flight %d)", uid, m.kind or -1, sim.tick, m.launch_tick or -1, m.flight_ticks or -1)) end
+			end
+		end
+	end
 	if i % 3000 == 0 then
 		local alive = 0
 		for o = 1, sim.owner_total do if sim.o_alive[o] == 1 then alive += 1 end end
@@ -75,4 +88,5 @@ for i = 1, ticks do
 	if sim.phase == 2 then print("  over at tick", sim.tick) break end
 end
 for k, v in fired do print("  fired", k, v) end
+print("ghost munitions:", ghosts)
 print(errs == 0 and "no errors" or (errs .. " errors"))

@@ -14,6 +14,8 @@ local RS = game:GetService("ReplicatedStorage")
 local Airfront = RS:WaitForChild("Airfront")
 local Eras = require(Airfront:WaitForChild("Data"):WaitForChild("Eras")) :: any
 local Era = require(Airfront:WaitForChild("Core"):WaitForChild("Era")) :: any
+-- (2026-11-07) the player's language: before the era's words, the text; after them, the era's names
+local Lang = require(script.Parent:WaitForChild("Lang")) :: any
 
 local EraText = {}
 
@@ -146,7 +148,7 @@ local function fix(obj: any)
 		return
 	end
 	orig[obj] = t
-	local n = EraText.tr(t)
+	local n = Lang.terms(EraText.tr(Lang.tr(t)))
 	if n ~= t then
 		wrote[obj] = n
 		obj.Text = n
@@ -166,18 +168,26 @@ local function watch(obj: Instance)
 	end
 end
 
+--- The texts on screen: rewritten from what the game set (a new era, a new language).
+local function redo()
+	for obj, t in orig do
+		if (obj :: any).Parent ~= nil then
+			local n = Lang.terms(EraText.tr(Lang.tr(t)))
+			wrote[obj] = n
+			;(obj :: any).Text = n
+		end
+	end
+end
+
 function EraText.start()
 	build(Era.id())
 	Era.on_change(function(id: string?)
 		build(id)
-		-- the texts on screen: rewritten from what the game set, in the new era's words
-		for obj, t in orig do
-			if (obj :: any).Parent ~= nil then
-				local n = EraText.tr(t)
-				wrote[obj] = n
-				;(obj :: any).Text = n
-			end
-		end
+		redo()
+	end)
+	Lang.on_change(redo)
+	task.spawn(function()
+		Lang.set(Lang.choose("auto"))
 	end)
 	local pg = Players.LocalPlayer:WaitForChild("PlayerGui")
 	for _, d in pg:GetDescendants() do

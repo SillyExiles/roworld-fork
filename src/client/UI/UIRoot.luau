@@ -16,6 +16,7 @@ local UICtx = require("./UICtx")
 local UIInteract = require("./UIInteract")
 local Telemetry = require("./Telemetry")
 local MusicMood = require("../Audio/MusicMood")
+local Lang = require("../Lang")
 local UIAdvisor = require("./UIAdvisor")
 local UILayoutProbe = require("./UILayoutProbe")
 local TouchRouter = require("./TouchRouter")
@@ -418,6 +419,10 @@ function UIRoot._on_settings_loaded(self)
 	local ctx = self.ctx
 	ctx:reload_settings()
 	self:_check_new_player(false)
+	-- (2026-11-07) the language saved (Settings' Language), else the account's / its country's
+	task.spawn(function()
+		Lang.set(Lang.choose(tostring(ctx:setting("lang", "auto"))))
+	end)
 	self.labels_on = ctx:setting("labels", true) ~= false
 	self.title.difficulty =
 		math.clamp(tonumber(ctx:setting("difficulty", UICtx.DEFAULT_DIFFICULTY)) or UICtx.DEFAULT_DIFFICULTY, 0, 2)
