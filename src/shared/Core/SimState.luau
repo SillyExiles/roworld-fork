@@ -1199,6 +1199,11 @@ function SimState.install(C: any)
 		if id <= 0 or self.o_alive[id] == 0 then
 			return
 		end
+		-- (2026-11-07) trade pays big traders less (Rules.trade_mult)
+		if amount > 0 then
+			local b = id * STRUCT_KINDS
+			amount *= Rules.trade_mult(self.o_alevel[b + Defs.S_PORT] + self.o_alevel[b + Defs.S_FACTORY])
+		end
 		self.o_gold[id] += amount
 		self.o_bonus_acc[id] += amount
 		if

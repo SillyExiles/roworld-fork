@@ -197,6 +197,8 @@ function HelpOverlay._fill_rules(text: string): string
 		traitor_def = tostring(Defs.round(R.TRAITOR_DEFENSE_DEBUFF * 100.0)),
 		spacing = tostring(Defs.round(R.STRUCT_MIN_DIST)),
 		def_mag = tostring(Defs.round(R.DEFENSE_POST_MAG)),
+		upkeep_free = tostring(R.UPKEEP_FREE_LEVELS or 40),
+		upkeep = tostring(Defs.round(R.UPKEEP_PER_LEVEL or 30)),
 		def_cost = tostring(Defs.round(R.DEFENSE_POST_COST)),
 		wall_mag = tostring(Defs.round(R.WALL_MAG or 6)),
 		wall_cost = tostring(Defs.round(R.WALL_COST or 5)),
@@ -260,7 +262,7 @@ HelpOverlay.SECTIONS = {
 		title = "Build your economy",
 		builds = true,
 		wide = true,
-		text = "Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 9, 0) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time.",
+		text = "Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 9, 0) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time. The biggest traders earn a little less per ship and cart, buildings past your first {upkeep_free} levels cost {upkeep} gold a second each to keep, and nations far behind the leader get extra gold to catch up.",
 	},
 	{
 		icon = "crown",

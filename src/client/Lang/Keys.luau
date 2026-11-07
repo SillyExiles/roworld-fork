@@ -486,7 +486,7 @@ return {
 	"Getting the match ready…",
 	"Goal %d%%",
 	"Gold",
-	"Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 9, 0) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time.",
+	"Gold flows from your land, factories and trade. Structures get pricier the more you own and need room ({spacing} tiles apart); place them on your own land with the command bar (1 – 9, 0) or the action menu. Land near a Defense Post costs attackers {def_mag}× the troops and {def_cost}× the time. The biggest traders earn a little less per ship and cart, buildings past your first {upkeep_free} levels cost {upkeep} gold a second each to keep, and nations far behind the leader get extra gold to catch up.",
 	"Gold income",
 	"Gold sent to the %s",
 	"Got it",

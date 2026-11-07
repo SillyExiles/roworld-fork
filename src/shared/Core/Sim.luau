@@ -1721,7 +1721,20 @@ function Sim._income_of(self: any, id: number): number
 	if allies > 0 then
 		mult *= 1.0 + Rules.ALLY_INCOME * allies
 	end
-	return (Rules.passive_income(kind, self.o_tiles[id]) + land) * mult
+	-- (2026-11-07) the small catch up once someone runs away with the map (Rules.catchup_income)
+	local catchup = Rules.catchup_income(kind, self:land_share(id), self._max_share or 0)
+	return (Rules.passive_income(kind, self.o_tiles[id]) + land + catchup) * mult
+end
+
+--- (2026-11-07) Gold a second `id`'s finished buildings cost to keep (Rules.upkeep).
+function Sim._upkeep_of(self: any, id: number): number
+	local b = id * STRUCT_KINDS
+	local levels = 0
+	local o_alevel = self.o_alevel
+	for k = 0, Defs.STRUCT_KIND_COUNT - 1 do
+		levels += o_alevel[b + k]
+	end
+	return Rules.upkeep(self.o_kind[id], levels)
 end
 
 function Sim._economy_tick(self: any)
@@ -1783,8 +1796,10 @@ function Sim._economy_tick(self: any)
 			if tp > 0 then
 				o_income[id] *= 1.0 + SimDiplomacy.TRADE_INCOME_BONUS * tp
 			end
+			-- (2026-11-07) less the buildings' upkeep: the income shown is what is left
+			o_income[id] -= self:_upkeep_of(id)
 		end
-		o_gold[id] += o_income[id] / TICK_RATE
+		o_gold[id] = math.max(0, o_gold[id] + o_income[id] / TICK_RATE)
 		if second then
 			o_bonus_rate[id] = o_bonus_rate[id] * 0.9 + o_bonus_acc[id] * 0.1
 			o_bonus_acc[id] = 0.0
@@ -1793,6 +1808,14 @@ function Sim._economy_tick(self: any)
 	if second then
 		self:_resource_tick()
 		self:_pacts_tick()
+		-- (2026-11-07) the biggest nation's share of the map, for the catch-up (Rules.catchup_income)
+		local best = 0
+		for id = 1, self.owner_total do
+			if o_alive[id] == 1 and o_kind[id] ~= Defs.KIND_TRIBE then
+				best = math.max(best, self:land_share(id))
+			end
+		end
+		self._max_share = best
 	end
 end
 

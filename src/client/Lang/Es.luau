@@ -486,7 +486,7 @@ return { values = {
 	"Preparando la partida…",
 	"Meta %d%%",
 	"Oro",
-	"El oro sale de tus tierras, postas y comercio. Las estructuras encarecen cuantas más tienes y necesitan espacio ({spacing} casillas de distancia); colócalas en tus tierras con la barra de mando (1 – 9, 0) o el menú de acciones. La tierra cerca de un Puesto de Defensa cuesta a los atacantes {def_mag}× las tropas y {def_cost}× el tiempo.",
+	"El oro sale de tus tierras, postas y comercio. Las estructuras encarecen cuantas más tienes y necesitan espacio ({spacing} casillas de distancia); colócalas en tus tierras con la barra de mando (1 – 9, 0) o el menú de acciones. La tierra cerca de un Puesto de Defensa cuesta a los atacantes {def_mag}× las tropas y {def_cost}× el tiempo. Los mayores comerciantes ganan un poco menos por barco y carreta, los edificios más allá de tus primeros {upkeep_free} niveles cuestan {upkeep} de oro por segundo cada uno en mantenimiento, y las naciones muy por detrás del líder reciben oro extra para alcanzarlo.",
 	"Ingresos de oro",
 	"Oro enviado a {1}",
 	"Entendido",

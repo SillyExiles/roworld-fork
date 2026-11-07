@@ -25,8 +25,12 @@ sim._trade_gold = function(self, id, g)
 end
 local ab = sim.add_bonus_gold
 sim.add_bonus_gold = function(self, id, amount, tile)
-	if nation(id) and amount > 0 then acc.bonus += amount; add_per(id, amount) end
-	return ab(self, id, amount, tile)
+	-- (what really reached the treasury: big traders are paid less since 2026-11-07, Rules.trade_mult)
+	local before = self.o_gold[id]
+	local r = ab(self, id, amount, tile)
+	local got = self.o_gold[id] - before
+	if nation(id) and got > 0 then acc.bonus += got; add_per(id, got) end
+	return r
 end
 local cg = sim._conquest_gold
 sim._conquest_gold = function(self, victim, by)

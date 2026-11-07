@@ -212,6 +212,40 @@ local function build(K_LIN: number, into: any?): any
 		return Rules.LAND_INCOME * share * 100.0
 	end
 
+	--- Empires Front (2026-11-07, economy balance: the leader ran away with the trade and sat on its gold)
+	--- A. Trade (ships, carts) pays less to big traders: past TRADE_FREE levels of finished Ports and
+	--- Factories, each delivery pays 1 / (1 + TRADE_FALLOFF x the levels over). More always earns more
+	--- (TRADE_FALLOFF < 1 / TRADE_FREE), just less and less a level: 10 levels 91%, 20 63%, 40 38%.
+	Rules.TRADE_FREE = 8
+	Rules.TRADE_FALLOFF = 0.05
+	function Rules.trade_mult(levels: number): number
+		local over = math.max(0, levels - Rules.TRADE_FREE)
+		return 1.0 / (1.0 + Rules.TRADE_FALLOFF * over)
+	end
+	--- B. Catching up: once the biggest nation holds CATCHUP_FROM of the map, a nation or player with
+	--- under CATCHUP_RATIO of its land earns up to CATCHUP_GOLD more a second (all of it with almost no
+	--- land, none at CATCHUP_RATIO). Early on, when everyone is small, nobody gets it.
+	Rules.CATCHUP_FROM = 0.08
+	Rules.CATCHUP_RATIO = 0.25
+	Rules.CATCHUP_GOLD = 1500.0
+	function Rules.catchup_income(kind: number, share: number, max_share: number): number
+		if kind == KIND_TRIBE or max_share < Rules.CATCHUP_FROM or share <= 0 then
+			return 0.0
+		end
+		local f = math.clamp((Rules.CATCHUP_RATIO - share / max_share) / Rules.CATCHUP_RATIO, 0, 1)
+		return Rules.CATCHUP_GOLD * f
+	end
+	--- C. Upkeep: past UPKEEP_FREE_LEVELS levels of finished buildings, each level more costs
+	--- UPKEEP_PER_LEVEL gold a second (taken from the income; the treasury never goes below 0).
+	Rules.UPKEEP_FREE_LEVELS = 40
+	Rules.UPKEEP_PER_LEVEL = 30.0
+	function Rules.upkeep(kind: number, levels: number): number
+		if kind == KIND_TRIBE then
+			return 0.0
+		end
+		return Rules.UPKEEP_PER_LEVEL * math.max(0, levels - Rules.UPKEEP_FREE_LEVELS)
+	end
+
 	--- conquerGoldAmount: conquering a nation or tribe takes all its gold, a human half of it.
 	function Rules.conquer_gold(victim_kind: number, victim_gold: number): number
 		return victim_gold * (if victim_kind == KIND_HUMAN then 0.5 else 1.0)

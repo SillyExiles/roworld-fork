@@ -486,7 +486,7 @@ return { values = {
 	"Preparando a partida…",
 	"Meta %d%%",
 	"Ouro",
-	"O ouro vem das suas terras, entrepostos e comércio. Estruturas ficam mais caras quanto mais você tem e precisam de espaço ({spacing} casas de distância); coloque-as nas suas terras com a barra de comandos (1 – 9, 0) ou o menu de ações. Terras perto de um Posto de Defesa custam aos atacantes {def_mag}× as tropas e {def_cost}× o tempo.",
+	"O ouro vem das suas terras, entrepostos e comércio. Estruturas ficam mais caras quanto mais você tem e precisam de espaço ({spacing} casas de distância); coloque-as nas suas terras com a barra de comandos (1 – 9, 0) ou o menu de ações. Terras perto de um Posto de Defesa custam aos atacantes {def_mag}× as tropas e {def_cost}× o tempo. Os maiores comerciantes ganham um pouco menos por navio e carroça, as construções além dos seus primeiros {upkeep_free} níveis custam {upkeep} de ouro por segundo cada para manter, e nações muito atrás do líder ganham ouro extra para alcançá-lo.",
 	"Renda em ouro",
 	"Ouro enviado para {1}",
 	"Entendi",
