@@ -38,6 +38,7 @@ local RS = game:GetService("ReplicatedStorage")
 local Airfront = RS:WaitForChild("Airfront")
 local Defs = require(Airfront:WaitForChild("Core"):WaitForChild("Defs")) :: any
 local Rules = require(Airfront:WaitForChild("Core"):WaitForChild("Rules")) :: any
+local SiegeArt = require(script.Parent:WaitForChild("SiegeArt")) :: any
 -- Every sprite here is drawn for Rofront, rows of one atlas (tools/assets/make_map_fx.py; 2026-10-25:
 -- all new art): the explosions, the debris a nuke leaves and the conquest's flag.
 local MapFx = require(Airfront:WaitForChild("Assets"):WaitForChild("MapFx")) :: any
@@ -127,11 +128,26 @@ FxLayer.FIRE_SMOKE = 0.3
 --- (2026-11-07) A small fire (radius up to RAIN_RADIUS tiles: the rain of fire arrows') is lit by
 --- RAIN_ARROWS flaming arrows falling from the sky over RAIN_FALL_S (from RAIN_FROM x its radius up
 --- and to the left), then burns with RAIN_FLAMES flames only: there are many of them at once.
-FxLayer.RAIN_RADIUS = 12
-FxLayer.RAIN_ARROWS = 3
-FxLayer.RAIN_FALL_S = 0.55
-FxLayer.RAIN_FROM = 2.2
-FxLayer.RAIN_FLAMES = 5
+--- (2026-11-07, like RoWorld's nuke) Each lands with a blast: an explosion, a flash RAIN_FLASH x its
+--- radius wide, a little smoke, the camera nudged (RAIN_SHAKE, once a RAIN_SHAKE_GAP_S at most).
+FxLayer.RAIN_RADIUS = 16
+FxLayer.RAIN_FLAMES = 6
+FxLayer.RAIN_SMOKE = 2
+FxLayer.RAIN_FLASH = 1.3
+FxLayer.RAIN_SHAKE = 0.14
+FxLayer.RAIN_SHAKE_GAP_S = 0.25
+--- (2026-11-07) The volley (FxLayer.volley, Ev.VOLLEY): each fire is a sheaf of VOLLEY_PER arrows (one
+--- when there are many) flying from the workshop that shot it, on an arc VOLLEY_LIFT x its length
+--- high, VOLLEY_ARROW_WORLD full-size tiles long (VOLLEY_ARROW_MIN_PX..MAX_PX on screen); at most
+--- VOLLEY_MAX in the air. A workshop that shoots flashes orange (VOLLEY_FLASH tiles).
+FxLayer.VOLLEY_PER = 3
+FxLayer.VOLLEY_MAX = 180
+FxLayer.VOLLEY_LIFT = 0.22
+FxLayer.VOLLEY_ARROW_WORLD = 10
+FxLayer.VOLLEY_ARROW_MIN_PX = 14
+FxLayer.VOLLEY_ARROW_MAX_PX = 44
+FxLayer.VOLLEY_FLASH = 16
+FxLayer.VOLLEY_ORANGE = Color3.fromRGB(255, 150, 50)
 FxLayer.PLAGUE_GREEN = Color3.fromRGB(150, 235, 100)
 FxLayer.PLAGUE_PUFFS = 10
 FxLayer.PLAGUE_EVERY_S = 1.4
@@ -288,6 +304,10 @@ function FxLayer.new(parent: Instance, view: any)
 	self._warheads_landed = {} :: { number }
 	self._warheads_flying = 0
 	self._warheads_counted = -1.0
+	--- (2026-11-07) the volley's arrows in the air and their pooled sprites
+	self._arrows = {} :: { any }
+	self._arrow_gui = {} :: { any }
+	self._rain_shake = -1.0
 	self._bonus = {} :: { Bonus }
 	self._bonus_gui = {} :: { BonusGui }
 	--- Signals: { u, v, t0, kind, name, from } and their pooled GUI
@@ -314,6 +334,7 @@ function FxLayer.bind(self: any, state: any)
 	table.clear(self._warheads_landed)
 	table.clear(self._bonus)
 	table.clear(self._pings)
+	table.clear(self._arrows)
 end
 
 function FxLayer.unbind(self: any)
@@ -325,6 +346,11 @@ function FxLayer.unbind(self: any)
 	table.clear(self._warheads_landed)
 	table.clear(self._bonus)
 	table.clear(self._pings)
+	table.clear(self._arrows)
+	for _, g in self._arrow_gui do
+		g.vis = false
+		g.img.Visible = false
+	end
 	for _, g in self._ping_gui do
 		g.vis = false
 		g.root.Visible = false
@@ -471,10 +497,8 @@ function FxLayer.nuke(self: any, kind: number, tile: number, radius: number)
 	-- (Empires Front 2026-11-06) the plague: a green cloud; fire: a flash, its front does the rest
 	-- (FxLayer.blaze); a bombard: a blast its own size
 	-- (2026-11-07) the rain of fire arrows' shot: a flash; its fires fall on their own (Ev.BLAZE)
+	-- (2026-11-07: its lead arrow lands with the others: each fire blasts on its own, FxLayer.blaze)
 	if kind == Defs.N_FIRERAIN then
-		add(self, tile, 0, 14 / k, 0.7, Color3.new(1, 0.55, 0.2), true)
-		local W0 = if st ~= nil then st.map.W or Defs.W else Defs.W
-		self:burst("nuke", tile % W0 + 0.5, tile // W0 + 0.5)
 		return
 	end
 	if kind == Defs.N_PLAGUE then
@@ -542,31 +566,33 @@ function FxLayer.blaze(self: any, tile: number, radius: number, spread_s: number
 	local u0, v0 = tile % W + 0.5, tile // W + 0.5
 	local now = FrameClock.now()
 	local count = math.floor(radius * FxLayer.FIRE_DENSITY) + 6
-	-- (2026-11-07) a fire of the rain of fire arrows: the arrows fall first, then a few flames
+	-- (2026-11-07) a fire of the rain of fire arrows' volley: it lands with a blast, then its flames
 	if radius <= FxLayer.RAIN_RADIUS then
-		local fall = FxLayer.RAIN_FALL_S
-		for i = 1, FxLayer.RAIN_ARROWS do
+		self:burst("building", u0, v0)
+		add(self, tile, 0, radius * FxLayer.RAIN_FLASH, 0.6, FxLayer.VOLLEY_ORANGE, true)
+		for i = 1, FxLayer.RAIN_SMOKE do
 			if #self._debris >= FxLayer.DEBRIS_MAX then
 				break
 			end
 			local seed = uid * 7919 + 0x40000 + i
 			local ang = FxLayer.seeded_random(seed) * math.pi * 2
-			local d = FxLayer.seeded_random(seed + 0x10000) * radius * 0.6
-			local lag = FxLayer.seeded_random(seed + 0x20000) * 0.25
+			local d = FxLayer.seeded_random(seed + 0x10000) * radius * 0.35
 			table.insert(self._debris, {
 				u = u0 + math.cos(ang) * d,
 				v = v0 + math.sin(ang) * d,
-				t0 = now + lag,
-				row = FxLayer.BURSTS.fire,
-				life = fall,
-				fade_in = 0.05,
-				fade_out = 0.85,
-				fall = fall,
-				du = radius * FxLayer.RAIN_FROM * 0.45,
-				dv = radius * FxLayer.RAIN_FROM,
+				t0 = now + 0.15,
+				row = FxLayer.BURSTS.big_smoke,
+				life = FxLayer.FIRE_S,
+				fade_in = 0.1,
+				fade_out = 0.6,
 			})
 		end
-		now += fall
+		local cam = self.view.rig
+		local x, y = cam:tile_to_screen(tile)
+		if now - self._rain_shake >= FxLayer.RAIN_SHAKE_GAP_S and cam:on_screen(x, y, 100) then
+			self._rain_shake = now
+			cam:add_shake(FxLayer.RAIN_SHAKE)
+		end
 		count = FxLayer.RAIN_FLAMES
 	end
 	for i = 1, count do
@@ -586,6 +612,62 @@ function FxLayer.blaze(self: any, tile: number, radius: number, spread_s: number
 			fade_in = 0.08,
 			fade_out = 0.7,
 		})
+	end
+end
+
+--- (2026-11-07) The rain of fire arrows shot at tick `shot` (Ev.VOLLEY): `rows` { from, to, at }
+--- (ticks), heard at tick `heard`. Each sheaf flies from its workshop to where it lands at `at`, when
+--- its fire's blast (FxLayer.blaze) goes off; each workshop that shot flashes.
+function FxLayer.volley(self: any, rows: { { number } }, shot: number, heard: number)
+	local st = self._state
+	if st == nil or #rows == 0 then
+		return
+	end
+	local W = st.map.W or Defs.W
+	local k = tonumber(st.map.k_lin) or Rules.K_LIN
+	local now = FrameClock.now()
+	-- (the ticks are the Sim's: the volley left `heard - shot` ticks ago)
+	local t_shot = now - math.max(0, heard - shot) / Defs.TICK_RATE
+	local per = math.clamp(FxLayer.VOLLEY_MAX // #rows, 1, FxLayer.VOLLEY_PER)
+	local step = math.max(1, #rows / FxLayer.VOLLEY_MAX)
+	local flashed = {}
+	local i = 1.0
+	while i <= #rows + 0.001 do
+		local r = rows[math.floor(i)]
+		i += step
+		local from, to, at = r[1], r[2], r[3]
+		if from < 0 or to < 0 then
+			continue
+		end
+		if not flashed[from] then
+			flashed[from] = true
+			add(self, from, 0, FxLayer.VOLLEY_FLASH / k, 0.7, FxLayer.VOLLEY_ORANGE, true)
+		end
+		local u0, v0 = from % W + 0.5, from // W + 0.5
+		local u1, v1 = to % W + 0.5, to // W + 0.5
+		local du = u1 - u0
+		if du > W / 2 then
+			u1 -= W
+		elseif du < -W / 2 then
+			u1 += W
+		end
+		local len = math.sqrt((u1 - u0) ^ 2 + (v1 - v0) ^ 2)
+		-- (the flight: from the shot, as long as the Sim's, a little apart for each arrow of a sheaf)
+		local t1 = t_shot + math.max(0.4, (at - shot) / Defs.TICK_RATE)
+		for j = 1, per do
+			local seed = to * 131 + j
+			local off = (j - (per + 1) / 2) * 1.6
+			local nx, ny = -(v1 - v0) / math.max(len, 1), (u1 - u0) / math.max(len, 1)
+			table.insert(self._arrows, {
+				u0 = u0 + nx * off,
+				v0 = v0 + ny * off,
+				u1 = u1 + nx * off * 0.4,
+				v1 = v1 + ny * off * 0.4,
+				t0 = t_shot + FxLayer.seeded_random(seed) * 0.25,
+				t1 = t1 - FxLayer.seeded_random(seed + 7) * 0.1,
+				h = len * FxLayer.VOLLEY_LIFT,
+			})
+		end
 	end
 end
 
@@ -1383,6 +1465,80 @@ local function bursts_step(self: any, cam: any, now: number, list: { Burst }, po
 	end
 end
 
+--- The volley's arrows in the air: each on its arc, turned along it, fading in as it leaves.
+local function arrows_step(self: any, cam: any, now: number)
+	local list = self._arrows
+	local pool = self._arrow_gui
+	local content = if #list > 0 then SiegeArt.content(Defs.N_FIRERAIN) else nil
+	local st = self._state
+	local k = tonumber(st and st.map and st.map.k_lin) or Rules.K_LIN
+	local ax, ay = cam:anchor()
+	local sc, cu, cv = cam.scale, cam.cu, cam.cv
+	local vp = cam:viewport_size()
+	local vw, vh = vp.X, vp.Y
+	local w = math.clamp(FxLayer.VOLLEY_ARROW_WORLD / k * sc, FxLayer.VOLLEY_ARROW_MIN_PX, FxLayer.VOLLEY_ARROW_MAX_PX)
+	local n, keep = 0, 0
+	for i = 1, #list do
+		local a = list[i]
+		if now >= a.t1 then
+			continue
+		end
+		keep += 1
+		list[keep] = a
+		if now < a.t0 or content == nil then
+			continue
+		end
+		local s = (now - a.t0) / math.max(a.t1 - a.t0, 0.05)
+		local u = a.u0 + (a.u1 - a.u0) * s
+		local v = a.v0 + (a.v1 - a.v0) * s - a.h * 4 * s * (1 - s)
+		local x, y = ax + (u - cu) * sc, ay + (v - cv) * sc
+		if not (x >= -w and y >= -w and x <= vw + w and y <= vh + w) then
+			continue
+		end
+		-- (along the arc: the sprite points up and to the right, 45 degrees)
+		local dxs = a.u1 - a.u0
+		local dys = (a.v1 - a.v0) - a.h * 4 * (1 - 2 * s)
+		local rot = math.deg(math.atan2(dys, dxs)) + 45
+		n += 1
+		local g = pool[n]
+		if g == nil then
+			local img = Instance.new("ImageLabel")
+			img.Name = "Arrow"
+			img.BackgroundTransparency = 1
+			img.AnchorPoint = Vector2.new(0.5, 0.5)
+			img.ResampleMode = Enum.ResamplerMode.Pixelated
+			img.ZIndex = FxLayer.Z + 3
+			img.Parent = self.root
+			g = { img = img, vis = true, w = -1, set = false }
+			pool[n] = g
+		end
+		local img = g.img
+		if not g.set then
+			g.set = true
+			img.ImageContent = content
+		end
+		if not g.vis then
+			g.vis = true
+			img.Visible = true
+		end
+		img.Position = UDim2.fromOffset(x, y)
+		img.Rotation = rot
+		if g.w ~= w then
+			g.w = w
+			img.Size = UDim2.fromOffset(w, w)
+		end
+		img.ImageTransparency = if s < 0.06 then 1 - s / 0.06 else 0
+	end
+	truncate(list, keep)
+	for j = n + 1, #pool do
+		local g = pool[j]
+		if g.vis then
+			g.vis = false
+			g.img.Visible = false
+		end
+	end
+end
+
 function FxLayer.tick(self: any, _dt: number)
 	local cam = self.view.rig
 	local now = FrameClock.now()
@@ -1483,6 +1639,9 @@ function FxLayer.tick(self: any, _dt: number)
 	bursts_step(self, cam, now, self._bursts, self._burst_gui, FxLayer.Z + 1)
 	-- (the debris over the fireball, pushed after it)
 	bursts_step(self, cam, now, self._debris, self._debris_gui, FxLayer.Z + 2)
+	if #self._arrows > 0 or #self._arrow_gui > 0 then
+		arrows_step(self, cam, now)
+	end
 	bonus_step(self, cam, now)
 	if #self._pings > 0 or #self._ping_gui > 0 then
 		pings_step(self, cam, now)

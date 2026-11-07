@@ -407,6 +407,12 @@ function MapView.bind_state(self: any, state: any)
 			call(self.layers.fx, "blaze", tile, radius, (tonumber(ticks) or 60) / Defs.TICK_RATE, uid)
 		end)
 	end
+	-- (Empires Front 2026-11-07) the rain of fire arrows shot: its arrows fly to where they fall
+	if state.volley_shot ~= nil then
+		self:_connect(state.volley_shot, function(_owner, _kind, start, rows)
+			call(self.layers.fx, "volley", rows, start, tonumber(state.tick) or start)
+		end)
+	end
 	-- (Empires Front 2026-11-07) the plague's land breaking away: spores along its front
 	if state.blight_spread ~= nil then
 		self:_connect(state.blight_spread, function(victim, rid, origin, done, tiles)

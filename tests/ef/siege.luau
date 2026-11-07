@@ -334,6 +334,44 @@ if tower >= 0 and sim:try_build(D, "sam", tower) then
 	for _ = 1, 200 do sim:step() end
 	expect(downed[Defs.N_ATOM] == nil and sim.fallout_count > fo2, "the bombard can't be stopped: it scorched the land")
 	expect(Rules.NUKE_INTERCEPT_P[Defs.N_PLAGUE] == 0 and Rules.NUKE_INTERCEPT_P[Defs.N_HYDROGEN] > 0, "nor can the plague; only the fire can")
+	-- (2026-11-07) the tower levels up; from level 10 it stops one bombard, then waits
+	-- (the bombard, wider now, razed the tower: a new one, out of its blast)
+	local sam = sim:structs_of(D, Defs.S_SAM)[1]
+	if sam == nil then
+		for u = 0, sim.N - 1, 3 do
+			if buffer.readi32(sim.owner, u * 4) == D and sim.range_d2(u, target_tile) > 40 ^ 2 and sim.range_d2(site, u) < (reach - 15) ^ 2 and sim:valid_site(D, Defs.S_SAM, u) and sim:try_build(D, "sam", u) then break end
+		end
+		for _ = 1, Rules.BUILD_TICKS[Defs.S_SAM] + 10 do sim:step() end
+		sam = sim:structs_of(D, Defs.S_SAM)[1]
+	end
+	expect(sam ~= nil and Rules.is_upgradable(Defs.S_SAM), "the Watchtower can be upgraded")
+	while sam.level < Rules.SAM_HEAVY_LEVEL do sim:upgrade_struct(sam) end
+	sam.shots = {}
+	expect(sam.level == Rules.SAM_HEAVY_LEVEL, "a Watchtower at level " .. sam.level)
+	ensure_silo()
+	expect(sim:launch_nuke(A, "atom", target_tile), "a bombard at the level-10 tower's land")
+	for _ = 1, 200 do sim:step() end
+	expect(downed[Defs.N_ATOM] == 1, "the level-10 tower shot the bombard down")
+	ensure_silo()
+	sam.shots = {}
+	local fo3 = sim.fallout_count
+	expect(sim:launch_nuke(A, "atom", target_tile), "a second bombard right after")
+	for _ = 1, 200 do sim:step() end
+	expect(downed[Defs.N_ATOM] == 1 and sim.fallout_count > fo3, "one only: the second lands (the tower waits " .. Rules.SAM_HEAVY_RELOAD .. " ticks)")
+	-- a rain's sheaf on the tower's land within its reach: shot down, the volley's others there too
+	sam.heavy_tick = nil
+	local t0 = sim.o_tiles[D]
+	local guards = { sam }
+	-- (a tile of D's within the tower's reach: the bombard left the old target waste)
+	for u = 0, sim.N - 1 do
+		if buffer.readi32(sim.owner, u * 4) == D and sim.range_d2(u, sam.tile) < 100 then target_tile = u break end
+	end
+	local f1 = { at = sim.tick, tile = target_tile, victim = D, owner = A, vid = 424242 }
+	local f2 = { at = sim.tick, tile = target_tile, victim = D, owner = A, vid = 424242 }
+	local f3 = { at = sim.tick, tile = target_tile, victim = D, owner = A, vid = 434343 }
+	expect(sim:_rain_guarded(f1, guards) and sim:_rain_guarded(f2, guards), "the tower shoots down a rain's sheaves over its land")
+	expect(not sim:_rain_guarded(f3, guards), "but only one volley a while")
+	expect(sim.o_tiles[D] == t0, "(nothing burned)")
 	sim._sam_intercept = real
 else
 	print("  (no Watchtower site: skipped)")
@@ -392,14 +430,30 @@ do
 	expect(not sim:launch_nuke(A, "firerain", sim.o_spawn_tile[ally]), "the rain can't be aimed at an ally")
 	expect(sim:launch_nuke(A, "firerain", foe_t), "the rain of fire arrows flies")
 	expect(g0 - sim.o_gold[A] == Rules.firerain_cost(0) and sim:siege_uses(A, Defs.N_FIRERAIN) == 1, "at its first price (" .. (g0 - sim.o_gold[A]) .. ")")
+	local owners0 = sim.owner_total
+	-- (the plague's land breaking away, earlier in this test, done with)
+	sim.blights = {}
+	sim.plague_list = {}
+	-- (and no province of anyone's revolts meanwhile: the volley flies for seconds)
+	local unrest_tick = sim._unrest_tick
+	sim._unrest_tick = function() end
 	for _ = 1, 400 do
 		sim:step()
+		-- (the nations rising out of the flames keep still too)
+		for o = owners0 + 1, sim.owner_total do sim.o_ai[o] = 0 end
+		sim.attacks = {}
 		if #sim.firerain == 0 and #sim.blazes == 0 and sim.tick % 10 == 0 then
 			local landed = true
 			for _, n0 in sim.nukes do if not n0.dead and n0.kind == Defs.N_FIRERAIN then landed = false end end
 			if landed then break end
 		end
 	end
+	sim._unrest_tick = unrest_tick
+	local risen = 0
+	for o = owners0 + 1, sim.owner_total do
+		if sim.o_alive[o] == 1 and string.sub(sim.o_name[o], 1, 5) == "Free " then risen += sim.o_tiles[o] end
+	end
+	expect(risen > 0, string.format("some of the burned land rose as free nations (%d nations, %d tiles)", sim.owner_total - owners0, risen))
 	local hit, burned, razed = 0, 0, 0
 	for o, f in foes do
 		if sim.o_tiles[o] < f.tiles then hit += 1; burned += f.tiles - sim.o_tiles[o] end
@@ -409,7 +463,7 @@ do
 	for _ in foes do nfoes += 1 end
 	expect(hit >= math.min(3, nfoes) and hit >= nfoes * 0.6, string.format("it burned the land of its enemies (%d of %d nations, %d tiles)", hit, nfoes, burned))
 	expect(razed > 0, string.format("and burned down their buildings (%d)", razed))
-	expect(sim.o_tiles[A] >= mine0 and sim.o_tiles[ally] >= ally0 and count_structs(ally) >= ally_s0, "and spared A and its ally")
+	expect(sim.o_tiles[A] >= mine0 and sim.o_tiles[ally] >= ally0 and count_structs(ally) >= ally_s0, string.format("and spared A and its ally (%d -> %d, %d -> %d, %d -> %d)", mine0, sim.o_tiles[A], ally0, sim.o_tiles[ally], ally_s0, count_structs(ally)))
 	-- (a fire of the rain falling right on the ally's land spares it; one not of the rain doesn't)
 	local at = sim.o_spawn_tile[ally]
 	if buffer.readi32(sim.owner, at * 4) ~= ally then

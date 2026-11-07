@@ -16,6 +16,7 @@
 --     peers = function() -> { peer },             -- connected peers that are listening (lobby info)
 --     now_ms = function() -> number,              -- monotonic milliseconds
 --     log = function(text)?,
+--     report = function(text)?,                   -- a match step's error, for the Error Report
 --     seed = function() -> number?,
 --     lobby = {                                   -- optional: a public-lobby match server
 --       countdown = function() -> number?,        --   seconds to the lobby's start (nil = unknown yet)
@@ -1079,6 +1080,9 @@ function MatchServer._server_step(self: any)
 	if not self._step_errors_seen[key] then
 		self._step_errors_seen[key] = true
 		self:_log("[Session] match step failed: " .. tostring(err))
+		if self.deps.report ~= nil then
+			pcall(self.deps.report, "[Session] match step failed: " .. tostring(err))
+		end
 	end
 	if
 		self._step_failures_row >= MatchServer.MAX_STEP_FAILURES_IN_ROW

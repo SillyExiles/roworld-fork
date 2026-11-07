@@ -250,7 +250,9 @@ local function build(K_LIN: number, into: any?): any
 	--- the Arsenal's structures). (Empires Front 2026-11-01: nor the Temple, Palace, Fortress and
 	--- University: one building, one level, so their caps are real caps.)
 	--- (2026-11-06: nor the Watchtower and the Siege Workshop: capped, one level each)
-	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 0, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0 })
+	--- (2026-11-07: the Watchtower levels up again: a shot more and a little more reach a level, and from
+	--- SAM_HEAVY_LEVEL it stops what nothing else does)
+	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0 })
 	--- Empires Front (2026-10-31) Border Wall: when finished it raises stones on every tile of the
 	--- owner's frontier (own land next to someone else's land) within WALL_RADIUS_FULL full-size tiles
 	--- (Defs.F_WALL). Taking a walled tile costs the attacker WALL_MAG x the troops and WALL_COST x
@@ -297,6 +299,8 @@ local function build(K_LIN: number, into: any?): any
 		[Defs.S_SAM] = 4,
 	}
 	Rules.LEVEL_LIMITS = {
+		-- (2026-11-07: the Watchtowers' levels, 40 in all: four towers at 10, or fewer higher)
+		[Defs.S_SAM] = 40,
 		[Defs.S_MINE] = 16,
 		[Defs.S_MARKET] = 6,
 		[Defs.S_FARM] = 12,
@@ -1078,8 +1082,8 @@ local function build(K_LIN: number, into: any?): any
 	--- (Arsenal: mega = twice an atom bomb's radii, four times its ground; scattershot's own crater is
 	--- an atom bomb's; a shell, an air strike and a slug have one blast disc and take no land.)
 	--- (the plague: no blast; its outer radius is only the target ring)
-	Rules.NUKE_INNER_FULL = f32t({ 12.0, 80.0, 0.0, 12.0, 24.0, 12.0, 0.0, 0.0, 0.0, 0.0, 4.0 })
-	Rules.NUKE_OUTER_FULL = f32t({ 30.0, 100.0, 0.0, 18.0, 60.0, 30.0, 1.5, 15.0, 5.0, 4.0, 9.0 })
+	Rules.NUKE_INNER_FULL = f32t({ 12.0, 80.0, 0.0, 12.0, 24.0, 12.0, 0.0, 0.0, 0.0, 0.0, 5.0 })
+	Rules.NUKE_OUTER_FULL = f32t({ 30.0, 100.0, 0.0, 18.0, 60.0, 30.0, 1.5, 15.0, 5.0, 4.0, 12.0 })
 	--- Outer blast radius in our tiles (UI displays trunc(NUKE_RADIUS[kind])).
 	Rules.NUKE_RADIUS = f32t({
 		30.0 / K_LIN,
@@ -1100,6 +1104,19 @@ local function build(K_LIN: number, into: any?): any
 	--- atom kind) and the plague can't be stopped, only softened by Walls, Fortresses and Temples.)
 	--- (2026-11-07: nor the rain of fire arrows)
 	Rules.NUKE_INTERCEPT_P = f32t({ 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0 })
+	--- (2026-11-07) A Watchtower of SAM_HEAVY_LEVEL or more also stops one shot of the weapons nothing
+	--- else stops (SAM_HEAVY_KINDS: the bombard, the plague; and of a rain of fire arrows, every sheaf
+	--- of the volley falling within its reach on its owner's or its friends' land), then waits
+	--- SAM_HEAVY_RELOAD ticks before it can again.
+	Rules.SAM_HEAVY_LEVEL = 10
+	Rules.SAM_HEAVY_RELOAD = 1200
+	Rules.SAM_HEAVY_KINDS = { [Defs.N_ATOM] = true, [Defs.N_PLAGUE] = true }
+	function Rules.sam_heavy_ready(s: any, tick: number): boolean
+		return (s.level or 1) >= Rules.SAM_HEAVY_LEVEL
+			and (s.heavy_tick == nil or s.heavy_tick + Rules.SAM_HEAVY_RELOAD <= tick)
+	end
+	--- (2026-11-07) A bombard razes its inner circle and BOMBARD_OUTER_P of the ring beyond (was a half).
+	Rules.BOMBARD_OUTER_P = 0.7
 	--- defaultSamMissileSpeed 12 full-size tiles/tick (manhattan time to reach); a bomb or warhead can be
 	--- targeted only within defaultNukeTargetableRange (150 full-size tiles) of its target or of its launch point.
 	Rules.SAM_MISSILE_SPEED_FULL = 12.0
@@ -1127,8 +1144,13 @@ local function build(K_LIN: number, into: any?): any
 	--- inner radius burns with FIRE_BURN_INNER, one beyond it with FIRE_BURN_OUTER (a bombard razes the
 	--- inner radius and half of the ring at once).
 	Rules.FIRE_SPREAD_TICKS = 60
-	Rules.FIRE_BURN_INNER = 0.8
-	Rules.FIRE_BURN_OUTER = 0.4
+	--- (2026-11-07: fiercer, 0.95 and 0.6 from 0.8 and 0.4)
+	Rules.FIRE_BURN_INNER = 0.95
+	Rules.FIRE_BURN_OUTER = 0.6
+	--- (2026-11-07) Every fire's front is ragged: how far it reaches is shrunk along FIRE_LOBES
+	--- ({ waves around, amplitude }, each turned at random) and by up to FIRE_JITTER a tile.
+	Rules.FIRE_LOBES = { { 3, 0.18 }, { 5, 0.1 }, { 8, 0.06 } }
+	Rules.FIRE_JITTER = 0.12
 	--- Walls and Fortresses: a tile behind a Border Wall's stones or within its owner's Fortress's reach
 	--- burns / is razed with PROTECT_MULT of the chance, and a building there survives with PROTECT_SAVE.
 	Rules.PROTECT_MULT = 0.5
@@ -1204,6 +1226,37 @@ local function build(K_LIN: number, into: any?): any
 	Rules.FIRERAIN_BORDER_WALK = 3000
 	Rules.FIRERAIN_MAX_USES = 2
 	Rules.FIRERAIN_COST_GROWTH = 2
+	--- (2026-11-07, like RoWorld's nuke, that leaves nothing standing) The rain is a volley: every fire
+	--- is a sheaf of arrows shot at once from the launcher's Siege Workshop nearest it (Ev.VOLLEY: the
+	--- clients draw them flying), FIRERAIN_FLIGHT_K x a bombard's time in the air (FIRERAIN_FLIGHT_MIN
+	--- ..MAX ticks, + up to FIRERAIN_STAGGER so they don't all land at once). Where it lands it blows a
+	--- crater, its inner radius razed whole (FIRERAIN_BURN_INNER) with the buildings in it, and its fire
+	--- spreads, ragged (FIRE_LOBES), to its outer radius over FIRERAIN_SPREAD_TICKS, burning
+	--- FIRERAIN_BURN_OUTER of the land it passes: left waste. On a nation of FIRERAIN_FREE_MIN_TILES or
+	--- more, FIRERAIN_FREE_SHARE of its fires (those not on its buildings) set the burned land beyond
+	--- the crater free instead, as one independent nation rising out of the flames.
+	Rules.FIRERAIN_FLIGHT_K = 0.6
+	Rules.FIRERAIN_FLIGHT_MIN = 25
+	Rules.FIRERAIN_FLIGHT_MAX = 110
+	Rules.FIRERAIN_STAGGER = 25
+	Rules.FIRERAIN_SPREAD_TICKS = 80
+	Rules.FIRERAIN_BURN_INNER = 1.0
+	Rules.FIRERAIN_BURN_OUTER = 0.6
+	Rules.FIRERAIN_FREE_SHARE = 0.35
+	Rules.FIRERAIN_FREE_MIN_TILES = 1200
+	--- (at most this many rise a rain: on its biggest victims; each is a new AI nation to run)
+	Rules.FIRERAIN_FREE_MAX = 8
+	--- (its colour: the old empire's, FIRERAIN_FREE_TINT of the way to ash-orange)
+	Rules.FIRERAIN_FREE_TINT = 0.35
+	--- Ticks a volley's arrows fly from `from_tile` to `to_tile` (W x H map).
+	function Rules.firerain_flight(W: number, H: number, from_tile: number, to_tile: number): number
+		local arc = Rules.munition_arc(W, H, from_tile, to_tile, Defs.N_FIRERAIN)
+		return math.clamp(
+			math.floor(Rules.nuke_arc_ticks(arc, Defs.N_FIRERAIN) * Rules.FIRERAIN_FLIGHT_K),
+			Rules.FIRERAIN_FLIGHT_MIN,
+			Rules.FIRERAIN_FLIGHT_MAX
+		)
+	end
 	function Rules.firerain_cost(uses: number?): number
 		return math.floor(Rules.nuke_cost("firerain") * Rules.FIRERAIN_COST_GROWTH ^ math.max(0, uses or 0))
 	end

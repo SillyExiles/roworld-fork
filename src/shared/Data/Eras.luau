@@ -950,30 +950,30 @@ end
 Eras.SIEGE = {
 	ancient = {
 		nuke = {
-			atom = { 6, 14, 6, 400000 },
-			hydrogen = { 10, 20, 5, 1500000 },
+			atom = { 9, 19, 6, 400000 },
+			hydrogen = { 14, 28, 5, 1500000 },
 			plague = { 0, 4, 5, 4000000 },
-			firerain = { 4, 10, 8, 9000000 },
+			firerain = { 5, 12, 8, 9000000 },
 		},
 		silo_range_full = 650,
 		sam_range = 0.5,
 	},
 	gunpowder = {
 		nuke = {
-			atom = { 8, 17, 8, 500000 },
-			hydrogen = { 11, 22, 6, 1800000 },
+			atom = { 11, 23, 8, 500000 },
+			hydrogen = { 16, 31, 6, 1800000 },
 			plague = { 0, 4, 6, 4500000 },
-			firerain = { 5, 11, 9, 10500000 },
+			firerain = { 6, 13, 9, 10500000 },
 		},
 		silo_range_full = 750,
 		sam_range = 0.6,
 	},
 	modern = {
 		nuke = {
-			atom = { 10, 20, 10, 600000 },
-			hydrogen = { 13, 26, 8, 2200000 },
+			atom = { 13, 27, 10, 600000 },
+			hydrogen = { 18, 36, 8, 2200000 },
 			plague = { 0, 4, 8, 5000000 },
-			firerain = { 6, 12, 11, 12000000 },
+			firerain = { 7, 14, 11, 12000000 },
 		},
 		silo_range_full = 900,
 		sam_range = 0.75,

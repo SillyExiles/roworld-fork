@@ -537,6 +537,11 @@ function ServerMain.start()
 			return os.clock() * 1000
 		end,
 		log = print,
+		-- (2026-11-07) a match step's error, raised on a thread of its own so it shows in the Creator
+		-- Dashboard's Error Report (a printed one is seen in no live game)
+		report = function(text: string)
+			task.spawn(error, text, 0)
+		end,
 	})
 	ServerMain.server = server
 

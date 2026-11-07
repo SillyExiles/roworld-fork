@@ -80,6 +80,7 @@ local SIGNALS = {
 	"plague_changed", -- (id) Empires Front Ev.PLAGUE: a nation fell sick or got well (GameState.plague)
 	"blaze_started", -- (uid, owner, tile, radius, start_tick, spread_ticks) Empires Front Ev.BLAZE: fire spreads
 	"blight_spread", -- (victim, rid, origin, done, tiles) Empires Front Ev.BLIGHT: the plague's land breaking away
+	"volley_shot", -- (owner, kind, start_tick, rows {from, to, at}) Empires Front Ev.VOLLEY: the rain of fire arrows shot
 }
 GameState.SIGNAL_NAMES = SIGNALS
 
@@ -1433,6 +1434,14 @@ HANDLERS[Ev.BLIGHT] = function(self, e)
 		table.insert(tiles, tonumber(e[i]) or -1)
 	end
 	self.blight_spread:Fire(tonumber(e[2]) or 0, tonumber(e[3]) or 0, tonumber(e[4]) or -1, e[5] == 1, tiles)
+end
+
+HANDLERS[Ev.VOLLEY] = function(self, e)
+	local rows = {}
+	for i = 5, #e - 2, 3 do
+		table.insert(rows, { tonumber(e[i]) or -1, tonumber(e[i + 1]) or -1, tonumber(e[i + 2]) or 0 })
+	end
+	self.volley_shot:Fire(tonumber(e[2]) or 0, tonumber(e[3]) or 0, tonumber(e[4]) or 0, rows)
 end
 
 HANDLERS[Ev.BLAZE] = function(self, e)

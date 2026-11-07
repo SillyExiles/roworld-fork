@@ -329,8 +329,15 @@ function SimNukes.install(C)
 		table.insert(silo.shots, self:shot_stamp(silo, if siege then kind else nil))
 		self:ev({ Ev.STRUCT_SHOTS, silo.sid, table.clone(silo.shots) })
 		local arc = self.R.munition_arc(self.W, self.H, silo.tile, t, kind)
-		local n = self:_spawn_nuke(kind, id, silo.tile, t, self.R.nuke_arc_ticks(arc, kind), arc)
+		local flight = if kind == N_FIRERAIN
+			then self.R.firerain_flight(self.W, self.H, silo.tile, t)
+			else self.R.nuke_arc_ticks(arc, kind)
+		local n = self:_spawn_nuke(kind, id, silo.tile, t, flight, arc)
 		n.target_owner = tg
+		-- (2026-11-07) the rain of fire arrows: the whole volley leaves now, from every workshop
+		if kind == N_FIRERAIN then
+			self:_firerain_land(n)
+		end
 		if strike then
 			self:msg(id, Defs.MSG_INFO, string.format("%s on its way to %s", nuke_title(kind), self:name_of(tg)))
 			return true
@@ -450,7 +457,8 @@ function SimNukes.install(C)
 				elseif n.kind == N_PLAGUE then
 					self:_plague_land(n)
 				elseif n.kind == N_FIRERAIN then
-					self:_firerain_land(n)
+					-- (the volley's lead arrow: its fires are the volley's, _firerain_tick)
+					self:ev({ Ev.BOOM, n.uid, n.kind, n.to_tile, 1, n.owner })
 				elseif n.kind == N_HYDROGEN then
 					self:_ignite(n)
 				else
@@ -509,7 +517,9 @@ function SimNukes.install(C)
 		local sams = nil
 		local fires = {}
 		for _, n in list do
-			if n.dead or n.sam_sid ~= 0 or Rules.NUKE_INTERCEPT_P[n.kind] <= 0 then
+			-- (2026-11-07: a bombard or the plague, only for a tower of SAM_HEAVY_LEVEL with its shot ready)
+			local heavy = Rules.NUKE_INTERCEPT_P[n.kind] <= 0 and Rules.SAM_HEAVY_KINDS[n.kind] == true
+			if n.dead or n.sam_sid ~= 0 or (Rules.NUKE_INTERCEPT_P[n.kind] <= 0 and not heavy) then
 				continue
 			end
 			if tick >= n.cand_tick then
@@ -529,6 +539,9 @@ function SimNukes.install(C)
 			for _, sid in n.cands do
 				local s = structs[sid]
 				if s == nil or s.dead or not s.active or s.owner == n.owner or self:allied(s.owner, n.owner) then
+					continue
+				end
+				if heavy and not Rules.sam_heavy_ready(s, tick) then
 					continue
 				end
 				local plan = n.plan_fire[sid]
@@ -559,6 +572,12 @@ function SimNukes.install(C)
 			local s2 = f[3]
 			if n2.sam_sid ~= 0 or self:ready_missiles(s2, Rules.SAM_COOLDOWN_TICKS) <= 0 then
 				continue
+			end
+			if Rules.NUKE_INTERCEPT_P[n2.kind] <= 0 then
+				if not Rules.sam_heavy_ready(s2, tick) then
+					continue
+				end
+				s2.heavy_tick = tick
 			end
 			table.insert(s2.shots, tick)
 			self:ev({ Ev.STRUCT_SHOTS, s2.sid, table.clone(s2.shots) })
@@ -819,7 +838,7 @@ function SimNukes.install(C)
 		local o_tiles = self.o_tiles
 		local rng = self.rng
 		for _, t in tiles do
-			if range_d2(to, t) > inner2 and rng:randi() % 2 == 0 then
+			if range_d2(to, t) > inner2 and rng:randf() >= Rules.BOMBARD_OUTER_P then
 				continue
 			end
 			local o = readi32(owner, t * 4)
@@ -1020,17 +1039,45 @@ function SimNukes.install(C)
 	--- Fire landing: it spreads from its tile over Rules.FIRE_SPREAD_TICKS (_blazes_tick).
 	--- (2026-11-07: `foes_of` an owner: the fire spares that owner and its friends, Rules allied; `quiet`:
 	--- no Ev.BOOM nor messages, for the rain of fire arrows' many small fires.)
-	function C:_ignite(n: Nuke, foes_of: number?, quiet: boolean?)
+	--- (2026-11-07: `rain`, a fire of the rain of fire arrows' volley: a crater first, its inner radius
+	--- razed at once, then its fire, longer and fiercer (Rules.FIRERAIN_*); `rain.free`: the burned land
+	--- beyond the crater goes to a nation rising out of the flames (_fire_nation). Every fire's front is
+	--- ragged: Rules.FIRE_LOBES, FIRE_JITTER.)
+	function C:_ignite(n: Nuke, foes_of: number?, quiet: boolean?, rain: any?)
 		local inner, outer = self.R.nuke_radii(n.kind)
 		local to = n.to_tile
 		local range_d2 = self.range_d2
 		local tiles = self:disk_tiles(to, outer, true)
 		local d2s = {}
+		local keys = {}
+		local rng = self.rng
+		local W = self.W
+		local x0, y0 = to % W, to // W
+		local lobes = {}
+		for _, l in Rules.FIRE_LOBES do
+			table.insert(lobes, { k = l[1], a = l[2] * (0.5 + rng:randf()), ph = rng:randf() * math.pi * 2 })
+		end
+		local jit = Rules.FIRE_JITTER
 		for _, t in tiles do
-			d2s[t] = range_d2(to, t)
+			local d2 = range_d2(to, t)
+			d2s[t] = d2
+			local dx, dy = t % W - x0, t // W - y0
+			if dx > W // 2 then
+				dx -= W
+			elseif dx < -(W // 2) then
+				dx += W
+			end
+			local ang = math.atan2(dy, dx)
+			local lobe = 0
+			for _, l in lobes do
+				lobe += l.a * math.sin(l.k * ang + l.ph)
+			end
+			-- (how far the front must get to reach it: further along a bay, nearer along a tongue)
+			local h = ((t * 2654435761) % 4294967296) / 4294967296
+			keys[t] = math.sqrt(d2) / math.max(0.4, 1 + lobe) * (1 + jit * (h - 0.5) * 2)
 		end
 		table.sort(tiles, function(a, b)
-			local da, db = d2s[a], d2s[b]
+			local da, db = keys[a], keys[b]
 			if da ~= db then
 				return da < db
 			end
@@ -1052,7 +1099,7 @@ function SimNukes.install(C)
 			end
 			return a.s.sid < b.s.sid
 		end)
-		local dur = Rules.FIRE_SPREAD_TICKS
+		local dur = if rain ~= nil then Rules.FIRERAIN_SPREAD_TICKS else Rules.FIRE_SPREAD_TICKS
 		table.insert(self.blazes, {
 			uid = n.uid,
 			kind = n.kind,
@@ -1060,8 +1107,14 @@ function SimNukes.install(C)
 			to = to,
 			inner2 = inner * inner,
 			outer = outer,
+			-- (the rain's crater: its front starts at the inner radius)
+			r0 = if rain ~= nil then inner else 0,
+			p_in = if rain ~= nil then Rules.FIRERAIN_BURN_INNER else Rules.FIRE_BURN_INNER,
+			p_out = if rain ~= nil then Rules.FIRERAIN_BURN_OUTER else Rules.FIRE_BURN_OUTER,
+			free = if rain ~= nil then rain.free else nil,
 			tiles = tiles,
 			d2s = d2s,
+			keys = keys,
 			i = 1,
 			structs = ss,
 			si = 1,
@@ -1098,18 +1151,21 @@ function SimNukes.install(C)
 		for i = 1, #list do
 			local b = list[i]
 			local frac = math.min(1.0, (tick - b.start + 1) / b.dur)
-			local r = b.outer * frac
+			local r0 = b.r0 or 0
+			local r = r0 + (b.outer - r0) * frac
 			local r2 = r * r
 			local lost, before, order = {}, {}, {}
-			local tiles, d2s = b.tiles, b.d2s
+			local tiles, d2s, keys = b.tiles, b.d2s, b.keys
+			local fr = b.free
+			local freed = 0
 			while b.i <= #tiles do
 				local t = tiles[b.i]
-				local d = d2s[t]
-				if d > r2 then
+				if keys[t] > r then
 					break
 				end
 				b.i += 1
-				local p = if d <= b.inner2 then Rules.FIRE_BURN_INNER else Rules.FIRE_BURN_OUTER
+				local d = d2s[t]
+				local p = if d <= b.inner2 then b.p_in else b.p_out
 				local o = readi32(owner, t * 4)
 				if o > 0 and self.o_rookie[o] == 1 then
 					continue -- (a new player's land does not burn)
@@ -1123,6 +1179,17 @@ function SimNukes.install(C)
 				end
 				if rng:randf() >= p then
 					continue
+				end
+				-- (2026-11-07) the land of a fire of the volley beyond its crater rises: free, not waste
+				if fr ~= nil and o == fr.victim and d > b.inner2 and self.o_alive[o] == 1 then
+					if fr.rid == 0 then
+						fr.rid = self:_fire_nation(fr, t)
+					end
+					if fr.rid > 0 and self.o_alive[fr.rid] == 1 then
+						self:set_owner(t, fr.rid)
+						freed += 1
+						continue
+					end
 				end
 				if o ~= 0 then
 					if before[o] == nil then
@@ -1157,6 +1224,19 @@ function SimNukes.install(C)
 					self:msg(so, Defs.MSG_BAD, string.format("Fire destroyed your %s", Defs.STRUCT_TITLES[s.kind]))
 				end
 			end
+			-- (the garrison of the land that rose goes with it, and it raises an army of its own)
+			if freed > 0 and fr ~= nil and fr.rid > 0 then
+				local v, rid = fr.victim, fr.rid
+				local moved = self.o_troops[v] * freed / math.max(1, o_tiles[v] + freed)
+				self.o_troops[v] -= moved
+				self.o_troops[rid] += moved
+				local levy = 0.5 * self.R.max_troops(Defs.KIND_NATION, o_tiles[rid], 0, SimRevolts.FREE_SKILL)
+				self.o_troops[rid] = math.max(self.o_troops[rid], levy)
+				fr.taken += freed
+				if o_tiles[v] <= 0 then
+					self.o_killer[v] = b.owner
+				end
+			end
 			for _, o in order do
 				self:_nuke_troops(o, b.kind, lost[o], before[o])
 				if o_tiles[o] <= 0 then
@@ -1166,7 +1246,8 @@ function SimNukes.install(C)
 					self:add_grudge(o, b.owner, Rules.NUKE_GRUDGE_TICKS)
 				end
 			end
-			if frac < 1.0 or b.i <= #tiles then
+			-- (2026-11-07: its time up, it is out: a ragged front never reaches the tiles of its bays)
+			if frac < 1.0 then
 				w += 1
 				list[w] = b
 			end
@@ -1203,7 +1284,6 @@ function SimNukes.install(C)
 				)
 			end
 		end
-		self:ev({ Ev.BOOM, n.uid, n.kind, n.to_tile, 8, id })
 		if #targets == 0 then
 			self:msg(id, Defs.MSG_INFO, "The rain of fire arrows found no enemy to fall on")
 			return
@@ -1272,6 +1352,38 @@ function SimNukes.install(C)
 		end
 		local q = self.firerain
 		local tick = self.tick
+		-- (2026-11-07) shot from the launcher's workshops: each fire from the one nearest it
+		local silos = {}
+		for _, s in self:structs_of(id, S_SILO) do
+			if s.active and not s.dead then
+				table.insert(silos, s.tile)
+			end
+		end
+		if #silos == 0 then
+			table.insert(silos, n.from_tile)
+		end
+		local range_d2 = self.range_d2
+		local volley = { Ev.VOLLEY, id, N_FIRERAIN, tick }
+		-- (the nations whose burned land may rise: the biggest, FIRERAIN_FREE_MAX of them)
+		local may_rise = {}
+		do
+			local big = {}
+			for _, o in targets do
+				if self.o_tiles[o] >= Rules.FIRERAIN_FREE_MIN_TILES then
+					table.insert(big, o)
+				end
+			end
+			table.sort(big, function(a, b)
+				if self.o_tiles[a] ~= self.o_tiles[b] then
+					return self.o_tiles[a] > self.o_tiles[b]
+				end
+				return a < b
+			end)
+			for i = 1, math.min(#big, Rules.FIRERAIN_FREE_MAX) do
+				may_rise[big[i]] = true
+			end
+		end
+		local shot = {}
 		for _, o in targets do
 			local tiles = {}
 			-- half on its buildings
@@ -1296,8 +1408,23 @@ function SimNukes.install(C)
 				end
 				table.insert(tiles, t)
 			end
-			for _, t in tiles do
-				table.insert(q, { at = tick + 1 + rng:randi() % math.max(1, Rules.FIRERAIN_TICKS), tile = t, victim = o, owner = id })
+			-- (a big nation: the last of its fires, those on its land, set it free there)
+			local n_free = 0
+			if may_rise[o] then
+				n_free = math.min(#tiles - on_b, math.floor(#tiles * Rules.FIRERAIN_FREE_SHARE + 0.5))
+			end
+			local free = if n_free > 0 then { victim = o, launcher = id, rid = 0, taken = 0 } else nil
+			for j, t in tiles do
+				local from, bd = silos[1], math.huge
+				for _, st in silos do
+					local d = range_d2(st, t)
+					if d < bd then
+						bd, from = d, st
+					end
+				end
+				local at = tick + self.R.firerain_flight(self.W, self.H, from, t) + rng:randi() % math.max(1, Rules.FIRERAIN_STAGGER)
+				table.insert(q, { at = at, tile = t, victim = o, owner = id, vid = n.uid, free = if j > #tiles - n_free then free else nil })
+				table.insert(shot, { from, t, at })
 			end
 			self:add_grudge(o, id, Rules.NUKE_GRUDGE_TICKS)
 			self:msg(o, Defs.MSG_ALERT, string.format("%s rains fire arrows on your land!", o_name[id]))
@@ -1308,6 +1435,18 @@ function SimNukes.install(C)
 			end
 			return a.tile < b.tile
 		end)
+		table.sort(shot, function(a, b)
+			if a[3] ~= b[3] then
+				return a[3] < b[3]
+			end
+			return a[2] < b[2]
+		end)
+		for _, r in shot do
+			table.insert(volley, r[1])
+			table.insert(volley, r[2])
+			table.insert(volley, r[3])
+		end
+		self:ev(volley)
 		self:msg(id, Defs.MSG_INFO, string.format("Your rain of fire arrows falls on %d nations", #targets))
 		for _, h in self.humans do
 			if h ~= id and not table.find(targets, h) then
@@ -1322,9 +1461,23 @@ function SimNukes.install(C)
 		local q = self.firerain
 		local tick = self.tick
 		local n = 0
+		local guards = nil
 		while n < #q and q[n + 1].at <= tick do
 			n += 1
 			local f = q[n]
+			-- (2026-11-07) a Watchtower of SAM_HEAVY_LEVEL shoots down the sheaves of a volley falling
+			-- within its reach on its owner's or its friends' land (one volley a SAM_HEAVY_RELOAD)
+			if guards == nil then
+				guards = {}
+				for _, s in self.struct_list do
+					if not s.dead and s.kind == S_SAM and s.active and (s.level or 1) >= Rules.SAM_HEAVY_LEVEL then
+						table.insert(guards, s)
+					end
+				end
+			end
+			if #guards > 0 and self:_rain_guarded(f, guards) then
+				continue
+			end
 			local fake = {
 				uid = self.next_uid,
 				kind = N_FIRERAIN,
@@ -1333,7 +1486,7 @@ function SimNukes.install(C)
 				target_owner = readi32(self.owner, f.tile * 4),
 			}
 			self.next_uid += 1
-			self:_ignite(fake :: any, f.owner, true)
+			self:_ignite(fake :: any, f.owner, true, f)
 		end
 		if n > 0 then
 			local m = #q
@@ -1342,6 +1495,41 @@ function SimNukes.install(C)
 				q[i] = nil
 			end
 		end
+	end
+
+	--- (2026-11-07) Whether a Watchtower among `guards` (SAM_HEAVY_LEVEL or more) shoots down the rain's
+	--- sheaf `f`: on its owner's or its friends' land within its reach, its shot ready or already spent
+	--- on this volley. A hit: Ev.BOOM radius 0 there (the clients' shot-down burst), the tower told once.
+	function C:_rain_guarded(f: any, guards: { any }): boolean
+		local o = readi32(self.owner, f.tile * 4)
+		if o <= 0 then
+			return false
+		end
+		local tick = self.tick
+		local range_d2 = self.range_d2
+		for _, s in guards do
+			local so = s.owner
+			if s.dead or so == f.owner or self:allied(so, f.owner) or not (so == o or self:allied(so, o)) then
+				continue
+			end
+			local same = s.heavy_vid == f.vid and f.vid ~= nil
+			if not same and not Rules.sam_heavy_ready(s, tick) then
+				continue
+			end
+			local r = self.R.sam_range(s.level)
+			if range_d2(s.tile, f.tile) > r * r then
+				continue
+			end
+			if not same then
+				s.heavy_tick = tick
+				s.heavy_vid = f.vid
+				self:msg(so, Defs.MSG_GOOD, string.format("Your Watchtower shot down the fire arrows of %s", self.o_name[f.owner]))
+			end
+			self:ev({ Ev.BOOM, self.next_uid, N_FIRERAIN, f.tile, 0, f.owner })
+			self.next_uid += 1
+			return true
+		end
+		return false
 	end
 
 	--- How many finished Temples `o` holds (they ease the plague).
@@ -1551,7 +1739,35 @@ function SimNukes.install(C)
 	--- old empire's colour (Rules.PLAGUE_TINT of the plague's green), an AI nation (SimRevolts.FREE_SKILL).
 	function C:_blight_nation(b: any): number
 		local victim = b.victim
-		local pname = self:_province_name(victim, b.at)
+		local rid, name, pname = self:_free_nation(victim, b.at, 120, 190, 70, Rules.PLAGUE_TINT)
+		if rid <= 0 then
+			return 0
+		end
+		-- (it rose out of the plague: it won't catch it again for a while)
+		self.o_plague_imm[rid] = self.tick + Rules.PLAGUE_IMMUNE_TICKS
+		self:msg(victim, Defs.MSG_BAD, string.format("The plague-struck %s breaks away: %s is independent", pname, name))
+		self:msg_others(victim, Defs.MSG_INFO, string.format("The plague tears %s from %s", name, self.o_name[victim]))
+		return rid
+	end
+
+	--- (2026-11-07) The nation that rises out of a rain of fire arrows' flames on `fr.victim`'s land
+	--- (tile `t`): "Free <province>", ash-orange (Rules.FIRERAIN_FREE_TINT).
+	function C:_fire_nation(fr: any, t: number): number
+		local victim = fr.victim
+		local rid, name, pname = self:_free_nation(victim, t, 235, 120, 40, Rules.FIRERAIN_FREE_TINT)
+		if rid <= 0 then
+			return -1
+		end
+		self:msg(victim, Defs.MSG_BAD, string.format("%s rises in the flames: %s is independent", pname, name))
+		self:msg_others(victim, Defs.MSG_INFO, string.format("The fire tears %s from %s", name, self.o_name[victim]))
+		return rid
+	end
+
+	--- A nation breaking away from `victim` at tile `at` (an AI nation, SimRevolts.FREE_SKILL): "Free
+	--- <province>" (numbered if that name is worn), in the old empire's rebel colour `f` of the way to
+	--- (r, g, b). Returns its id (0: no room), its name and the province's.
+	function C:_free_nation(victim: number, at: number, tr: number, tg: number, tb: number, f: number): (number, string, string)
+		local pname = self:_province_name(victim, at)
 		local base = "Free " .. pname
 		local name = base
 		local n = 1
@@ -1569,27 +1785,22 @@ function SimNukes.install(C)
 		end
 		local col = SimRevolts.rebel_color(self.o_color[victim])
 		do
-			local f = Rules.PLAGUE_TINT
 			local function mix(c: number, g: number): number
 				return math.clamp(math.floor(c * (1 - f) + g * f + 0.5), 0, 255)
 			end
 			local r, g, bl, a = (col // 0x1000000) % 256, (col // 0x10000) % 256, (col // 0x100) % 256, col % 256
-			col = ((mix(r, 120) * 256 + mix(g, 190)) * 256 + mix(bl, 70)) * 256 + a
+			col = ((mix(r, tr) * 256 + mix(g, tg)) * 256 + mix(bl, tb)) * 256 + a
 		end
 		local rid = self:add_owner(name, col, Defs.KIND_NATION)
 		if rid <= 0 then
-			return 0
+			return 0, name, pname
 		end
 		self.o_ai[rid] = 1
 		self.o_skill[rid] = SimRevolts.FREE_SKILL
 		self.o_spawned[rid] = 1
-		self.o_spawn_tile[rid] = b.at
-		-- (it rose out of the plague: it won't catch it again for a while)
-		self.o_plague_imm[rid] = self.tick + Rules.PLAGUE_IMMUNE_TICKS
-		self:ev({ Ev.SPAWNED, rid, b.at })
-		self:msg(victim, Defs.MSG_BAD, string.format("The plague-struck %s breaks away: %s is independent", pname, name))
-		self:msg_others(victim, Defs.MSG_INFO, string.format("The plague tears %s from %s", name, self.o_name[victim]))
-		return rid
+		self.o_spawn_tile[rid] = at
+		self:ev({ Ev.SPAWNED, rid, at })
+		return rid, name, pname
 	end
 
 	--- Each 5 ticks, the plague takes the next tiles of its struck land (nearest its warped front first,

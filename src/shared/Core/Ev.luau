@@ -68,6 +68,9 @@ Ev.PLAGUE_USES = 42 -- id, uses, kind (Defs.N_PLAGUE, or N_FIRERAIN: 2026-11-07)
 --- (Empires Front 2026-11-07) the plague's land breaking away: its victim, the free nation (0 before its
 --- first tile), where it landed, done (1 / 0), then a few of the tiles it just took (Map/FxLayer.blight).
 Ev.BLIGHT = 43 -- victim, rid, origin, done, tiles...
-Ev.COUNT = 44
+--- (2026-11-07) the rain of fire arrows shot: owner, kind, start_tick, then (from_tile, to_tile, at_tick)
+--- for each sheaf of arrows (Core/SimNukes._firerain_land; Map/FxLayer.volley draws them flying)
+Ev.VOLLEY = 44
+Ev.COUNT = 45
 
 return Ev
