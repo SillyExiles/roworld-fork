@@ -1598,6 +1598,13 @@ function UIRules.has_mates(self: any): boolean
 	return false
 end
 
+--- (Empires Front) The pacts two allies may sign: { kind id, name, label, what it does }.
+UIRules.PACTS = {
+	{ 1, "trade", "Trade Pact", "more income for both, and your Markets sell dearer" },
+	{ 2, "defense", "Defence Pact", "whoever attacks one of you angers the other" },
+	{ 3, "access", "Military Access", "your troops march through their land and sail from their ports" },
+}
+
 function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 	local ctx = self.ctx
 	local items = {}
@@ -1688,7 +1695,8 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 	-- what can be launched at the tile: the bombs with a silo, and the Arsenal's munitions the player
 	-- has unlocked (a strike with its own structure)
 	local launch_kinds = {}
-	if playing and own ~= me and me ~= 0 then
+	-- (2026-11-07: not on an ally's land, where every weapon is refused: the ally ring was crowded)
+	if playing and own ~= me and me ~= 0 and not (own ~= 0 and s:are_allies(me, own)) then
 		local kinds = table.clone(UIRules.NUKE_KINDS)
 		for _, k in UIRules.ARSENAL_NUKES do
 			if not self:arsenal_locked(k) then
@@ -1769,28 +1777,69 @@ function UIRules.radial_items(self: any, tile: number): { { [string]: any } }
 				capped = plan.capped,
 			})
 			-- Empires Front: pacts and resources between allies (SimDiplomacy, SimEconomy)
+			-- (2026-11-07: the pacts in a ring of their own, Pacts ▸, and the Ore trade in another: ten
+			-- segments on the ally's ring overlapped and their labels ran into each other)
 			if type(s.has_pact) == "function" then
 				-- (2026-11-01: Military Access: march through their land and sail from their ports)
-				for _, pk in { { 1, "trade", "Trade Pact" }, { 2, "defense", "Defence Pact" }, { 3, "access", "Military Access" } } do
+				local psub = {}
+				local signed, offered = 0, {}
+				for _, pk in UIRules.PACTS do
 					local kid, kname, label = pk[1], pk[2], pk[3]
 					local picon = if kname == "access" then "alliance" else "pact_" .. kname
+					local it = { id = "pact:" .. kname, label = label, icon = picon, ok = true, reason = "", danger = false, hint = pk[4] }
 					if s:has_pact(me, own, kid) then
-						table.insert(items, { id = "pact:" .. kname, label = label, icon = picon, ok = false, reason = "Signed", danger = false })
+						it.ok, it.done, it.reason = false, true, "Signed"
+						signed += 1
 					elseif s:pact_requested(own, me, kid) then
-						table.insert(items, { id = "pact_accept:" .. kname, label = "Accept " .. label, icon = picon, ok = true, reason = "", danger = false })
+						it.id, it.label, it.hint = "pact_accept:" .. kname, "Accept " .. label, "They propose a " .. label .. ": " .. pk[4]
+						it.fresh = true
+						table.insert(offered, label)
 					elseif s:pact_requested(me, own, kid) then
-						table.insert(items, { id = "pact:" .. kname, label = label, icon = picon, ok = false, reason = "Proposed", danger = false })
-					else
-						table.insert(items, { id = "pact:" .. kname, label = label, icon = picon, ok = true, reason = "", danger = false })
+						it.ok, it.reason = false, "Proposed: waiting for their answer"
 					end
+					table.insert(psub, it)
 				end
+				table.insert(items, {
+					id = "pacts",
+					label = "Pacts",
+					icon = "pact_trade",
+					ok = true,
+					reason = "",
+					danger = false,
+					fresh = #offered > 0,
+					hint = if #offered > 0
+						then "They propose: " .. table.concat(offered, ", ")
+						else string.format("%d of %d signed", signed, #UIRules.PACTS),
+					sub = psub,
+				})
 				local mo = s:get_owner(me)
 				local ore = if mo ~= nil then tonumber(mo.ore) or 0 else 0
+				local send = {
+					id = "send:ore",
+					label = "Send Ore",
+					icon = "ore",
+					ok = ore >= 4,
+					reason = if ore >= 4 then "" else "No Ore to spare",
+					danger = false,
+					hint = if ore >= 4 then string.format("A quarter of yours: %d Ore", math.floor(ore * 0.25)) else nil,
+				}
 				if s:has_pact(me, own, 1) then
-					table.insert(items, { id = "trade:sell", label = "Sell Ore", icon = "ore_sell", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to sell", danger = false })
-					table.insert(items, { id = "trade:buy", label = "Buy Ore", icon = "ore_buy", ok = true, reason = "", danger = false })
+					table.insert(items, {
+						id = "ore",
+						label = "Ore",
+						icon = "ore",
+						ok = true,
+						reason = "",
+						danger = false,
+						hint = "Sell, buy or send Ore",
+						sub = {
+							{ id = "trade:sell", label = "Sell Ore", icon = "ore_sell", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to sell", danger = false },
+							{ id = "trade:buy", label = "Buy Ore", icon = "ore_buy", ok = true, reason = "", danger = false },
+							send,
+						},
+					})
 				else
-					table.insert(items, { id = "send:ore", label = "Send Ore", icon = "ore", ok = ore >= 4, reason = if ore >= 4 then "" else "No Ore to spare", danger = false })
+					table.insert(items, send)
 				end
 			end
 			-- the last ALLIANCE_EXTEND_WINDOW_TICKS: ask to renew (renewed once both asked)

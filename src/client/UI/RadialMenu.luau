@@ -40,6 +40,27 @@ local TAU = 2 * math.pi
 local RadialMenu = {}
 RadialMenu.__index = RadialMenu
 
+--- The most segments a ring has (UiShapes has masks for 2..8): the rest go in a last "More" ring
+--- (2026-11-07: ten items drew eight-wide segments over each other, labels overlapping).
+RadialMenu.MAX_SEGS = 8
+
+local function fold(its: { any }): { any }
+	local m = RadialMenu.MAX_SEGS
+	if #its <= m then
+		return its
+	end
+	local out, rest = {}, {}
+	for i, it in its do
+		if i < m then
+			table.insert(out, it)
+		else
+			table.insert(rest, it)
+		end
+	end
+	table.insert(out, { id = "more", label = "More", icon = "info", ok = true, reason = "", danger = false, sub = rest })
+	return out
+end
+
 --- How far (logical px) the opening finger must slide before its release picks an item (was 16: a
 --- lift's wobble picked whatever the finger rested on, so press and hold felt glitchy; 2026-09-29).
 RadialMenu.SLIDE_PICK_PX = 30.0
@@ -218,8 +239,27 @@ function RadialMenu._seg(self: any, i: number): any
 			TextYAlignment = Enum.TextYAlignment.Top,
 			ZIndex = 4,
 		}, holder),
+		-- a small mark at the rim: this item opens a ring of its own
+		dot = UICtx.make("Frame", {
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(5, 5),
+			BackgroundColor3 = Th.TEXT_2,
+			ZIndex = 4,
+		}, holder),
+		-- something waits for an answer there (a pact they propose)
+		badge = UICtx.make("Frame", {
+			BorderSizePixel = 0,
+			AnchorPoint = Vector2.new(0.5, 0.5),
+			Size = UDim2.fromOffset(9, 9),
+			BackgroundColor3 = Color3.new(1.0, 0.32, 0.3),
+			ZIndex = 5,
+		}, holder),
 		key = "",
 	}
+	UICtx.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, s.dot)
+	UICtx.make("UICorner", { CornerRadius = UDim.new(0.5, 0) }, s.badge)
+	UICtx.make("UIStroke", { Thickness = 1.5, Color = Color3.new(0.02, 0.03, 0.07) }, s.badge)
 	self._segs[i] = s
 	return s
 end
@@ -231,6 +271,7 @@ end
 function RadialMenu.open_at(self: any, t: number, pos: Vector2, its: { any }, title_text: string, title_col: Color3)
 	local ctx = self.ctx
 	self.tile = t
+	its = fold(its)
 	self._root_items = its
 	self.items = its
 	self._in_sub = false
@@ -303,7 +344,7 @@ function RadialMenu._enter_sub(self: any, item: any)
 	if self._in_sub then
 		table.insert(self._stack, { items = self.items, title = self._sub_title })
 	end
-	self.items = sub
+	self.items = fold(sub)
 	self._in_sub = true
 	self._sub_title = tostring(item.label or "")
 	self._hover = -1
@@ -571,6 +612,8 @@ function RadialMenu._redraw(self: any)
 				sg.line.Visible = false
 				sg.icon.Visible = false
 				sg.label.Visible = false
+				sg.dot.Visible = false
+				sg.badge.Visible = false
 			end
 			continue
 		end
@@ -586,7 +629,13 @@ function RadialMenu._redraw(self: any)
 		if danger and ok then
 			icol = rgb(1.0, 0.8, 0.8)
 		end
-		if not ok then
+		local done = it.done == true
+		if not ok and done then
+			-- already in place (a signed pact): green, not greyed as if refused
+			fill = rgb(0.05, 0.13, 0.1)
+			icol = Th.GREEN
+			icol_a = 0.85
+		elseif not ok then
 			fill = rgb(0.05, 0.065, 0.12)
 			icol = Th.TEXT
 			icol_a = 0.28
@@ -649,14 +698,42 @@ function RadialMenu._redraw(self: any)
 			sg.icon.ImageRectOffset = Vector2.zero
 			sg.icon.ImageRectSize = Vector2.zero
 		end
-		sg.icon.Position = UDim2.fromOffset(ip.X, ip.Y - 5)
+		-- the label fits its slice: the arc between neighbours at the icon's radius; a long one is
+		-- set smaller, then on two lines (2026-11-07: "Military Access" ran over its neighbours)
+		local text = tostring(it.label or "")
+		local fs = math.max(11, Th.min_font_size or 0)
+		local maxw = math.clamp(TAU * rm / math.max(n, 1) - 8.0, 46.0, 104.0)
+		local lines = 1
+		if n > 1 and Th.text_width(text, fs, 600, 0) > maxw then
+			local fs2 = math.max(10, Th.min_font_size or 0)
+			if Th.text_width(text, fs2, 600, 0) <= maxw then
+				fs = fs2
+			elseif string.find(text, " ", 1, true) ~= nil then
+				fs = fs2
+				lines = 2
+			end
+		end
+		local lift = if lines == 2 then 6.0 else 0.0
+		sg.icon.Position = UDim2.fromOffset(ip.X, ip.Y - 5 - lift)
 		sg.icon.ImageColor3 = icol
 		sg.icon.ImageTransparency = 1 - icol_a * alpha
 		sg.label.Visible = true
-		sg.label.Text = tostring(it.label or "")
-		sg.label.TextSize = UICtx.ts(math.max(11, Th.min_font_size or 0))
+		sg.label.Text = text
+		sg.label.TextSize = UICtx.ts(fs)
+		sg.label.TextWrapped = lines == 2
+		sg.label.LineHeight = if lines == 2 then 0.95 else 1
+		sg.label.Size = UDim2.fromOffset(maxw, UICtx.ts(fs) * lines * 1.05)
 		-- Godot draws the label with its baseline at ip.y + 12 + 9; Rubik ascent 0.935 em.
-		sg.label.Position = UDim2.fromOffset(ip.X, ip.Y + 21 - 0.935 * math.max(11, Th.min_font_size or 0))
+		sg.label.Position = UDim2.fromOffset(ip.X, ip.Y + 21 - 0.935 * fs - lift)
+		-- the rim mark of a sub-ring, and the badge of an offer waiting
+		local rim = Vector2.new(math.cos(mid), math.sin(mid)) * (ro2 - 6.0)
+		sg.dot.Visible = it.sub ~= nil
+		sg.dot.Position = UDim2.fromOffset(rim.X, rim.Y)
+		sg.dot.BackgroundColor3 = if hov and ok then Th.INK else Th.TEXT_2
+		sg.dot.BackgroundTransparency = 1 - (if ok then 0.75 else 0.3) * alpha
+		sg.badge.Visible = it.fresh == true
+		sg.badge.Position = UDim2.fromOffset(ip.X + 13, ip.Y - 15 - lift)
+		sg.badge.BackgroundTransparency = 1 - alpha
 		sg.label.TextColor3 = icol
 		sg.label.TextTransparency = 1 - icol_a * alpha * (if ok then 0.95 else 1.0)
 	end
@@ -683,7 +760,10 @@ function RadialMenu._redraw(self: any)
 		local cap = tostring(it2.label or "")
 		local sub = ""
 		local sub_col = Th.TEXT_2
-		if not it2.ok then
+		if not it2.ok and it2.done then
+			sub = tostring(it2.reason or "")
+			sub_col = Th.GREEN
+		elseif not it2.ok then
 			sub = tostring(it2.reason or "")
 			sub_col = rgb(1.0, 0.6, 0.62)
 		elseif it2.cost ~= nil then
@@ -704,6 +784,11 @@ function RadialMenu._redraw(self: any)
 				Th.fmt_troops(self.ctx:troops_for_ratio()),
 				math.floor(self.ctx.ratio * 100 + 0.5)
 			)
+		end
+		-- (2026-11-07) what an item does or holds, when nothing else is said
+		if sub == "" and it2.hint ~= nil and it2.hint ~= "" then
+			sub = tostring(it2.hint)
+			sub_col = if it2.fresh then Th.AMBER else Th.TEXT_2
 		end
 		cap_text = if sub == "" then cap else cap .. "  ·  " .. sub
 		cap_col = if sub ~= "" then sub_col else Th.TEXT
