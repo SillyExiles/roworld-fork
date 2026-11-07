@@ -847,6 +847,7 @@ return { values = {
 	"Revolta em %s: {2} pegam em armas",
 	"Revolta! %s se levanta: %d casas e %s tropas se separam como {4}. Recompre a província ou reconheça-a como nação independente",
 	"Revoltas em %s! Aumente suas tropas ou construa uma Cidade, Mercado, Posto de Defesa ou estrada lá. %s",
+	"Recompensa",
 	"Botão direito",
 	"Clique com o botão direito numa nação para se aliar ou comerciar; clique em terras além do mar para enviar barcos",
 	"Clique com o botão direito numa nação para propor uma aliança. Em jogos todos contra todos, cada um, jogador ou bot, tem no máximo 3 alianças ao mesmo tempo; em jogos de times seu time é sua aliança e você não pode se aliar a outro time. Cada aliado soma 5% à sua renda em ouro, mas só você pode vencer: as terras dos aliados não contam para a sua vitória. Aliados não podem se atacar, podem doar tropas e enviar Minério um ao outro, e podem assinar um Pacto Comercial (mais renda, preços melhores no Mercado), um Pacto de Defesa (quem atacar um parceiro vira inimigo do outro) ou Acesso Militar (marchar e navegar pelas terras um do outro). Romper uma aliança marca você como Traidor por {traitor_s} s: todos ficam sabendo, e atacar você custa só {traitor_def}% das tropas e avança mais rápido.",

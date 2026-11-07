@@ -847,6 +847,7 @@ return { values = {
 	"Revuelta en %s: {2} toman las armas",
 	"¡Revuelta! %s se alza: %d casillas y %s tropas se separan como {4}. Recompra la provincia o reconócela como nación independiente",
 	"¡Revueltas en %s! Sube tus tropas o construye allí una Ciudad, Mercado, Puesto de Defensa o un camino. %s",
+	"Recompensa",
 	"Clic derecho",
 	"Haz clic derecho en una nación para aliarte o comerciar; haz clic en tierras al otro lado del mar para enviar barcos",
 	"Haz clic derecho en una nación para proponer una alianza. En partidas todos contra todos, cada uno, jugador o bot, tiene como máximo 3 alianzas a la vez; en partidas por equipos tu equipo es tu alianza y no puedes aliarte con otro equipo. Cada aliado suma un 5% a tus ingresos de oro, pero solo tú puedes ganar: las tierras de tus aliados no cuentan para tu victoria. Los aliados no pueden atacarse, pueden donarse tropas y enviarse Mineral, y pueden firmar un Pacto Comercial (más ingresos, mejores precios en el Mercado), un Pacto de Defensa (quien ataque a uno se gana la enemistad del otro) o Acceso Militar (marchar y navegar por las tierras del otro). Romper una alianza te marca como Traidor durante {traitor_s} s: todos lo saben, y atacarte cuesta solo el {traitor_def}% de las tropas y avanza más rápido.",

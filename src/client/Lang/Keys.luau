@@ -847,6 +847,7 @@ return {
 	"Revolt in %s: the %s take up arms",
 	"Revolt! %s rises: %d tiles and %s troops break away as the %s. Buy the province back, or recognize it as an independent nation",
 	"Revolts in %s! Raise your troops, or build a City, Market, Defense Post or a road there. %s",
+	"Reward",
 	"Right-click",
 	"Right-click a nation to ally or trade with it; click land over the sea to send boats",
 	"Right-click a nation to propose an alliance. In free-for-all games everyone, player or bot, holds at most 3 alliances at once; in team games your team is your alliance and you can't ally with another team. Each ally adds 5% to your gold income, but only you can win: your allies' land doesn't count toward your victory. Allies can't attack each other, can donate troops and send each other Ore, and can sign a Trade Pact (more income, dearer Market prices), a Defence Pact (whoever attacks one partner makes an enemy of the other) or Military Access (march and sail through each other's land). Breaking an alliance brands you a Traitor for {traitor_s} s: everyone knows, and attacks against you cost only {traitor_def}% of the troops and land faster.",

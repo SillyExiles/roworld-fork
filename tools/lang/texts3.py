@@ -336,4 +336,5 @@ T = [
     ("%s a second", "%s por segundo", "%s por segundo", "%s в секунду"),
     ("%s Ore/s", "%s Minério/s", "%s Mineral/s", "%s руды/с"),
     ("sells +50%", "vende +50%", "vende +50%", "продаёт +50%"),
+    ("Reward", "Recompensa", "Recompensa", "Награда"),
 ]
