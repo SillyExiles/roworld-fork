@@ -57,6 +57,8 @@ for _, c in { "pt", "es", "ru" } do
 	end
 	expect(bad, 0, c .. ": every exact entry")
 end
-Lang.set("en")
+Lang.apply("en")
 expect(Lang.tr("Leaderboard"), "Leaderboard", "English is left alone")
+Lang.apply_default()
+expect(Lang.code(), "en", "an early automatic choice doesn't override the setting")
 print(if fails == 0 then "ALL OK" else (fails .. " FAILED"))

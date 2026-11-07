@@ -481,7 +481,7 @@ function PauseMenu.new(c: any)
 		local nxt = order[(table.find(order, cur) or 1) % #order + 1]
 		self.ctx:set_setting("lang", nxt)
 		task.spawn(function()
-			Lang.set(Lang.choose(nxt))
+			Lang.apply(nxt)
 			self:_lang_text()
 		end)
 		self:_lang_text()

@@ -187,7 +187,7 @@ function EraText.start()
 	end)
 	Lang.on_change(redo)
 	task.spawn(function()
-		Lang.set(Lang.choose("auto"))
+		Lang.apply_default()
 	end)
 	local pg = Players.LocalPlayer:WaitForChild("PlayerGui")
 	for _, d in pg:GetDescendants() do

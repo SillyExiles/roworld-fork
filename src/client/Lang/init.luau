@@ -422,6 +422,26 @@ function Lang.set(c: string)
 	end
 end
 
+--- The player's choice ("auto" or a code) in force: the last one asked for wins, though looking up
+--- the country takes a moment (an early "auto" never overrides the saved setting read after it).
+local pref: string? = nil
+
+function Lang.apply(p: string?)
+	local want = p or "auto"
+	pref = want
+	local c = Lang.choose(want)
+	if pref == want then
+		Lang.set(c)
+	end
+end
+
+--- "auto" until the saved setting says otherwise.
+function Lang.apply_default()
+	if pref == nil then
+		Lang.apply("auto")
+	end
+end
+
 function Lang.on_change(f: () -> ())
 	table.insert(changed, f)
 end

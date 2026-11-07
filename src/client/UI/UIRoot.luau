@@ -421,7 +421,7 @@ function UIRoot._on_settings_loaded(self)
 	self:_check_new_player(false)
 	-- (2026-11-07) the language saved (Settings' Language), else the account's / its country's
 	task.spawn(function()
-		Lang.set(Lang.choose(tostring(ctx:setting("lang", "auto"))))
+		Lang.apply(tostring(ctx:setting("lang", "auto")))
 	end)
 	self.labels_on = ctx:setting("labels", true) ~= false
 	self.title.difficulty =
