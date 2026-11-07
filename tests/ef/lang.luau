@@ -7,6 +7,7 @@ local DATA = {
 	Pt = require("../../src/client/Lang/Pt"),
 	Es = require("../../src/client/Lang/Es"),
 	Ru = require("../../src/client/Lang/Ru"),
+	Keys = require("../../src/client/Lang/Keys"),
 }
 Lang.services = function()
 	return { LocalPlayer = { LocaleId = "en-us" } }, { GetCountryRegionForPlayerAsync = function() return country end }
@@ -44,7 +45,9 @@ for _, c in { "pt", "es", "ru" } do
 	Lang.set(c)
 	local data = DATA[string.upper(string.sub(c, 1, 1)) .. string.sub(c, 2)]
 	local bad = 0
-	for k, v in data.texts do
+	for i, k in DATA.Keys do
+		local v = data.values[i]
+		if v == "" then continue end
 		if not string.find(k, "%%[%-%d%.]*[sdfi]") and not string.find(k, "{[%w_]+}") then
 			if Lang.tr(k) ~= v then
 				bad += 1

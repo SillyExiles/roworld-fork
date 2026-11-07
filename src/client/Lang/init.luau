@@ -218,7 +218,25 @@ local function load(c: string)
 		code = "en"
 		return
 	end
-	for k, v in data.texts or {} do
+	local texts: { [string]: string } = data.texts or {}
+	if data.values ~= nil then
+		-- (the values in the order of Lang/Keys)
+		local keys = Lang.find("Keys")
+		local kok, klist = true, keys
+		if type(keys) ~= "table" then
+			kok, klist = pcall(require, keys)
+		end
+		if kok and type(klist) == "table" then
+			texts = {}
+			for i, k in klist do
+				local v = data.values[i]
+				if type(v) == "string" and v ~= "" then
+					texts[k] = v
+				end
+			end
+		end
+	end
+	for k, v in texts do
 		if type(k) == "string" and type(v) == "string" and v ~= "" then
 			if string.find(k, PH) or string.find(k, "{[%w_]+}") then
 				local t = compile(k, v)
