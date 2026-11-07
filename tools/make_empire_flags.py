@@ -772,6 +772,183 @@ add("legion", "Legion Vexillum", "epic", (lambda f: [f.set(x, H - 1, "gold") for
     F().fill("crimson").rect(0, 0, W - 1, 0, "gold").shape(6, 2, EAGLE, {"x": "gold"}).rect(8, 8, 10, 9, "gold")))
 add("viking_sail", "Viking Sail", "rare", F().vstripes("red", "white", "red", "white", "red", "white"))
 
+# ---------------------------------------------------------------- 2026-11-07: forty more
+# (nations whose flags carry no weapon, scripture, party or disputed claim; banners of history; two
+# original suns for the Andes and Mexico maps)
+C.update({"aqua": 0x00778B, "luxblue": 0x00A1DE, "pr_blue": 0x0050F0, "kgred": 0xE8112D, "bosblue": 0x002395,
+          "laored": 0xCE1126, "tzblue": 0x00A3DD, "mkred": 0xD20000, "mkgold": 0xFFE600, "azblue": 0x00B5E2,
+          "azgreen": 0x3F9C35, "uzblue": 0x0099B5, "uzgreen": 0x1EB53A, "ivgreen": 0x009E60, "faroeblue": 0x0065BD,
+          "mgred": 0xFC3D32, "mggreen": 0x007E3A})
+
+
+def diag(f, c_tl, c_br, band=None, edge=None, w=2.2, e=0.9):
+    """A diagonal from bottom-left to top-right: `c_tl` above it, `c_br` below, a `band` along it with
+    `edge` on both sides."""
+    for y in range(H):
+        for x in range(W):
+            d = (x + 0.5) / W + (y + 0.5) / H - 1.0  # < 0 above-left
+            dist = abs(d) * min(W, H)
+            if band is not None and dist <= w / 2:
+                f.px[y][x] = band
+            elif edge is not None and dist <= w / 2 + e:
+                f.px[y][x] = edge
+            else:
+                f.px[y][x] = c_tl if d < 0 else c_br
+    return f
+
+
+def lozenges(f, a, b):
+    for y in range(H):
+        for x in range(W):
+            f.px[y][x] = a if ((x + y) // 3 + (x - y + 30) // 3) % 2 == 0 else b
+    return f
+
+
+SUN_RAYS = [  # North Macedonia's sun
+    "x.......x.......x",
+    ".x......x......x.",
+    "..x.....x.....x..",
+    "...x...xxx...x...",
+    "....x.xxxxx.x....",
+    "xxxxxxxxxxxxxxxxx",
+    "....x.xxxxx.x....",
+    "...x...xxx...x...",
+    "..x.....x.....x..",
+    ".x......x......x.",
+    "x.......x.......x",
+]
+SUN_KG = [  # Kyrgyzstan's sun
+    ".x.x.x.",
+    "x.xxx.x",
+    ".xxoxx.",
+    "xxo.oxx",
+    ".xxoxx.",
+    "x.xxx.x",
+    ".x.x.x.",
+]
+INTI = [  # an original Andean sun face
+    "x...x...x",
+    ".x.xxx.x.",
+    "..xxxxx..",
+    "xxxo.oxxx",
+    "..xxxxx..",
+    "xxx.o.xxx",
+    "..xxxxx..",
+    ".x.xxx.x.",
+    "x...x...x",
+]
+STONE_SUN = [  # an original sun stone: rings and four arms
+    "...xxxxx...",
+    "..xo...ox..",
+    ".xo.xxx.ox.",
+    "xo.x.o.x.ox",
+    "x.xo...ox.x",
+    "x.x.oxo.x.x",
+    "x.xo...ox.x",
+    "xo.x.o.x.ox",
+    ".xo.xxx.ox.",
+    "..xo...ox..",
+    "...xxxxx...",
+]
+SHIELD_SK = [  # Slovakia: a double cross on three hills
+    ".xxxxx.",
+    "xxoxoxx",
+    "xoooooox"[:7],
+    "xxoxoxx",
+    "xoooooox"[:7],
+    "xxxoxxx",
+    "xbbbbbx",
+    ".bbbbb.",
+    "..bbb..",
+]
+SHIELD_SI = [  # Slovenia: a small shield with mountain
+    "xxxxx",
+    "xxoxx",
+    "xooox",
+    "boooob"[:5],
+    ".bbb.",
+]
+EAGLE_SR = [  # Serbia: a white double eagle
+    "x.x.x.x",
+    "xxx.xxx",
+    ".xxxxx.",
+    "..xox..",
+    "..xxx..",
+    ".x.x.x.",
+]
+STARS_DIAG = [(5, 0), (6, 2), (7, 4), (8, 6), (9, 8), (10, 10)]
+LION_FL = [  # Flanders: a black lion rampant (8 x 8)
+    "....xx..",
+    "...xxxx.",
+    "x..xxx..",
+    "xx.xxxx.",
+    ".xxxxxx.",
+    "..xxxx..",
+    "..x..x..",
+    ".xx.xx..",
+]
+
+# nations of today
+add("ecuador", "Ecuador", "common", F().fill("yellow").rect(0, 6, W - 1, 8, "blue").rect(0, 9, W - 1, H - 1, "red").disc(9, 6, 1.6, "darkgreen"))
+add("paraguay", "Paraguay", "common", F().hstripes("red", "white", "blue").disc(9, 6, 1.4, "gold"))
+add("costa_rica", "Costa Rica", "common", F().fill("navy").rect(0, 2, W - 1, 9, "white").rect(0, 4, W - 1, 7, "red"))
+add("panama", "Panama", "rare", F().fill("white").rect(9, 0, W - 1, 5, "red").rect(0, 6, 8, H - 1, "blue").star(4, 3, "blue", big=True).star(13, 9, "red", big=True))
+add("honduras", "Honduras", "common", (lambda f: [f.set(x, y, "blue") for x, y in ((7, 5), (11, 5), (9, 6), (7, 7), (11, 7))] and f)(F().hstripes("blue", "white", "blue")))
+add("el_salvador", "El Salvador", "common", F().hstripes("blue", "white", "blue").ring(9, 6, 1.9, 0.8, "darkgreen").rect(8, 5, 9, 6, "gold"))
+add("dominican_rep", "Dominican Republic", "common", F().fill("white").rect(0, 0, 7, 4, "navy").rect(10, 0, W - 1, 4, "red").rect(0, 7, 7, H - 1, "red").rect(10, 7, W - 1, H - 1, "navy"))
+add("bahamas", "The Bahamas", "common", F().hstripes("aqua", "gold", "aqua").tri(7, "black"))
+add("trinidad", "Trinidad and Tobago", "common", (lambda f: [row.reverse() for row in f.px] and f)(diag(F(), "red", "red", band="black", edge="white", w=2.6, e=1.0)))
+add("puerto_rico", "Puerto Rico", "common", F().hstripes("red", "white", "red", "white", "red").tri(9, "pr_blue").star(3, 6, "white"))
+add("senegal", "Senegal", "common", F().vstripes("green", "yellow", "red").star(9, 6, "green", big=True))
+add("ivory_coast", "Ivory Coast", "common", F().vstripes("orange", "white", "ivgreen"))
+add("cameroon", "Cameroon", "common", F().vstripes("darkgreen", "red", "yellow").star(9, 6, "yellow", big=True))
+add("tanzania", "Tanzania", "rare", diag(F(), "green", "tzblue", band="black", edge="yellow", w=2.6, e=0.9))
+add("madagascar", "Madagascar", "common", F().fill("mgred").rect(0, 6, W - 1, H - 1, "mggreen").rect(0, 0, 5, H - 1, "white"))
+add("tunisia", "Tunisia", "rare", F().fill("red").disc(9, 6, 4.3, "white").crescent(8.2, 6, 3.1, "red", off=1.4).star(11, 6, "red"))
+add("malaysia", "Malaysia", "rare", (lambda f: f.rect(0, 0, 8, 6, "navy").crescent(3.5, 3.5, 2.6, "yellow", off=1.0).star(6, 3, "yellow"))(
+    F().hstripes("red", "white", "red", "white", "red", "white", "red", "white", "red", "white", "red", "white")))
+add("singapore", "Singapore", "rare", (lambda f: [f.set(x, y, "white") for x, y in ((5, 1), (4, 3), (6, 3), (5, 4))] and f)(
+    F().hstripes("red", "white").crescent(3, 3, 2.3, "white", off=0.9)))
+add("laos", "Laos", "common", F().fill("laored").rect(0, 3, W - 1, 8, "navy").disc(9, 6, 2.2, "white"))
+add("luxembourg", "Luxembourg", "common", F().hstripes("red", "white", "luxblue"))
+add("slovenia", "Slovenia", "common", F().hstripes("white", "blue", "red").shape(3, 2, SHIELD_SI, {"x": "blue", "o": "white", "b": "red"}))
+add("slovakia", "Slovakia", "rare", F().hstripes("white", "blue", "red").shape(3, 2, SHIELD_SK, {"x": "red", "o": "white", "b": "blue"}))
+add("serbia", "Serbia", "rare", F().hstripes("red", "blue", "white").shape(4, 3, EAGLE_SR, {"x": "white", "o": "red"}))
+add("albania", "Albania", "rare", F().fill("red").shape(5, 2, DOUBLE_EAGLE, {"x": "black"}))
+add("bosnia", "Bosnia and Herzegovina", "rare", (lambda f: [f.set(x, y, "white") for x, y in STARS_DIAG] and f)(
+    (lambda f: [f.set(x, y, "gold") for y in range(H) for x in range(7, 14) if x - 7 >= y * 7 / H - 0.2] and f)(F().fill("bosblue"))))
+add("malta", "Malta", "common", F().vstripes("white", "red").rect(1, 1, 3, 3, "grey").rect(2, 1, 2, 3, "silver").rect(1, 2, 3, 2, "silver"))
+add("north_macedonia", "North Macedonia", "rare", F().fill("mkred").shape(0, 0, SUN_RAYS, {"x": "mkgold"}).disc(8.5, 5.5, 2.2, "mkgold"))
+add("montenegro", "Montenegro", "rare", border(F().fill("red"), "gold").shape(5, 2, DOUBLE_EAGLE, {"x": "gold"}))
+add("azerbaijan", "Azerbaijan", "common", F().hstripes("azblue", "red", "azgreen").crescent(8.5, 6, 2.0, "white", off=0.8).star(10, 6, "white"))
+add("uzbekistan", "Uzbekistan", "common", (lambda f: [f.set(x, y, "white") for x, y in ((6, 1), (8, 1), (10, 1), (8, 2), (10, 2))] and f)(
+    F().fill("white").rect(0, 0, W - 1, 3, "uzblue").rect(0, 4, W - 1, 4, "red").rect(0, 7, W - 1, 7, "red").rect(0, 8, W - 1, H - 1, "uzgreen")
+    .crescent(3, 2, 1.8, "white", off=0.8)))
+add("kyrgyzstan", "Kyrgyzstan", "rare", F().fill("kgred").shape(6, 2, SUN_KG, {"x": "yellow", "o": "kgred"}))
+def greenland():
+    f = F().hstripes("white", "red")
+    for y in range(H):
+        for x in range(W):
+            if (x + 0.5 - 6.5) ** 2 + (y + 0.5 - 6) ** 2 <= 3.6 ** 2:
+                f.px[y][x] = "red" if y < 6 else "white"
+    return f
+
+
+add("greenland", "Greenland", "common", greenland())
+add("faroe", "Faroe Islands", "common", F().fill("white").cross(5, 4, 4, "faroeblue").cross(6, 5, 2, "red"))
+
+# banners of history
+add("bavaria", "Bavaria", "rare", lozenges(F(), "lightblue", "white"))
+add("brittany", "Brittany", "rare", (lambda f: [f.shape(x, y, [".x.", "xxx", ".x."], {"x": "black"}) for x, y in ((1, 1), (5, 1), (3, 3), (1, 4), (5, 4))] and f)(
+    F().hstripes("black", "white", "black", "white", "black", "white", "black", "white", "black").rect(0, 0, 7, 6, "white")))
+add("kalmar", "Kalmar Union", "epic", F().fill("gold").cross(5, 5, 2, "red"))
+add("flanders", "County of Flanders", "rare", F().fill("gold").shape(5, 2, LION_FL, {"x": "black"}))
+add("normandy", "Duchy of Normandy", "rare", (lambda f: [f.shape(5, y, LION_S, {"x": "gold"}) for y in (2, 7)] and f)(F().fill("red")))
+
+# two original suns, for the Andes and Mexico
+add("inti_sun", "Sun of the Andes", "epic", border(F().fill("darkred"), "gold").shape(5, 2, INTI, {"x": "gold", "o": "darkred"}), era="inca")
+add("stone_sun", "Sun Stone", "epic", border(F().fill("teal"), "tan").shape(4, 1, STONE_SUN, {"x": "tan", "o": "gold"}), era="aztec")
+
 # legendary banners, the Stars' top prize
 add("sun_emperor", "Sun Emperor", "legendary", sun_emperor())
 add("twin_dragons", "Twin Dragons", "legendary", border(F().fill("navy"), "gold").shape(1, 1, mirror(DRAGON), {"x": "gold", "o": "red"})
