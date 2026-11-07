@@ -1026,8 +1026,10 @@ function Sim._apply_intent(self: any, id: number, it: { [string]: any })
 		-- (Empires Front 2026-11-06: a volley of bombards or of fire, one from each workshop that has it loaded)
 		local kname = _str(it, "kind")
 		local n = if kname == "atom" or kname == "hydrogen" then math.clamp(_int(it, "amount", 1), 1, Sim.MAX_INTENT_AMOUNT) else 1
-		for _ = 1, n do
-			if not self:launch_nuke(id, kname, tile) then
+		-- (2026-11-07) a salvo falls on distinct spots of the target's land (salvo_targets)
+		local targets = if n > 1 then self:salvo_targets(kname, tile, n, id) else { tile }
+		for i = 1, n do
+			if not self:launch_nuke(id, kname, targets[i] or tile) then
 				break
 			end
 		end

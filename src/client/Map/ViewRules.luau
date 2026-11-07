@@ -88,10 +88,10 @@ function ViewRules.airfield_range(): number
 	return if type(Rules.launch_range) == "function" then Rules.launch_range(Defs.N_AIRSTRIKE) else 156
 end
 
---- Defense-post protection radius (tiles).
-function ViewRules.defense_range(): number
+--- Defense-post protection radius (tiles) of a post of `level` (2026-11-07: wider a level).
+function ViewRules.defense_range(level: number?): number
 	if type(Rules.defense_range) == "function" then
-		return Rules.defense_range()
+		return Rules.defense_range(level)
 	end
 	return num(Rules.DEFENSE_RADIUS, 0)
 end

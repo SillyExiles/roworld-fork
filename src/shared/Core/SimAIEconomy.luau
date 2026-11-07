@@ -370,8 +370,9 @@ function SimAIEconomy.install(C)
 			end
 			if capped or total * E.UPGRADE_DENSITY_FULL_TILES > sim.o_tiles[id] * sim.R.K_AREA then
 				local ready = {}
+				local top = Rules.max_level(kind)
 				for _, s in sim:structs_of(id, kind) do
-					if s.active then
+					if s.active and (top == nil or s.level < top) then
 						table.insert(ready, s)
 					end
 				end

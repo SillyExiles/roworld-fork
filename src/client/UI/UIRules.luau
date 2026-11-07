@@ -120,7 +120,7 @@ UIRules.BLURBS = {
 	city = "Raises your troop cap by {city}. Joins the road network.",
 	port = "Coastal. Sends trade ships for gold and builds warships.",
 	factory = "Road hub: every building within its reach joins the roads. Carts pay gold at every city, port, mine and market they pass.",
-	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time. On hills or mountains, build on your own post again to raise it into a Fortress: {fort_mag}x the troops and {fort_cost}x the time within {fort_r} tiles, and it calms the province (at most {fort_lim}).",
+	defense = "Land within {def_r} tiles costs attackers {def_mag}x the troops and {def_cost}x the time. Build on your own post again to level it up (up to level {def_max}): each level guards {def_step} more tiles. On hills or mountains, building on your post again raises it into a Fortress instead: {fort_mag}x the troops and {fort_cost}x the time within {fort_r} tiles, and it calms the province (at most {fort_lim}).",
 	forge = "Arms your troops (each level also needs Ore). Tiers: {forge_next}. At most 2 Forges per player: build near one to upgrade it.",
 	farm = "Feeds a bigger army: your troop cap +{farm_pct}% a level ({farm_plain}% on plains, less on hills or cold land). Near a Temple: x{farm_bless} (a blessed harvest).",
 	temple = "Calms the provinces within {temple_r} tiles and blesses the Farms there (x{farm_bless}). Each Temple also calms your whole empire a little. Universities near one study x{uni_temple}. At most {temple_lim}, no upgrades.",
@@ -191,6 +191,8 @@ function UIRules._blurb(kind: string): string
 	return UIRules.format(UIRules.BLURBS[kind] or "", {
 		city = T().fmt_troops(R.CITY_TROOPS),
 		def_r = tostring(Defs.round(R.defense_range())),
+		def_max = tostring(R.DEFENSE_MAX_LEVEL or 1),
+		def_step = tostring(Defs.round((R.DEFENSE_RANGE_STEP_FULL or 0) / (R.K_LIN or 1))),
 		def_mag = tostring(Defs.round(R.DEFENSE_POST_MAG)),
 		def_cost = tostring(Defs.round(R.DEFENSE_POST_COST)),
 		sam_r = tostring(Defs.round(R.sam_range(1))),
@@ -1113,6 +1115,7 @@ UIRules.PLACE_REASONS = {
 	no_port = "Warships need a finished port on this water",
 	gold = "Not enough gold",
 	limit = "Limit reached for this building",
+	max_level = "Already at its highest level",
 	invalid = "Can't build here",
 }
 

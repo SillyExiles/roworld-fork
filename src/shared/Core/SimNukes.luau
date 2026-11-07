@@ -187,6 +187,110 @@ function SimNukes.install(C)
 	-- Launch
 	-- =========================================================================================
 
+	--- (Empires Front 2026-11-07) Where a salvo of `n` bombs of `kind_name` aimed at `t` falls: the
+	--- first at `t`, the others spread over the same owner's land around it, about SALVO_SPREAD outer
+	--- radii from `t` and from each other (rings around the aim, evenly round each ring). A territory
+	--- too small for them all: the rest at `t`. Team games: never a spot with a teammate's building of
+	--- launcher `id` in its outer radius (launch_nuke refuses those). Deterministic.
+	SimNukes.SALVO_SPREAD = 1.2
+	SimNukes.SALVO_RINGS = 6
+	function C:salvo_targets(kind_name: string, t: number, n: number, id: number?): { number }
+		local out = { t }
+		if n <= 1 or t < 0 or t >= self.N then
+			return out
+		end
+		local kind = Defs.nuke_kind_from_name(kind_name)
+		local _, outer = self.R.nuke_radii(kind)
+		local sep = math.max(3, outer * SimNukes.SALVO_SPREAD)
+		local min2 = (sep * 0.8) * (sep * 0.8)
+		local W, H = self.W, self.H
+		local owner, land = self.owner, self.land
+		local tg = readi32(owner, t * 4)
+		local range_d2 = self.range_d2
+		local cx, cy = t % W, t // W
+		local ro = math.ceil(outer)
+		local o2 = outer * outer
+		local function good(c: number): boolean
+			if readu8(land, c) == 0 or readi32(owner, c * 4) ~= tg then
+				return false
+			end
+			for _, o in out do
+				if range_d2(o, c) < min2 then
+					return false
+				end
+			end
+			if self.team_mode and id ~= nil then
+				for _, st in self:structs_in_box(c, ro, ro) do
+					if st.owner ~= id and self:same_team(id, st.owner) and range_d2(c, st.tile) <= o2 then
+						return false
+					end
+				end
+			end
+			return true
+		end
+		-- the good tile nearest (x, y) within `r`, or -1
+		local function near(x: number, y: number, r: number): number
+			local best, bd = -1, math.huge
+			for dy = -r, r do
+				local yy = y + dy
+				if yy < 0 or yy >= H then
+					continue
+				end
+				for dx = -r, r do
+					local xx = x + dx
+					local d = dx * dx + dy * dy
+					if xx < 0 or xx >= W or d > r * r or d >= bd then
+						continue
+					end
+					local c = yy * W + xx
+					if good(c) then
+						best, bd = c, d
+					end
+				end
+			end
+			return best
+		end
+		local look = math.max(1, math.floor(sep / 2))
+		for ring = 1, SimNukes.SALVO_RINGS do
+			if #out >= n then
+				break
+			end
+			local rr = sep * ring
+			local pts = math.max(n - #out, math.floor(2 * math.pi * rr / sep))
+			-- the points evenly round the ring first (as many as still wanted), then the ones between
+			local order = {}
+			local taken = {}
+			local want = math.min(n - #out, pts)
+			for j = 0, want - 1 do
+				local i = math.floor(j * pts / want)
+				if not taken[i] then
+					taken[i] = true
+					table.insert(order, i)
+				end
+			end
+			for i = 0, pts - 1 do
+				if not taken[i] then
+					table.insert(order, i)
+				end
+			end
+			local off = (t % 97) / 97 * 2 * math.pi / pts
+			for _, i in order do
+				if #out >= n then
+					break
+				end
+				local a = off + i * 2 * math.pi / pts
+				local c = near(math.floor(cx + math.cos(a) * rr + 0.5), math.floor(cy + math.sin(a) * rr + 0.5), look)
+				if c >= 0 then
+					table.insert(out, c)
+				end
+			end
+		end
+		while #out < n do
+			table.insert(out, t)
+		end
+		return out
+	end
+
 	-- Nuke intent. Returns true when a missile left a silo.
 	function C:launch_nuke(id: number, kind_name: string, t: number): boolean
 		local kind = Defs.nuke_kind_from_name(kind_name)

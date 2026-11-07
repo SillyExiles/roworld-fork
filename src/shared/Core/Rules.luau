@@ -230,8 +230,14 @@ local function build(K_LIN: number, into: any?): any
 	Rules.DEFENSE_RANGE_FULL = 30.0
 	Rules.DEFENSE_POST_MAG = 5.0
 	Rules.DEFENSE_POST_COST = 3.0
-	--- Integer radius of the defense-post coverage map (ceil of defense_range()).
+	--- Integer radius of the defense-post coverage map (ceil of defense_range()) at level 1.
 	Rules.DEFENSE_RADIUS = math.ceil(30.0 / K_LIN)
+	--- (Empires Front 2026-11-07) A Defense Post levels up to DEFENSE_MAX_LEVEL; each level past the
+	--- first guards DEFENSE_RANGE_STEP_FULL more full-size tiles around it (30, 34, 38, 42, 46).
+	Rules.DEFENSE_MAX_LEVEL = 5
+	Rules.DEFENSE_RANGE_STEP_FULL = 4.0
+	--- Integer radius of the widest post's coverage (a post at DEFENSE_MAX_LEVEL): structure searches.
+	Rules.DEFENSE_RADIUS_MAX = math.ceil((30.0 + 4.0 * (5 - 1)) / K_LIN)
 	--- SAMCooldown / SiloCooldown: 90 ticks per missile; a SAM or silo holds `level` missiles.
 	Rules.SAM_COOLDOWN_TICKS = 90
 	--- (Empires Front 2026-11-06: a Siege Workshop reloads for SIEGE_RELOAD_TICKS: see below)
@@ -252,7 +258,15 @@ local function build(K_LIN: number, into: any?): any
 	--- (2026-11-06: nor the Watchtower and the Siege Workshop: capped, one level each)
 	--- (2026-11-07: the Watchtower levels up again: a shot more and a little more reach a level, and from
 	--- SAM_HEAVY_LEVEL it stops what nothing else does)
-	Rules.UPGRADABLE = zt({ 1, 1, 1, 0, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0 })
+	--- (2026-11-07: and the Defense Post, up to DEFENSE_MAX_LEVEL: a little more land guarded a level)
+	Rules.UPGRADABLE = zt({ 1, 1, 1, 1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 0, 1, 0, 0, 0, 0 })
+	--- The highest level one structure of a kind may reach (nil: no such cap).
+	Rules.MAX_LEVELS = {
+		[Defs.S_DEFENSE] = Rules.DEFENSE_MAX_LEVEL,
+	}
+	function Rules.max_level(kind: number): number?
+		return Rules.MAX_LEVELS[kind]
+	end
 	--- Empires Front (2026-10-31) Border Wall: when finished it raises stones on every tile of the
 	--- owner's frontier (own land next to someone else's land) within WALL_RADIUS_FULL full-size tiles
 	--- (Defs.F_WALL). Taking a walled tile costs the attacker WALL_MAG x the troops and WALL_COST x
@@ -453,9 +467,11 @@ local function build(K_LIN: number, into: any?): any
 	--- Integer SAM range at level 1 (our tiles), for callers that want a constant.
 	Rules.SAM_RADIUS = math.ceil(70.0 / K_LIN)
 
-	--- Defense-post protection radius in OUR tiles (euclidean, map.range_d2).
-	function Rules.defense_range(): number
-		return 30.0 / K_LIN
+	--- Defense-post protection radius in OUR tiles (euclidean, map.range_d2) for a post of `level`
+	--- (default 1; DEFENSE_RANGE_STEP_FULL more a level, up to DEFENSE_MAX_LEVEL).
+	function Rules.defense_range(level: number?): number
+		local l = math.clamp(math.floor(level or 1), 1, Rules.DEFENSE_MAX_LEVEL)
+		return (30.0 + Rules.DEFENSE_RANGE_STEP_FULL * (l - 1)) / K_LIN
 	end
 
 	--- SAM interception range in OUR tiles for a SAM of `level` (euclidean, map.range_d2).
@@ -603,6 +619,12 @@ local function build(K_LIN: number, into: any?): any
 				end
 			end
 			if best ~= nil and best[3] == id and best[6] <= now then
+				-- (2026-11-07) a structure at its kind's highest level (MAX_LEVELS) takes no more
+				local top = Rules.MAX_LEVELS[kind]
+				if top ~= nil and best[5] >= top then
+					out.reason = "max_level"
+					return out
+				end
 				out.tile = best[4]
 				out.upgrade_sid = best[1]
 				return out

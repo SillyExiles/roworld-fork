@@ -349,6 +349,9 @@ function RangeLayer._range_of(self: any, sid: number, kind: number, cur: number)
 		return VR.airfield_range()
 	elseif kind == Defs.S_FACTORY then
 		return VR.factory_range()
+	elseif kind == Defs.S_DEFENSE then
+		-- (2026-11-07) a Defense Post guards more land a level
+		return VR.defense_range((self._lvl[sid] or NO_LVL)[1])
 	elseif kind ~= Defs.S_SAM then
 		return VR.defense_range()
 	end
@@ -556,7 +559,7 @@ function RangeLayer._rebuild(self: any)
 				elseif bk == Defs.S_ARTILLERY then VR.artillery_range()
 				elseif bk == Defs.S_AIRFIELD then VR.airfield_range()
 				elseif bk == Defs.S_WALL then VR.wall_range()
-				else VR.defense_range(),
+				else VR.defense_range(self._aim_level),
 			C_BUILD,
 			bc,
 			-1,

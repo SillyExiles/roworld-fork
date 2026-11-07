@@ -642,6 +642,8 @@ function SimStructures.install(C)
 				self:msg(id, Defs.MSG_INFO, "A Fortress must stand on your hills or mountains")
 			elseif reason == "not_own" then
 				self:msg(id, Defs.MSG_INFO, "You can only build on your own land")
+			elseif reason == "max_level" then
+				self:msg(id, Defs.MSG_INFO, string.format("This %s is at its highest level", struct_title(kind)))
 			else
 				self:msg(id, Defs.MSG_INFO, string.format("No room for %s there", a_an(struct_title(kind))))
 			end
@@ -721,6 +723,11 @@ function SimStructures.install(C)
 		end
 		if s.kind == S_SAM then
 			s.up_tick = self.tick
+		end
+		-- (2026-11-07) a working Defense Post guards its new level's wider land at once
+		if s.kind == S_DEFENSE and s.active then
+			self:_cover(s.tile, -1, self.R.defense_range(s.level - 1))
+			self:_cover(s.tile, 1, self.R.defense_range(s.level))
 		end
 		self:ev({ Ev.STRUCT_LEVEL, s.sid, s.level, s.active_tick })
 		if s.kind == S_SAM or s.kind == S_SILO then
@@ -812,7 +819,7 @@ function SimStructures.install(C)
 		elseif k == S_FACTORY then
 			table.insert(self.factory_list, s)
 		elseif k == S_DEFENSE then
-			self:_cover(s.tile, 1)
+			self:_cover(s.tile, 1, self.R.defense_range(s.level))
 		elseif k == Defs.S_FORTRESS then
 			self:_cover(s.tile, 1, self.R.fortress_range())
 		elseif k == S_ARTILLERY then
@@ -888,7 +895,7 @@ function SimStructures.install(C)
 					table.remove(self.factory_list, i)
 				end
 			elseif k == S_DEFENSE then
-				self:_cover(s.tile, -1)
+				self:_cover(s.tile, -1, self.R.defense_range(s.level))
 			elseif k == Defs.S_FORTRESS then
 				self:_cover(s.tile, -1, self.R.fortress_range())
 			elseif k == S_WALL then
@@ -1026,14 +1033,18 @@ function SimStructures.install(C)
 		end
 	end
 
-	-- True when a finished defense post of `id` stands within defensePostRange of `t`.
+	-- True when a finished defense post of `id` stands within defensePostRange of `t` (its level's:
+	-- Rules.defense_range(level), 2026-11-07).
 	function C:_defense_post_covers(t: number, id: number): boolean
 		local R = self.R
 		local range_d2 = self.range_d2
-		local rf = R.defense_range()
-		for _, s in self:structs_in_box(t, self.geo_span(t, rf), R.DEFENSE_RADIUS, S_DEFENSE) do
-			if s.owner == id and s.active and range_d2(s.tile, t) <= rf * rf then
-				return true
+		local rmax = R.defense_range(R.DEFENSE_MAX_LEVEL)
+		for _, s in self:structs_in_box(t, self.geo_span(t, rmax), R.DEFENSE_RADIUS_MAX, S_DEFENSE) do
+			if s.owner == id and s.active then
+				local rf = R.defense_range(s.level)
+				if range_d2(s.tile, t) <= rf * rf then
+					return true
+				end
 			end
 		end
 		return false
