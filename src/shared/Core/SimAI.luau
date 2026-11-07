@@ -953,13 +953,27 @@ function SimAI:_consider_nuke(sim, id: number, age: number)
 	local tick = sim.tick
 	local big = sim.o_tiles[best] > 2500 * LA
 	local function can(k: number, spare: number): boolean
-		return gold >= Rules.siege_cost(Defs.NUKE_NAMES[k], share, sim:plague_uses(id)) * spare and sim:siege_loaded(id, k)
+		return gold >= Rules.siege_cost(Defs.NUKE_NAMES[k], share, sim:siege_uses(id, k)) * spare and sim:siege_loaded(id, k)
 	end
 	local kind = -1
+	-- (2026-11-07) the rain of fire arrows, on all its enemies at once: a rich AI at war, now and then
+	local foes = 0
+	for o = 1, sim.owner_total do
+		if o ~= id and sim.o_alive[o] == 1 and sim.o_kind[o] == Defs.KIND_NATION and sim:hostile(id, o) then
+			foes += 1
+		end
+	end
 	if
+		foes >= 2
+		and sim:siege_uses(id, Defs.N_FIRERAIN) < Rules.FIRERAIN_MAX_USES
+		and can(Defs.N_FIRERAIN, 1.3)
+		and sim.rng:randi() % 3 == 0
+	then
+		kind = Defs.N_FIRERAIN
+	elseif
 		sim.o_troops[best] > sim.o_troops[id] * 0.4
 		and sim.o_plague_until[best] <= tick
-		and sim:plague_uses(id) < Rules.PLAGUE_MAX_USES
+		and sim:siege_uses(id, Defs.N_PLAGUE) < Rules.PLAGUE_MAX_USES
 		and sim.o_tiles[best] > 1500 * LA
 		and can(Defs.N_PLAGUE, 1.5)
 	then

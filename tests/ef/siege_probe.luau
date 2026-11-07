@@ -17,7 +17,7 @@ local diff = tonumber(args[4]) or 2
 Era.set(mapid)
 local sim = Sim.new(WorldMap.get(mapid), { seed = seed, difficulty = diff, tribes = 60, max_humans = 0 })
 
-local K = { [Defs.N_ATOM] = "bombard", [Defs.N_HYDROGEN] = "fire", [Defs.N_PLAGUE] = "plague" }
+local K = { [Defs.N_ATOM] = "bombard", [Defs.N_HYDROGEN] = "fire", [Defs.N_PLAGUE] = "plague", [Defs.N_FIRERAIN] = "firerain" }
 local st = {}
 for k, n in K do st[k] = { n = 0, gold = 0, down = 0, tiles = 0, troops = 0, structs = 0, sick = 0 } end
 local fails = 0

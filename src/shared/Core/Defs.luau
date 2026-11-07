@@ -169,10 +169,13 @@ Defs.N_SLUG = 8
 -- the hydrogen bomb is fire that spreads (Greek fire, fire arrows...), and the plague
 -- (a new kind) sickens the nation it lands on and spreads to its neighbours (Core/SimNukes).
 Defs.N_PLAGUE = 9
-Defs.NUKE_KIND_COUNT = 10
-Defs.NUKE_NAMES = { [0] = "atom", "hydrogen", "mirv", "warhead", "mega", "scatter", "shell", "airstrike", "slug", "plague" }
+-- (2026-11-07) the rain of fire arrows: fire falls on every nation that isn't the launcher's ally
+-- (Core/SimNukes._firerain_land)
+Defs.N_FIRERAIN = 10
+Defs.NUKE_KIND_COUNT = 11
+Defs.NUKE_NAMES = { [0] = "atom", "hydrogen", "mirv", "warhead", "mega", "scatter", "shell", "airstrike", "slug", "plague", "firerain" }
 --- The munitions a Siege Workshop fires (the rest stay in the code, out of the game).
-Defs.SIEGE_KINDS = { [Defs.N_ATOM] = true, [Defs.N_HYDROGEN] = true, [Defs.N_PLAGUE] = true }
+Defs.SIEGE_KINDS = { [Defs.N_ATOM] = true, [Defs.N_HYDROGEN] = true, [Defs.N_PLAGUE] = true, [Defs.N_FIRERAIN] = true }
 Defs.NUKE_TITLES = {
 	[0] = "Atom Bomb",
 	"Hydrogen Bomb",
@@ -184,6 +187,7 @@ Defs.NUKE_TITLES = {
 	"Air Strike",
 	"Railgun Slug",
 	"Plague",
+	"Fire Arrow Rain",
 }
 
 -- Arsenal unlocks an owner holds (Sim.o_unlock bit mask; Data/Arsenal names them). Without its bit

@@ -33,7 +33,7 @@ sim.step = function(self: any, ...)
 	self.o_troops[A] = math.max(self.o_troops[A], self.o_cap[A] * 0.9)
 	return base_step(self, ...)
 end
-expect(Defs.NUKE_NAMES[Defs.N_PLAGUE] == "plague" and Defs.NUKE_KIND_COUNT == 10, "the plague is a munition")
+expect(Defs.NUKE_NAMES[Defs.N_PLAGUE] == "plague" and Defs.NUKE_NAMES[Defs.N_FIRERAIN] == "firerain" and Defs.NUKE_KIND_COUNT == 11, "the plague and the rain of fire arrows are munitions")
 expect(Rules.STRUCT_LIMITS[Defs.S_SILO] == 15 and Rules.UPGRADABLE[Defs.S_SILO] == 0, "Siege Workshops: fifteen at most, no levels")
 expect(R.launch_range(Defs.N_ATOM) > 0, "the bombard has a reach (" .. math.floor(R.launch_range(Defs.N_ATOM)) .. " tiles)")
 
@@ -347,6 +347,98 @@ end
 if wall_t >= 0 then
 	expect(sim:_shielded(wall_t, buffer.readi32(sim.owner, wall_t * 4)), "a walled tile is shielded")
 end
+-- (2026-11-07) the rain of fire arrows: on every nation that isn't A's friend, at once
+do
+	for _, w in sim:structs_of(A, Defs.S_SILO) do w.shots = {} end
+	sim.firerain = {}
+	-- an ally of A's, a nation it may hit (an enemy), A's own land
+	local ally, foe, foe_t = 0, 0, -1
+	for o = 1, sim.owner_total do
+		if o ~= A and sim.o_alive[o] == 1 and sim.o_kind[o] == Defs.KIND_NATION and sim.o_tiles[o] > 300 and sim.o_rookie[o] ~= 1 then
+			if sim:allied(A, o) then
+				if ally == 0 then ally = o end
+			elseif ally == 0 and not sim:same_team(A, o) and o ~= P then
+				sim:form_alliance(A, o)
+				if sim:allied(A, o) then ally = o end
+			end
+		end
+	end
+	for u = 0, sim.N - 1, 5 do
+		local o = buffer.readi32(sim.owner, u * 4)
+		if o > 0 and o ~= A and o ~= ally and not sim:allied(A, o) and sim.o_rookie[o] ~= 1 and sim:siege_loaded(A, Defs.N_FIRERAIN, u) then
+			foe, foe_t = o, u
+			break
+		end
+	end
+	expect(ally > 0 and foe > 0, "an ally and an enemy for the rain")
+	local function count_structs(o)
+		local c = 0
+		for k = 0, Defs.STRUCT_KIND_COUNT - 1 do for _, s0 in sim:structs_of(o, k) do if not s0.dead then c += 1 end end end
+		return c
+	end
+	-- (everyone keeps still: only the fire moves land)
+	for o = 1, sim.owner_total do sim.o_ai[o] = 0 end
+	sim.attacks = {}
+	local mine0, ally0 = sim.o_tiles[A], sim.o_tiles[ally]
+	local foes = {}
+	for o = 1, sim.owner_total do
+		if o ~= A and sim.o_alive[o] == 1 and sim.o_kind[o] == Defs.KIND_NATION and sim.o_tiles[o] > 0 and not sim:allied(A, o) and sim.o_rookie[o] ~= 1 then
+			foes[o] = { tiles = sim.o_tiles[o], structs = count_structs(o) }
+		end
+	end
+	local ally_s0 = count_structs(ally)
+	sim.o_gold[A] += 100000000
+	local g0 = sim.o_gold[A]
+	expect(not sim:launch_nuke(A, "firerain", sim.o_spawn_tile[ally]), "the rain can't be aimed at an ally")
+	expect(sim:launch_nuke(A, "firerain", foe_t), "the rain of fire arrows flies")
+	expect(g0 - sim.o_gold[A] == Rules.firerain_cost(0) and sim:siege_uses(A, Defs.N_FIRERAIN) == 1, "at its first price (" .. (g0 - sim.o_gold[A]) .. ")")
+	for _ = 1, 400 do
+		sim:step()
+		if #sim.firerain == 0 and #sim.blazes == 0 and sim.tick % 10 == 0 then
+			local landed = true
+			for _, n0 in sim.nukes do if not n0.dead and n0.kind == Defs.N_FIRERAIN then landed = false end end
+			if landed then break end
+		end
+	end
+	local hit, burned, razed = 0, 0, 0
+	for o, f in foes do
+		if sim.o_tiles[o] < f.tiles then hit += 1; burned += f.tiles - sim.o_tiles[o] end
+		razed += f.structs - count_structs(o)
+	end
+	local nfoes = 0
+	for _ in foes do nfoes += 1 end
+	expect(hit >= math.min(3, nfoes) and hit >= nfoes * 0.6, string.format("it burned the land of its enemies (%d of %d nations, %d tiles)", hit, nfoes, burned))
+	expect(razed > 0, string.format("and burned down their buildings (%d)", razed))
+	expect(sim.o_tiles[A] >= mine0 and sim.o_tiles[ally] >= ally0 and count_structs(ally) >= ally_s0, "and spared A and its ally")
+	-- (a fire of the rain falling right on the ally's land spares it; one not of the rain doesn't)
+	local at = sim.o_spawn_tile[ally]
+	if buffer.readi32(sim.owner, at * 4) ~= ally then
+		for u = 0, sim.N - 1, 3 do if buffer.readi32(sim.owner, u * 4) == ally then at = u break end end
+	end
+	local a1 = sim.o_tiles[ally]
+	sim:_ignite({ uid = 990101, kind = Defs.N_FIRERAIN, owner = A, to_tile = at, target_owner = ally } :: any, A, true)
+	for _ = 1, Rules.FIRE_SPREAD_TICKS + 5 do sim:step() end
+	expect(sim.o_tiles[ally] >= a1, string.format("a fire of the rain on the ally's land spares it (%d -> %d)", a1, sim.o_tiles[ally]))
+	sim:_ignite({ uid = 990102, kind = Defs.N_FIRERAIN, owner = A, to_tile = at, target_owner = ally } :: any)
+	for _ = 1, Rules.FIRE_SPREAD_TICKS + 5 do sim:step() end
+	expect(sim.o_tiles[ally] < a1, string.format("(a fire that isn't the rain's burns it: %d -> %d)", a1, sim.o_tiles[ally]))
+	-- twice a match, the second at double the price
+	for _, w in sim:structs_of(A, Defs.S_SILO) do w.shots = {} end
+	local g1 = sim.o_gold[A]
+	local t2 = -1
+	for u = 0, sim.N - 1, 5 do
+		local o = buffer.readi32(sim.owner, u * 4)
+		if o > 0 and o ~= A and not sim:allied(A, o) and sim.o_rookie[o] ~= 1 and sim:siege_loaded(A, Defs.N_FIRERAIN, u) then t2 = u break end
+	end
+	expect(t2 >= 0 and sim:launch_nuke(A, "firerain", t2), "a second rain flies")
+	expect(g1 - sim.o_gold[A] == Rules.firerain_cost(1), "at double the price")
+	for _, w in sim:structs_of(A, Defs.S_SILO) do w.shots = {} end
+	expect(not sim:launch_nuke(A, "firerain", t2), "no third this match")
+	for _ = 1, 300 do sim:step() end
+	sim.firerain = {}
+	sim.blazes = {}
+end
+
 -- (2026-11-06) a new player is safe: no siege weapon may be aimed at them, a blast spares their land,
 -- the plague never takes them, and the AI picks no target of theirs
 ensure_silo()

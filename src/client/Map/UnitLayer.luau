@@ -119,7 +119,7 @@ local NUKE_COL = {
 --- Munitions drawn without a trail and a target ring (a battery's shells: there are many).
 local NUKE_PLAIN = { [Defs.N_SHELL] = true }
 --- Munitions drawn bigger than the others.
-local NUKE_SCALE = { [Defs.N_MEGA] = 1.5, [Defs.N_SHELL] = 0.75, [Defs.N_SLUG] = 1.2, [Defs.N_ATOM] = 1.2, [Defs.N_HYDROGEN] = 1.3, [Defs.N_PLAGUE] = 1.3 }
+local NUKE_SCALE = { [Defs.N_MEGA] = 1.5, [Defs.N_SHELL] = 0.75, [Defs.N_SLUG] = 1.2, [Defs.N_ATOM] = 1.2, [Defs.N_HYDROGEN] = 1.3, [Defs.N_PLAGUE] = 1.3, [Defs.N_FIRERAIN] = 1.3 }
 
 type Sprite = {
 	frame: ImageLabel,

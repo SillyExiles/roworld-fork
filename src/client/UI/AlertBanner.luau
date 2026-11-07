@@ -225,7 +225,7 @@ function AlertBanner._refresh(self)
 	else
 		local p = UITheme.core("Rules").NUKE_INTERCEPT_P
 		local stop = if type(p) == "table" and (p[kind] or 1) <= 0 then " · can't be stopped" else ""
-		self._title:set_text(if kind == Defs.N_PLAGUE then "PLAGUE!" else "UNDER SIEGE!")
+		self._title:set_text(if kind == Defs.N_PLAGUE then "PLAGUE!" elseif kind == Defs.N_FIRERAIN then "FIRE RAIN!" else "UNDER SIEGE!")
 		self._detail:set_text(string.format("%s from %s · lands in %ds%s", what, s:owner_name(from), secs, stop))
 	end
 	self.panel:reset_size()

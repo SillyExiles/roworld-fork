@@ -53,6 +53,7 @@ local N_WARHEAD = Defs.N_WARHEAD
 local N_SCATTER = Defs.N_SCATTER
 local N_SHELL = Defs.N_SHELL
 local N_PLAGUE = Defs.N_PLAGUE
+local N_FIRERAIN = Defs.N_FIRERAIN
 local F_FALLOUT = Defs.F_FALLOUT
 local F_WALL = Defs.F_WALL
 local S_TEMPLE = Defs.S_TEMPLE
@@ -148,6 +149,20 @@ function SimNukes.install(C)
 		-- breaking away where it struck (_blights_tick)
 		self.o_plague_used = filled(MAXO, 0)
 		self.blights = {} :: { any }
+		-- (2026-11-07) the rain of fire arrows: how many times each player sent it, and its fires still
+		-- to fall (_firerain_tick)
+		self.o_firerain_used = filled(MAXO, 0)
+		self.firerain = {} :: { any }
+	end
+
+	--- (2026-11-07) How many times `id` fired `kind` this match, for the weapons Rules.LIMITED_USES counts.
+	function C:siege_uses(id: number, kind: number): number
+		if kind == N_FIRERAIN then
+			return self.o_firerain_used[id] or 0
+		elseif kind == N_PLAGUE then
+			return self.o_plague_used[id] or 0
+		end
+		return 0
 	end
 
 	--- (2026-11-06) How many times `id` sent the plague this match (its price doubles each time).
@@ -155,13 +170,14 @@ function SimNukes.install(C)
 		return self.o_plague_used[id] or 0
 	end
 
-	--- Snapshot rows: { owner, plague uses } of those who sent it.
+	--- Snapshot rows: { owner, plague uses, rain of fire arrows uses } of those who sent either.
 	function C:plague_use_rows(): { { number } }
 		local out = {}
 		for id = 1, self.owner_total do
 			local n = self.o_plague_used[id]
-			if n > 0 then
-				table.insert(out, { id, n })
+			local f = self.o_firerain_used[id]
+			if n > 0 or f > 0 then
+				table.insert(out, { id, n, f })
 			end
 		end
 		return out
@@ -215,9 +231,15 @@ function SimNukes.install(C)
 			self:msg(id, Defs.MSG_INFO, "Aim the plague at a nation's land")
 			return false
 		end
-		-- (2026-11-06) the plague: Rules.PLAGUE_MAX_USES a player a match
-		if kind == N_PLAGUE and self.o_plague_used[id] >= Rules.PLAGUE_MAX_USES then
-			self:msg(id, Defs.MSG_INFO, string.format("You have sent the plague %d times: no more this match", Rules.PLAGUE_MAX_USES))
+		-- (2026-11-07) the rain of fire arrows: aimed at an enemy's land (it spares the launcher's friends)
+		if kind == N_FIRERAIN and (tg <= 0 or self:allied(id, tg)) then
+			self:msg(id, Defs.MSG_INFO, "Aim the rain of fire arrows at an enemy's land")
+			return false
+		end
+		-- (2026-11-06) the plague, (2026-11-07) the rain of fire arrows: Rules.LIMITED_USES a player a match
+		local max_uses = Rules.LIMITED_USES[kind]
+		if max_uses ~= nil and self:siege_uses(id, kind) >= max_uses then
+			self:msg(id, Defs.MSG_INFO, string.format("You have sent %s %d times: no more this match", nuke_title(kind), max_uses))
 			return false
 		end
 		-- (2026-11-06) a new player (their first Rules.ROOKIE_MATCHES matches) is safe from them
@@ -251,7 +273,7 @@ function SimNukes.install(C)
 		end
 		-- (Empires Front 2026-11-06: a siege weapon costs a big empire more, Rules.siege_cost)
 		local cost = if siege
-			then Rules.siege_cost(kind_name, self:land_share(id), self.o_plague_used[id])
+			then Rules.siege_cost(kind_name, self:land_share(id), self:siege_uses(id, kind))
 			else Rules.nuke_cost(kind_name, self.mirvs_launched)
 		if self.o_gold[id] < cost then
 			self:msg(id, Defs.MSG_INFO, string.format("Not enough gold for %s", a_an(nuke_title(kind))))
@@ -299,7 +321,10 @@ function SimNukes.install(C)
 		self.o_gold[id] -= cost
 		if kind == N_PLAGUE then
 			self.o_plague_used[id] += 1
-			self:ev({ Ev.PLAGUE_USES, id, self.o_plague_used[id] })
+			self:ev({ Ev.PLAGUE_USES, id, self.o_plague_used[id], N_PLAGUE })
+		elseif kind == N_FIRERAIN then
+			self.o_firerain_used[id] += 1
+			self:ev({ Ev.PLAGUE_USES, id, self.o_firerain_used[id], N_FIRERAIN })
 		end
 		table.insert(silo.shots, self:shot_stamp(silo, if siege then kind else nil))
 		self:ev({ Ev.STRUCT_SHOTS, silo.sid, table.clone(silo.shots) })
@@ -339,7 +364,7 @@ function SimNukes.install(C)
 				end
 			end
 		end
-		if kind ~= N_MIRV and kind ~= N_PLAGUE then
+		if kind ~= N_MIRV and kind ~= N_PLAGUE and kind ~= N_FIRERAIN then
 			self:_break_nuked_alliances(id, t, kind)
 		end
 		self:_on_nuke_launched(id, tg, kind)
@@ -424,6 +449,8 @@ function SimNukes.install(C)
 					self:_strike(n) -- (a shell, an air strike, a slug: SimArsenal)
 				elseif n.kind == N_PLAGUE then
 					self:_plague_land(n)
+				elseif n.kind == N_FIRERAIN then
+					self:_firerain_land(n)
 				elseif n.kind == N_HYDROGEN then
 					self:_ignite(n)
 				else
@@ -457,6 +484,10 @@ function SimNukes.install(C)
 		-- (2026-11-07: the plague's land breaking away goes on whether or not its victim is still sick)
 		if #self.blights > 0 then
 			self:_blights_tick()
+		end
+		-- (2026-11-07) the rain of fire arrows still falling
+		if #self.firerain > 0 then
+			self:_firerain_tick()
 		end
 	end
 
@@ -987,7 +1018,9 @@ function SimNukes.install(C)
 	end
 
 	--- Fire landing: it spreads from its tile over Rules.FIRE_SPREAD_TICKS (_blazes_tick).
-	function C:_ignite(n: Nuke)
+	--- (2026-11-07: `foes_of` an owner: the fire spares that owner and its friends, Rules allied; `quiet`:
+	--- no Ev.BOOM nor messages, for the rain of fire arrows' many small fires.)
+	function C:_ignite(n: Nuke, foes_of: number?, quiet: boolean?)
 		local inner, outer = self.R.nuke_radii(n.kind)
 		local to = n.to_tile
 		local range_d2 = self.range_d2
@@ -1034,8 +1067,12 @@ function SimNukes.install(C)
 			si = 1,
 			start = self.tick,
 			dur = dur,
+			foes_of = foes_of or 0,
 		})
 		self:ev({ Ev.BLAZE, n.uid, n.owner, to, math.ceil(outer), self.tick, dur })
+		if quiet then
+			return
+		end
 		self:ev({ Ev.BOOM, n.uid, n.kind, to, math.ceil(outer), n.owner })
 		local victim = n.target_owner
 		local o_name = self.o_name
@@ -1077,6 +1114,10 @@ function SimNukes.install(C)
 				if o > 0 and self.o_rookie[o] == 1 then
 					continue -- (a new player's land does not burn)
 				end
+				-- (2026-11-07) the rain of fire arrows spares the launcher and its friends
+				if b.foes_of > 0 and (o == b.foes_of or self:allied(b.foes_of, o)) then
+					continue
+				end
 				if o > 0 and self:_shielded(t, o) then
 					p *= Rules.PROTECT_MULT
 				end
@@ -1105,6 +1146,9 @@ function SimNukes.install(C)
 				if so > 0 and self.o_rookie[so] == 1 then
 					continue
 				end
+				if b.foes_of > 0 and (so == b.foes_of or self:allied(b.foes_of, so)) then
+					continue
+				end
 				if self:_shielded(s.tile, so) and rng:randf() < Rules.PROTECT_SAVE then
 					continue
 				end
@@ -1129,6 +1173,150 @@ function SimNukes.install(C)
 		end
 		for i = #list, w + 1, -1 do
 			list[i] = nil
+		end
+	end
+
+	--- (2026-11-07) The rain of fire arrows came down: every nation that isn't the launcher, its ally or
+	--- teammate, nor a new player, takes Rules.FIRERAIN_STRIKES_MIN..MAX fires (one more a
+	--- FIRERAIN_TILES_PER of its land; FIRERAIN_STRIKES_ALL in all), half on its buildings, half on
+	--- its land at random, falling over FIRERAIN_TICKS (_firerain_tick).
+	function C:_firerain_land(n: Nuke)
+		local id = n.owner
+		local rng = self.rng
+		local o_name = self.o_name
+		local targets = {}
+		local want = {}
+		for o = 1, self.owner_total do
+			if
+				o ~= id
+				and self.o_alive[o] == 1
+				and self.o_kind[o] == Defs.KIND_NATION
+				and self.o_tiles[o] > 0
+				and self.o_rookie[o] ~= 1
+				and not self:allied(id, o)
+			then
+				table.insert(targets, o)
+				want[o] = math.clamp(
+					Rules.FIRERAIN_STRIKES_MIN + self.o_tiles[o] // Rules.FIRERAIN_TILES_PER,
+					Rules.FIRERAIN_STRIKES_MIN,
+					Rules.FIRERAIN_STRIKES_MAX
+				)
+			end
+		end
+		self:ev({ Ev.BOOM, n.uid, n.kind, n.to_tile, 8, id })
+		if #targets == 0 then
+			self:msg(id, Defs.MSG_INFO, "The rain of fire arrows found no enemy to fall on")
+			return
+		end
+		-- (too many for FIRERAIN_STRIKES_ALL: each nation's share cut alike, one at least)
+		local total = 0
+		for _, o in targets do
+			total += want[o]
+		end
+		if total > Rules.FIRERAIN_STRIKES_ALL then
+			local f = Rules.FIRERAIN_STRIKES_ALL / total
+			for _, o in targets do
+				want[o] = math.max(1, math.floor(want[o] * f))
+			end
+		end
+		-- each target's land: a sample by reservoir (one pass over the map), as many as it needs
+		local sample = {}
+		local seen = {}
+		local is_t = {}
+		for _, o in targets do
+			sample[o] = {}
+			seen[o] = 0
+			is_t[o] = true
+		end
+		local owner = self.owner
+		for t = 0, self.N - 1 do
+			local o = readi32(owner, t * 4)
+			if o > 0 and is_t[o] then
+				local c = seen[o] + 1
+				seen[o] = c
+				local k = want[o]
+				local sm = sample[o]
+				if #sm < k then
+					table.insert(sm, t)
+				else
+					local j = rng:randi() % c + 1
+					if j <= k then
+						sm[j] = t
+					end
+				end
+			end
+		end
+		local q = self.firerain
+		local tick = self.tick
+		for _, o in targets do
+			local tiles = {}
+			-- half on its buildings
+			local structs = {}
+			for k = 0, Defs.STRUCT_KIND_COUNT - 1 do
+				for _, s in self:structs_of(o, k) do
+					if not s.dead then
+						table.insert(structs, s.tile)
+					end
+				end
+			end
+			local on_b = math.min(#structs, want[o] // 2)
+			for _ = 1, on_b do
+				local j = rng:randi() % #structs + 1
+				table.insert(tiles, structs[j])
+				structs[j] = structs[#structs]
+				structs[#structs] = nil
+			end
+			for _, t in sample[o] do
+				if #tiles >= want[o] then
+					break
+				end
+				table.insert(tiles, t)
+			end
+			for _, t in tiles do
+				table.insert(q, { at = tick + 1 + rng:randi() % math.max(1, Rules.FIRERAIN_TICKS), tile = t, victim = o, owner = id })
+			end
+			self:add_grudge(o, id, Rules.NUKE_GRUDGE_TICKS)
+			self:msg(o, Defs.MSG_ALERT, string.format("%s rains fire arrows on your land!", o_name[id]))
+		end
+		table.sort(q, function(a, b)
+			if a.at ~= b.at then
+				return a.at < b.at
+			end
+			return a.tile < b.tile
+		end)
+		self:msg(id, Defs.MSG_INFO, string.format("Your rain of fire arrows falls on %d nations", #targets))
+		for _, h in self.humans do
+			if h ~= id and not table.find(targets, h) then
+				self:msg(h, Defs.MSG_INFO, string.format("%s rains fire arrows on all its enemies", o_name[id]))
+			end
+		end
+	end
+
+	--- The rain of fire arrows' fires that are due: each a small Fire (N_FIRERAIN's radii) that spares
+	--- the launcher's friends (_ignite foes_of), quietly.
+	function C:_firerain_tick()
+		local q = self.firerain
+		local tick = self.tick
+		local n = 0
+		while n < #q and q[n + 1].at <= tick do
+			n += 1
+			local f = q[n]
+			local fake = {
+				uid = self.next_uid,
+				kind = N_FIRERAIN,
+				owner = f.owner,
+				to_tile = f.tile,
+				target_owner = readi32(self.owner, f.tile * 4),
+			}
+			self.next_uid += 1
+			self:_ignite(fake :: any, f.owner, true)
+		end
+		if n > 0 then
+			local m = #q
+			table.move(q, n + 1, m, 1)
+			for i = m - n + 1, m do
+				q[i] = nil
+			end
 		end
 	end
 

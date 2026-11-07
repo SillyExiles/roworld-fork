@@ -1702,6 +1702,8 @@ if UICtx.IS_ROBLOX then
 		[K.Quote] = 17,
 		[K.Comma] = 18,
 		[K.Period] = 19,
+		-- (2026-11-07: the rain of fire arrows)
+		[K.Slash] = 20,
 		[K.Seven] = 7,
 		[K.KeypadSeven] = 7,
 		[K.Eight] = 8,

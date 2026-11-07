@@ -39,10 +39,11 @@ UIRules.__index = UIRules
 -- (2026-11-06: the siege weapons: the Watchtower and the Siege Workshop, which fires the era's
 -- bombard, fire and the plague; the weapons' slots show once the player has a workshop: CommandBar)
 UIRules.BUILD_KINDS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university", "sam", "silo" }
-UIRules.NUKE_KINDS = { "atom", "hydrogen", "plague" }
+-- (2026-11-07: and the rain of fire arrows)
+UIRules.NUKE_KINDS = { "atom", "hydrogen", "plague", "firerain" }
 --- Hotkeys 1..9, 0 in this order.
-UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university", "sam", "silo", "atom", "hydrogen", "plague" }
-UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]", "\\", ";", "'", ",", "." }
+UIRules.ACTIONS = { "city", "mine", "market", "port", "factory", "defense", "forge", "warship", "wall", "barracks", "farm", "temple", "palace", "university", "sam", "silo", "atom", "hydrogen", "plague", "firerain" }
+UIRules.HOTKEYS = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "=", "[", "]", "\\", ";", "'", ",", ".", "/" }
 --- The Arsenal's kinds (Data/Arsenal: unlocked with Stars or Robux), in the order of its tray:
 --- structures, munitions launched like a nuke (the last two from their own structure: strikes), and
 --- the Reinforcements call. A locked one is offered in the Arsenal instead of doing anything.
@@ -71,6 +72,7 @@ UIRules.TITLES = {
 	atom = "Atom Bomb",
 	hydrogen = "Hydrogen Bomb",
 	plague = "Plague",
+	firerain = "Fire Arrow Rain",
 	mirv = "MIRV",
 	artillery = "Artillery",
 	airfield = "Airfield",
@@ -103,6 +105,7 @@ UIRules.SHORT = {
 	atom = "Bombard",
 	hydrogen = "Fire",
 	plague = "Plague",
+	firerain = "Arrow Rain",
 	mirv = "MIRV",
 	artillery = "Artillery",
 	airfield = "Airfield",
@@ -134,6 +137,7 @@ UIRules.BLURBS = {
 	atom = "Razes a {atom_r}-tile circle: troops, land and buildings. The land stays scorched for {scorch_s} s. No SAM can stop it; Walls and Fortresses halve the damage. Reloads in {atom_cd} s.",
 	hydrogen = "Fire that spreads over {fire_r} tiles in {fire_s} s, burning land and buildings as it goes. SAMs can shoot it down; Walls and Fortresses halve the damage. Reloads in {fire_cd} s.",
 	plague = "Strikes the nation it lands on: it loses {plague_pct}% of its troops a second for {plague_s} s, raises none for {plague_halt} s, loses {plague_gold}% of its gold at once, and the land the plague spreads over ({plague_land}% of theirs) breaks away as an independent nation, taking its garrison along. Their neighbours may catch it too (yours, if you border them). Nothing stops or eases it. Twice a match at most: its price doubles each time. Reloads in {plague_cd} s.",
+	firerain = "Fire arrows rain on every nation that isn't your ally or teammate, all at once: {rain_n} fires on each (more on the big), half of them on their buildings, burning their land free and their buildings down. Your friends are spared. Nothing stops it. Twice a match at most: its price doubles each time. Reloads in {rain_cd} s.",
 	mirv = "Splits into up to {mirv_n} warheads that rain over one nation.",
 	artillery = "Shells every enemy within {art_r} tiles on its own: their troops, and the structures it reaches.",
 	airfield = "Flies Air Strikes on any spot within {air_r} tiles. Rearms in {air_s} s.",
@@ -238,6 +242,8 @@ function UIRules._blurb(kind: string): string
 		atom_cd = tostring(R.siege_reload(Defs.N_ATOM) // Defs.TICK_RATE),
 		fire_cd = tostring(R.siege_reload(Defs.N_HYDROGEN) // Defs.TICK_RATE),
 		plague_cd = tostring(R.siege_reload(Defs.N_PLAGUE) // Defs.TICK_RATE),
+		rain_cd = tostring(R.siege_reload(Defs.N_FIRERAIN) // Defs.TICK_RATE),
+		rain_n = string.format("%d-%d", R.FIRERAIN_STRIKES_MIN or 3, R.FIRERAIN_STRIKES_MAX or 12),
 		plague_halt = tostring((R.PLAGUE_HALT_TICKS or 0) // Defs.TICK_RATE),
 		plague_land = tostring(math.floor((R.PLAGUE_LAND_SHARE or 0) * 100 + 0.5)),
 		plague_gold = tostring(math.floor((R.PLAGUE_GOLD_LOSS or 0) * 100 + 0.5)),
@@ -323,6 +329,7 @@ function UIRules.is_nuke(kind: string): boolean
 	return kind == "atom"
 		or kind == "hydrogen"
 		or kind == "plague"
+		or kind == "firerain"
 		or kind == "mirv"
 		or kind == "mega"
 		or kind == "scatter"
@@ -717,9 +724,11 @@ function UIRules.availability(self: any, kind: string): { [string]: any }
 				out.locked = true
 				return out
 			end
-			-- (the plague: Rules.PLAGUE_MAX_USES a player a match)
-			if kind == "plague" and s.plague_uses ~= nil and s:plague_uses(o.id) >= (Rules().PLAGUE_MAX_USES or math.huge) then
-				out.reason = string.format("Sent %d times: no more this match", Rules().PLAGUE_MAX_USES)
+			-- (the plague and the rain of fire arrows: Rules.LIMITED_USES a player a match)
+			local nk = Defs.nuke_kind_from_name(kind)
+			local max_uses = if Rules().LIMITED_USES ~= nil then Rules().LIMITED_USES[nk] else nil
+			if max_uses ~= nil and s.siege_uses ~= nil and s:siege_uses(o.id, nk) >= max_uses then
+				out.reason = string.format("Sent %d times: no more this match", max_uses)
 				out.locked = true
 				return out
 			end
@@ -1233,6 +1242,11 @@ function UIRules._placement_exact(self: any, kind: string, tile: number): { [str
 		if UIRules.launcher(kind) == Defs.S_SILO and not UIRules.is_strike(kind) then
 			if kind == "plague" and own == 0 then
 				out.reason = "Aim the plague at a nation"
+				return out
+			end
+			-- (2026-11-07) the rain of fire arrows: at an enemy (it falls on all of them at once)
+			if kind == "firerain" and (own == 0 or s:are_allies(me, own)) then
+				out.reason = "Aim it at an enemy: it falls on all of them"
 				return out
 			end
 			if own ~= 0 and s:same_team(me, own) and s:is_team_game() then

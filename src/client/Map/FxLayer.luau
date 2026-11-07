@@ -457,6 +457,13 @@ function FxLayer.nuke(self: any, kind: number, tile: number, radius: number)
 	local k = tonumber(st and st.map and st.map.k_lin) or Rules.K_LIN
 	-- (Empires Front 2026-11-06) the plague: a green cloud; fire: a flash, its front does the rest
 	-- (FxLayer.blaze); a bombard: a blast its own size
+	-- (2026-11-07) the rain of fire arrows' shot: a flash; its fires fall on their own (Ev.BLAZE)
+	if kind == Defs.N_FIRERAIN then
+		add(self, tile, 0, 14 / k, 0.7, Color3.new(1, 0.55, 0.2), true)
+		local W0 = if st ~= nil then st.map.W or Defs.W else Defs.W
+		self:burst("nuke", tile % W0 + 0.5, tile // W0 + 0.5)
+		return
+	end
 	if kind == Defs.N_PLAGUE then
 		self:plague_cloud(tile, FxLayer.PLAGUE_PUFFS, 6.0)
 		add(self, tile, 0, 10 / k, 0.9, FxLayer.PLAGUE_GREEN, false)

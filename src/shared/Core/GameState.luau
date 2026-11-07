@@ -256,6 +256,8 @@ function GameState.new(world: any?)
 	self.rookies = {} :: { [number]: boolean }
 	--- (Empires Front 2026-11-06) how many times each player sent the plague (its price doubles each time)
 	self.plague_used = {} :: { [number]: number }
+	--- (2026-11-07) and the rain of fire arrows
+	self.firerain_used = {} :: { [number]: number }
 	--- owner id -> the tick its next Reinforcements call is ready (Ev.REINFORCE; absent: now)
 	self.reinforce_ready = {} :: { [number]: number }
 	self.attacks = {} :: { [number]: AttackInfo }
@@ -1026,6 +1028,7 @@ function GameState.load_snapshot(self: GameState, snap: { [string]: any })
 	end
 	for _, row in snap.plague_uses or {} do
 		self.plague_used[tonumber(row[1]) or 0] = tonumber(row[2]) or 0
+		self.firerain_used[tonumber(row[1]) or 0] = tonumber(row[3]) or 0
 	end
 	self.loaded = true
 	self.snapshot_loaded:Fire()
@@ -1396,7 +1399,22 @@ HANDLERS[Ev.ROOKIE] = function(self, e)
 end
 
 HANDLERS[Ev.PLAGUE_USES] = function(self, e)
-	self.plague_used[tonumber(e[2]) or 0] = tonumber(e[3]) or 0
+	local id = tonumber(e[2]) or 0
+	if tonumber(e[4]) == Defs.N_FIRERAIN then
+		self.firerain_used[id] = tonumber(e[3]) or 0
+	else
+		self.plague_used[id] = tonumber(e[3]) or 0
+	end
+end
+
+--- (2026-11-07) How many times `id` fired `kind` this match (the weapons Rules.LIMITED_USES counts).
+function GameState.siege_uses(self: GameState, id: number, kind: number): number
+	if kind == Defs.N_FIRERAIN then
+		return self.firerain_used[id] or 0
+	elseif kind == Defs.N_PLAGUE then
+		return self.plague_used[id] or 0
+	end
+	return 0
 end
 
 --- How many times `id` sent the plague this match (Rules.plague_cost doubles with each).

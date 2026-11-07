@@ -41,6 +41,8 @@ function SiegeArt.sprite_of(kind: number): string?
 		return set.hydrogen
 	elseif kind == Defs.N_PLAGUE then
 		return set.plague
+	elseif kind == Defs.N_FIRERAIN then
+		return set.firerain or set.hydrogen
 	end
 	return nil
 end

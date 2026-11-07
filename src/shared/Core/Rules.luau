@@ -701,7 +701,7 @@ local function build(K_LIN: number, into: any?): any
 		if nk >= 0 then
 			-- (Empires Front 2026-11-06: a siege weapon costs a big empire more, siege_cost)
 			if Defs.SIEGE_KINDS[nk] and state.land_share ~= nil then
-				local uses = if state.plague_uses ~= nil then state:plague_uses(id) else 0
+				local uses = if state.siege_uses ~= nil then state:siege_uses(id, nk) else 0
 				return Rules.siege_cost(kind_name, state:land_share(id), uses)
 			end
 			return Rules.nuke_cost(kind_name, state.mirvs_launched)
@@ -1072,14 +1072,14 @@ local function build(K_LIN: number, into: any?): any
 	--- Atom 750k, hydrogen 5M, MIRV 25M (+15M per MIRV launched in the match; see nuke_cost()).
 	--- (Arsenal: mega 2.5M, scattershot 3.75M; a shell, an air strike and a railgun slug are free —
 	--- their battery, airfield or railgun is the price.)
-	Rules.NUKE_COST = zt({ 750000, 5000000, 25000000, 0, 2500000, 3750000, 0, 0, 0, 1200000 })
+	Rules.NUKE_COST = zt({ 750000, 5000000, 25000000, 0, 2500000, 3750000, 0, 0, 0, 1200000, 6000000 })
 	Rules.MIRV_COST_STEP = 15000000
 	--- nukeMagnitudes (full-size tiles): atom 12/30, hydrogen 80/100, warhead 12/18 (inner / outer).
 	--- (Arsenal: mega = twice an atom bomb's radii, four times its ground; scattershot's own crater is
 	--- an atom bomb's; a shell, an air strike and a slug have one blast disc and take no land.)
 	--- (the plague: no blast; its outer radius is only the target ring)
-	Rules.NUKE_INNER_FULL = f32t({ 12.0, 80.0, 0.0, 12.0, 24.0, 12.0, 0.0, 0.0, 0.0, 0.0 })
-	Rules.NUKE_OUTER_FULL = f32t({ 30.0, 100.0, 0.0, 18.0, 60.0, 30.0, 1.5, 15.0, 5.0, 4.0 })
+	Rules.NUKE_INNER_FULL = f32t({ 12.0, 80.0, 0.0, 12.0, 24.0, 12.0, 0.0, 0.0, 0.0, 0.0, 4.0 })
+	Rules.NUKE_OUTER_FULL = f32t({ 30.0, 100.0, 0.0, 18.0, 60.0, 30.0, 1.5, 15.0, 5.0, 4.0, 9.0 })
 	--- Outer blast radius in our tiles (UI displays trunc(NUKE_RADIUS[kind])).
 	Rules.NUKE_RADIUS = f32t({
 		30.0 / K_LIN,
@@ -1092,19 +1092,21 @@ local function build(K_LIN: number, into: any?): any
 		15.0 / K_LIN,
 		5.0 / K_LIN,
 		4.0 / K_LIN,
+		9.0 / K_LIN,
 	})
 	--- SAMs always hit what they can reach; the MIRV carrier itself can't be intercepted (nor can a
 	--- shell, an air strike or a slug).
 	--- (Empires Front 2026-11-06: a Watchtower stops only the fire (the hydrogen kind); the bombard (the
 	--- atom kind) and the plague can't be stopped, only softened by Walls, Fortresses and Temples.)
-	Rules.NUKE_INTERCEPT_P = f32t({ 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0 })
+	--- (2026-11-07: nor the rain of fire arrows)
+	Rules.NUKE_INTERCEPT_P = f32t({ 0.0, 1.0, 0.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0 })
 	--- defaultSamMissileSpeed 12 full-size tiles/tick (manhattan time to reach); a bomb or warhead can be
 	--- targeted only within defaultNukeTargetableRange (150 full-size tiles) of its target or of its launch point.
 	Rules.SAM_MISSILE_SPEED_FULL = 12.0
 	Rules.NUKE_TARGETABLE_FULL = 150.0
 	--- nukeSpeed (full-size tiles per tick): atom / hydrogen 10, MIRV 15, warhead 22.
 	--- (Arsenal: mega / scattershot 10 like the bombs; shell 6, air strike 8, slug 80.)
-	Rules.NUKE_SPEED_FULL = f32t({ 10.0, 10.0, 15.0, 22.0, 10.0, 10.0, 6.0, 8.0, 80.0, 6.0 })
+	Rules.NUKE_SPEED_FULL = f32t({ 10.0, 10.0, 15.0, 22.0, 10.0, 10.0, 6.0, 8.0, 80.0, 6.0, 12.0 })
 	--- MIRV: 350 warheads within 1500 full-size tiles of the aim, on the target's land.
 	Rules.MIRV_WARHEADS = 350
 	Rules.MIRV_SPREAD = trunc(1500.0 / K_LIN)
@@ -1184,10 +1186,29 @@ local function build(K_LIN: number, into: any?): any
 		return math.floor(Rules.nuke_cost("plague") * Rules.PLAGUE_COST_GROWTH ^ math.max(0, uses or 0))
 	end
 
+	--- (2026-11-07) The rain of fire arrows: when it lands, fire falls on every nation that isn't the
+	--- launcher's ally or teammate (nor a new player): FIRERAIN_STRIKES_MIN..MAX fires each (one more a
+	--- FIRERAIN_TILES_PER of its land), half of them on its buildings, over FIRERAIN_TICKS; each burns
+	--- like a small Fire (nuke radii of N_FIRERAIN, FIRE_BURN_*: the land burns free, the buildings
+	--- burn down) and spares the launcher's friends. At most FIRERAIN_STRIKES_ALL fires in all. Like
+	--- the plague, FIRERAIN_MAX_USES a player a match, its price doubling (FIRERAIN_COST_GROWTH).
+	Rules.FIRERAIN_TICKS = 100
+	Rules.FIRERAIN_STRIKES_MIN = 3
+	Rules.FIRERAIN_STRIKES_MAX = 12
+	Rules.FIRERAIN_TILES_PER = 1500
+	Rules.FIRERAIN_STRIKES_ALL = 220
+	Rules.FIRERAIN_MAX_USES = 2
+	Rules.FIRERAIN_COST_GROWTH = 2
+	function Rules.firerain_cost(uses: number?): number
+		return math.floor(Rules.nuke_cost("firerain") * Rules.FIRERAIN_COST_GROWTH ^ math.max(0, uses or 0))
+	end
+	--- The weapons a player may fire only so often a match: Defs.N_* -> uses allowed.
+	Rules.LIMITED_USES = { [Defs.N_PLAGUE] = Rules.PLAGUE_MAX_USES, [Defs.N_FIRERAIN] = Rules.FIRERAIN_MAX_USES }
+
 	--- (2026-11-06) Each Siege Workshop reloads each weapon on its own: a bombard fired leaves its fire
 	--- and its plague loaded. SIEGE_RELOAD ticks per weapon (index Defs.N_*): the bombard 40 s, fire
 	--- 75 s, the plague 2 minutes. Five workshops fire five of each before any of them waits.
-	Rules.SIEGE_RELOAD = { [Defs.N_ATOM] = 400, [Defs.N_HYDROGEN] = 750, [Defs.N_PLAGUE] = 1200 }
+	Rules.SIEGE_RELOAD = { [Defs.N_ATOM] = 400, [Defs.N_HYDROGEN] = 750, [Defs.N_PLAGUE] = 1200, [Defs.N_FIRERAIN] = 1200 }
 	function Rules.siege_reload(kind: number): number
 		return Rules.SIEGE_RELOAD[kind] or Rules.RELOAD_TICKS[Defs.S_SILO]
 	end
@@ -1230,7 +1251,8 @@ local function build(K_LIN: number, into: any?): any
 	--- the launcher's share of the map), rounded to 1k: x1.25 at 10%, x1.75 at 30%, x2.25 at 50%. Gold
 	--- piled up by a runaway leader pays for its wars; a small nation fires at the base price.
 	Rules.SIEGE_SHARE_COST = 2.5
-	--- (The plague isn't scaled: it doubles with each of the player's `plague_uses`, plague_cost.)
+	--- (The plague and the rain of fire arrows aren't scaled: each doubles with the player's uses of it,
+	--- passed as `plague_uses`: plague_cost / firerain_cost.)
 	function Rules.siege_cost(kind_name: string, share: number?, plague_uses: number?): number
 		local base = Rules.nuke_cost(kind_name)
 		local k = Defs.nuke_kind_from_name(kind_name)
@@ -1239,6 +1261,8 @@ local function build(K_LIN: number, into: any?): any
 		end
 		if k == Defs.N_PLAGUE then
 			return Rules.plague_cost(plague_uses)
+		elseif k == Defs.N_FIRERAIN then
+			return Rules.firerain_cost(plague_uses)
 		end
 		-- (the share in whole percents, so the price shown and the price paid agree while borders move)
 		local pct = math.floor(math.clamp(tonumber(share) or 0, 0, 1) * 100)
@@ -1361,7 +1385,7 @@ local function build(K_LIN: number, into: any?): any
 	-- ---------------------------------------------------------------------------------------------
 	--- Munitions that fly a straight line (a shell, a bomber's run, a railgun slug); the others fly
 	--- the nuke arc (nuke_arc).
-	Rules.NUKE_FLAT = zt({ false, false, false, false, false, false, true, true, true, false })
+	Rules.NUKE_FLAT = zt({ false, false, false, false, false, false, true, true, true, false, false })
 	--- The structure a munition leaves from (Defs.S_*): bombs a silo, an air strike an airfield, a slug
 	--- a railgun. (Shells are fired by the battery itself; warheads come off a MIRV or a scattershot.)
 	Rules.NUKE_LAUNCHER = zt({
@@ -1374,6 +1398,7 @@ local function build(K_LIN: number, into: any?): any
 		Defs.S_ARTILLERY,
 		Defs.S_AIRFIELD,
 		Defs.S_RAILGUN,
+		Defs.S_SILO,
 		Defs.S_SILO,
 	})
 	--- A structure that fires reloads for this long per shot (index Defs.S_*; 0: it doesn't fire).
