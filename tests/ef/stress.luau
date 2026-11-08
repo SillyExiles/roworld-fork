@@ -1,7 +1,9 @@
 -- Empires Front (2026-11-07): an AI match stepped with each step guarded, the way MatchServer does,
 -- and the network encoder run on every delta: prints the first errors (a step error three times in a
 -- row ends a live match: "The match ran into a problem").
--- usage: luau tests/ef/stress.luau -a [map] [minutes] [seed] [difficulty]
+-- usage: luau tests/ef/stress.luau -a [map] [minutes] [seed] [difficulty] [teams]
+-- (2026-11-08: [teams] plays it as a team game; the player also fires salvos (×5, ×50) through the
+-- intent path and levels Defense Posts up past their top)
 task = { spawn = function(f, ...) f(...) end, wait = function() end }
 local WorldMap = require("../../src/shared/Core/WorldMap")
 WorldMap.put_data("rome", require("./rome_raw"))
@@ -16,8 +18,9 @@ local mapid = args[1] or "rome"
 local minutes = tonumber(args[2]) or 20
 local seed = tonumber(args[3]) or 3
 local diff = tonumber(args[4]) or 2
+local teams = tonumber(args[5])
 Era.set(mapid)
-local sim = Sim.new(WorldMap.get(mapid), { seed = seed, difficulty = diff, tribes = 60, max_humans = 0 })
+local sim = Sim.new(WorldMap.get(mapid), { seed = seed, difficulty = diff, tribes = 60, max_humans = 0, teams = teams })
 local gs = GameState.new()
 gs:load_snapshot(Protocol.decode_snapshot(Protocol.encode_snapshot(sim:snapshot())))
 local Defs = require("../../src/shared/Core/Defs")
@@ -38,6 +41,31 @@ local function player_fire()
 		end
 	end
 	for _, w in sim:structs_of(A, Defs.S_SILO) do w.shots = {} end
+	-- salvos through the intent path, the way a client sends them
+	for _, n in { 5, 50 } do
+		for _ = 1, 40 do
+			local t = sim.rng:randi() % sim.N
+			local o = buffer.readi32(sim.owner, t * 4)
+			if o > 0 and o ~= A and not sim:allied(A, o) then
+				sim:_apply_intent(A, { type = "nuke", kind = if n == 5 then "atom" else "hydrogen", tile = t, amount = n })
+				fired["salvo" .. n] = (fired["salvo" .. n] or 0) + 1
+				break
+			end
+		end
+	end
+	-- Defense Posts built and levelled past the top
+	for t = 0, sim.N - 1, 13 do
+		if buffer.readi32(sim.owner, t * 4) == A and sim:valid_site(A, Defs.S_DEFENSE, t) then
+			sim:_apply_intent(A, { type = "build", kind = "defense", tile = t, amount = 1 })
+			break
+		end
+	end
+	for _, p in sim:structs_of(A, Defs.S_DEFENSE) do
+		if p.active then
+			sim:_apply_intent(A, { type = "build", kind = "defense", tile = p.tile, amount = 8 })
+			fired.post_up = (fired.post_up or 0) + 1
+		end
+	end
 	for _, kname in { "atom", "hydrogen", "plague", "firerain" } do
 		for _ = 1, 40 do
 			local t = sim.rng:randi() % sim.N
