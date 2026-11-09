@@ -183,9 +183,7 @@ function SimRevolts.install(C: any)
 		local W = self.W
 		local dx = t % W - cap % W
 		local dy = t // W - cap // W
-		if math.abs(dx) > W / 2 then
-			dx -= if dx > 0 then W else -W
-		end
+		-- (2026-11-08: no wrap: every map is flat, so a province far east is "Eastern")
 		-- (rows grow southwards: north is -y)
 		local a = math.atan2(dy, dx)
 		local k = math.floor((a / (2 * math.pi)) * 8 + 0.5) % 8

@@ -1413,6 +1413,7 @@ function SimNukes.install(C)
 		-- each target's land: tiles found near its buildings, its capital and along its border, a few
 		-- random steps from them (2026-11-07: no pass over the whole map, which took a quarter of a second)
 		local owner = self.owner
+		local land = self.land
 		local W, H = self.W, self.H
 		local sample = {}
 		for _, o in targets do
@@ -1442,21 +1443,32 @@ function SimNukes.install(C)
 			local sm = {}
 			if #centres > 0 then
 				local reach = math.clamp(math.floor(math.sqrt(self.o_tiles[o]) * 0.35), 4, 60)
+				-- (2026-11-08) always on its land: a spot that isn't (the sea, another's land, past the
+				-- map's edge) is tried again nearer, then its centre; none of it: no fire there
 				for _ = 1, want[o] do
 					local c = centres[rng:randi() % #centres + 1]
-					local pick = c
-					for _ = 1, 10 do
-						local x = c % W + rng:randi() % (2 * reach + 1) - reach
-						local y = c // W + rng:randi() % (2 * reach + 1) - reach
+					local pick = -1
+					local r = reach
+					for try = 1, 16 do
+						local x = c % W + rng:randi() % (2 * r + 1) - r
+						local y = c // W + rng:randi() % (2 * r + 1) - r
 						if x >= 0 and x < W and y >= 0 and y < H then
 							local u = y * W + x
-							if readi32(owner, u * 4) == o then
+							if readu8(land, u) == 1 and readi32(owner, u * 4) == o then
 								pick = u
 								break
 							end
 						end
+						if try % 4 == 0 then
+							r = math.max(1, r // 2)
+						end
 					end
-					table.insert(sm, pick)
+					if pick < 0 and readu8(land, c) == 1 and readi32(owner, c * 4) == o then
+						pick = c
+					end
+					if pick >= 0 then
+						table.insert(sm, pick)
+					end
 				end
 			end
 			sample[o] = sm

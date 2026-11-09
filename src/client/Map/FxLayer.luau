@@ -643,14 +643,10 @@ function FxLayer.volley(self: any, rows: { { number } }, shot: number, heard: nu
 			flashed[from] = true
 			add(self, from, 0, FxLayer.VOLLEY_FLASH / k, 0.7, FxLayer.VOLLEY_ORANGE, true)
 		end
+		-- (2026-11-08: every map is flat, no wrap: an arrow shot across more than half the map was
+		-- turned round the edge and fell off it)
 		local u0, v0 = from % W + 0.5, from // W + 0.5
 		local u1, v1 = to % W + 0.5, to // W + 0.5
-		local du = u1 - u0
-		if du > W / 2 then
-			u1 -= W
-		elseif du < -W / 2 then
-			u1 += W
-		end
 		local len = math.sqrt((u1 - u0) ^ 2 + (v1 - v0) ^ 2)
 		-- (the flight: from the shot, as long as the Sim's, a little apart for each arrow of a sheaf)
 		local t1 = t_shot + math.max(0.4, (at - shot) / Defs.TICK_RATE)
@@ -665,7 +661,8 @@ function FxLayer.volley(self: any, rows: { { number } }, shot: number, heard: nu
 				v1 = v1 + ny * off * 0.4,
 				t0 = t_shot + FxLayer.seeded_random(seed) * 0.25,
 				t1 = t1 - FxLayer.seeded_random(seed + 7) * 0.1,
-				h = len * FxLayer.VOLLEY_LIFT,
+				-- (2026-11-08: the arc's top stays on the map: a long shot near its top edge flew off it)
+				h = math.clamp(len * FxLayer.VOLLEY_LIFT, 0, math.max(0, (v0 + v1) * 0.5 - 1)),
 			})
 		end
 	end
