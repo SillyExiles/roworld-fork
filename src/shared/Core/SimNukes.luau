@@ -2014,6 +2014,13 @@ function SimNukes.install(C)
 						break
 					end
 				end
+				-- (2026-11-09) the free nation fell (all its land taken) while the plague still went on:
+				-- it ends here. It kept handing land to the fallen nation, a ghost that held land
+				-- nobody could attack and raised no troops.
+				if self.o_alive[b.rid] ~= 1 then
+					b.keys, b.tiles = {}, {}
+					break
+				end
 				self:set_owner(t, b.rid)
 				table.insert(took, t)
 				b.taken += 1

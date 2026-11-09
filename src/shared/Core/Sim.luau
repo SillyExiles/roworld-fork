@@ -1816,7 +1816,27 @@ function Sim._economy_tick(self: any)
 			end
 		end
 		self._max_share = best
+		-- (2026-11-09) a safety net: an owner out of the match that still holds land (a ghost: no one
+		-- can attack it and it raises no troops; the plague once made them) comes back as an AI nation
+		for id = 1, self.owner_total do
+			if o_alive[id] == 0 and self.o_tiles[id] > 0 and o_kind[id] ~= Defs.KIND_HUMAN then
+				self:_revive_ghost(id)
+			end
+		end
 	end
+end
+
+--- (2026-11-09) Brings back an owner that was out of the match yet holds land (see the economy
+--- tick's safety net): alive, an AI, with half a nation's army for its land; the clients hear it
+--- (OWNER_ADD revives their copy).
+function Sim._revive_ghost(self: any, id: number)
+	self.o_alive[id] = 1
+	self.o_ai[id] = 1
+	self.o_spawned[id] = 1
+	local kind = self.o_kind[id]
+	local cap = self.R.max_troops(kind, self.o_tiles[id], 0, self.difficulty)
+	self.o_troops[id] = math.max(self.o_troops[id], 0.5 * cap)
+	self:ev({ Ev.OWNER_ADD, id, self.o_name[id], self.o_color[id], kind, self.o_team[id] })
 end
 
 function Sim._diplomacy_tick(self: any)
